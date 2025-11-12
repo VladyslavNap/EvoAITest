@@ -1,4 +1,4 @@
-api-version: 2024-02-02-preview
+azdapi-version: 2024-02-02-preview
 location: {{ .Env.AZURE_LOCATION }}
 identity:
   type: UserAssigned
