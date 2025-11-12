@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="EvoAITest.ApiService/EvoAITest.ApiService.csproj" />
+  <Project Path="EvoAITest.AppHost/EvoAITest.AppHost.csproj" />
+  <Project Path="EvoAITest.ServiceDefaults/EvoAITest.ServiceDefaults.csproj" />
+  <Project Path="EvoAITest.Tests/EvoAITest.Tests.csproj" />
+  <Project Path="EvoAITest.Web/EvoAITest.Web.csproj" />
+</Solution>
