@@ -35,6 +35,7 @@ public sealed record BrowserToolDefinition(
 public static class BrowserToolRegistry
 {
     private static readonly Dictionary<string, BrowserToolDefinition> _tools;
+    private static readonly string _cachedToolsJson;
 
     static BrowserToolRegistry()
     {
@@ -184,6 +185,40 @@ public static class BrowserToolRegistry
                 }
             )
         };
+
+        // Cache the serialized JSON to avoid repeated serialization overhead
+        var toolsForLLM = _tools.Values.Select(tool => new
+        {
+            type = "function",
+            function = new
+            {
+                name = tool.Name,
+                description = tool.Description,
+                parameters = new
+                {
+                    type = "object",
+                    properties = tool.Parameters.ToDictionary(
+                        p => p.Key,
+                        p => new
+                        {
+                            type = p.Value.Type,
+                            description = p.Value.Description,
+                            @default = p.Value.DefaultValue
+                        }
+                    ),
+                    required = tool.Parameters
+                        .Where(p => p.Value.Required)
+                        .Select(p => p.Key)
+                        .ToArray()
+                }
+            }
+        });
+
+        _cachedToolsJson = JsonSerializer.Serialize(toolsForLLM, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
     }
 
     /// <summary>
@@ -227,38 +262,7 @@ public static class BrowserToolRegistry
     /// <returns>JSON string representation of all tools.</returns>
     public static string GetToolsAsJson()
     {
-        var toolsForLLM = _tools.Values.Select(tool => new
-        {
-            type = "function",
-            function = new
-            {
-                name = tool.Name,
-                description = tool.Description,
-                parameters = new
-                {
-                    type = "object",
-                    properties = tool.Parameters.ToDictionary(
-                        p => p.Key,
-                        p => new
-                        {
-                            type = p.Value.Type,
-                            description = p.Value.Description,
-                            @default = p.Value.DefaultValue
-                        }
-                    ),
-                    required = tool.Parameters
-                        .Where(p => p.Value.Required)
-                        .Select(p => p.Key)
-                        .ToArray()
-                }
-            }
-        });
-
-        return JsonSerializer.Serialize(toolsForLLM, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
+        return _cachedToolsJson;
     }
 
     /// <summary>
