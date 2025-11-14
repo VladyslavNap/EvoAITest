@@ -836,7 +836,6 @@ public class AzureOpenAIConfigurationIntegrationTests
         };
 
         // Act - Simulate logging or ToString() scenarios
-        var mockLogger = new Mock<ILogger<EvoAITestCoreOptions>>();
         var logMessage = $"Options configured: Provider={options.LLMProvider}, Model={options.LLMModel}";
 
         // Assert - Ensure API key is NOT in the log message
