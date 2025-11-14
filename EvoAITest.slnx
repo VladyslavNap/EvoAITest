@@ -1,6 +1,9 @@
 <Solution>
+  <Project Path="EvoAITest.Agents/EvoAITest.Agents.csproj" />
   <Project Path="EvoAITest.ApiService/EvoAITest.ApiService.csproj" />
   <Project Path="EvoAITest.AppHost/EvoAITest.AppHost.csproj" />
+  <Project Path="EvoAITest.Core/EvoAITest.Core.csproj" Id="5ee2934f-38f5-4e98-ae0b-8d7eb6eaec50" />
+  <Project Path="EvoAITest.LLM/EvoAITest.LLM.csproj" />
   <Project Path="EvoAITest.ServiceDefaults/EvoAITest.ServiceDefaults.csproj" />
   <Project Path="EvoAITest.Tests/EvoAITest.Tests.csproj" />
   <Project Path="EvoAITest.Web/EvoAITest.Web.csproj" />
