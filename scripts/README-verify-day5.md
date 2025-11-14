@@ -58,7 +58,7 @@ pwsh ./scripts/verify-day5.ps1
 ### ? Azure OpenAI Setup
 - AZURE_OPENAI_ENDPOINT environment variable
 - Endpoint URL format validation
-- Expected endpoint: `https://twazncopenai2.cognitiveservices.azure.com`
+- Expected endpoint: `https://youropenai.cognitiveservices.azure.com`
 - Warning if API key in environment (should use Key Vault)
 
 ### ? Ollama (Local Development)
@@ -191,10 +191,10 @@ az keyvault secret set \
 **Fix:**
 ```powershell
 # PowerShell (Windows)
-$env:AZURE_OPENAI_ENDPOINT = "https://twazncopenai2.cognitiveservices.azure.com"
+$env:AZURE_OPENAI_ENDPOINT = "https://youropenai.cognitiveservices.azure.com"
 
 # Bash (Linux/macOS)
-export AZURE_OPENAI_ENDPOINT="https://twazncopenai2.cognitiveservices.azure.com"
+export AZURE_OPENAI_ENDPOINT="https://youropenai.cognitiveservices.azure.com"
 
 # Persistent (add to your profile or .env file)
 ```
@@ -247,11 +247,11 @@ dotnet test --filter "FullyQualifiedName~EvoAITestCoreOptionsTests"
 ```powershell
 # PowerShell
 $env:EVOAITEST__CORE__LLMPROVIDER = "AzureOpenAI"
-$env:AZURE_OPENAI_ENDPOINT = "https://twazncopenai2.cognitiveservices.azure.com"
+$env:AZURE_OPENAI_ENDPOINT = "https://youropenai.cognitiveservices.azure.com"
 
 # Bash
 export EVOAITEST__CORE__LLMPROVIDER="AzureOpenAI"
-export AZURE_OPENAI_ENDPOINT="https://twazncopenai2.cognitiveservices.azure.com"
+export AZURE_OPENAI_ENDPOINT="https://youropenai.cognitiveservices.azure.com"
 ```
 
 ### Development (Ollama)

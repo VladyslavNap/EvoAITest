@@ -96,7 +96,7 @@ public sealed class EvoAITestCoreOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Example: "https://twazncopenai2.cognitiveservices.azure.com"
+    /// Example: "https://youropenai.cognitiveservices.azure.com"
     /// </para>
     /// <para>
     /// This should be set via the AZURE_OPENAI_ENDPOINT environment variable for security.
@@ -431,7 +431,7 @@ public sealed class EvoAITestCoreOptions
                     throw new InvalidOperationException(
                         "Azure OpenAI endpoint is required when LLMProvider is 'AzureOpenAI'. " +
                         "Set the AZURE_OPENAI_ENDPOINT environment variable. " +
-                        "Example: AZURE_OPENAI_ENDPOINT=https://twazncopenai2.cognitiveservices.azure.com");
+                        "Example: AZURE_OPENAI_ENDPOINT=https://youropenai.cognitiveservices.azure.com");
                 }
 
                 if (string.IsNullOrWhiteSpace(AzureOpenAIApiKey))

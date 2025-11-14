@@ -100,13 +100,13 @@ They come from environment variables and Key Vault.
 
 ```bash
 # Azure OpenAI Configuration
-export AZURE_OPENAI_ENDPOINT="https://twazncopenai2.cognitiveservices.azure.com"
+export AZURE_OPENAI_ENDPOINT="https://youropenai.cognitiveservices.azure.com"
 export AZURE_OPENAI_API_KEY="sk-..." # OR use Key Vault (recommended)
 
 # Aspire Configuration Format (double underscore)
 export EVOAITEST__CORE__LLMPROVIDER="AzureOpenAI"
 export EVOAITEST__CORE__LLMMODEL="gpt-5"
-export EVOAITEST__CORE__AZUREOPENAIENDPOINT="https://twazncopenai2.cognitiveservices.azure.com"
+export EVOAITEST__CORE__AZUREOPENAIENDPOINT="https://youropenai.cognitiveservices.azure.com"
 export EVOAITEST__CORE__AZUREOPENAIAPIVERSIONINFO="2025-01-01-preview"
 export EVOAITEST__CORE__BROWSERTIMEOUTMS="60000"
 export EVOAITEST__CORE__HEADLESSMODE="true"
@@ -131,7 +131,7 @@ export EVOAITEST__CORE__HEADLESSMODE="false"
 # Set in Azure Container Apps configuration
 EVOAITEST__CORE__LLMPROVIDER=AzureOpenAI
 EVOAITEST__CORE__LLMMODEL=gpt-5
-EVOAITEST__CORE__AZUREOPENAIENDPOINT=https://twazncopenai2.cognitiveservices.azure.com
+EVOAITEST__CORE__AZUREOPENAIENDPOINT=https://youropenai.cognitiveservices.azure.com
 EVOAITEST__CORE__AZUREOPENAIAPIVERSIONINFO=2025-01-01-preview
 EVOAITEST__CORE__BROWSERTIMEOUTMS=60000
 EVOAITEST__CORE__HEADLESSMODE=true
@@ -264,7 +264,7 @@ app.Run();
 dotnet user-secrets init --project EvoAITest.ApiService
 
 # Set Azure OpenAI secrets
-dotnet user-secrets set "EvoAITest:Core:AzureOpenAIEndpoint" "https://twazncopenai2.cognitiveservices.azure.com" --project EvoAITest.ApiService
+dotnet user-secrets set "EvoAITest:Core:AzureOpenAIEndpoint" "https://youropenai.cognitiveservices.azure.com" --project EvoAITest.ApiService
 dotnet user-secrets set "EvoAITest:Core:AzureOpenAIApiKey" "YOUR_API_KEY_HERE" --project EvoAITest.ApiService
 
 # Verify secrets
@@ -353,7 +353,7 @@ The `ValidateConfiguration()` method checks:
 ```
 Azure OpenAI endpoint is required when LLMProvider is 'AzureOpenAI'. 
 Set the AZURE_OPENAI_ENDPOINT environment variable. 
-Example: AZURE_OPENAI_ENDPOINT=https://twazncopenai2.cognitiveservices.azure.com
+Example: AZURE_OPENAI_ENDPOINT=https://youropenai.cognitiveservices.azure.com
 
 Azure OpenAI API key is required when LLMProvider is 'AzureOpenAI'. 
 Configure Key Vault secret 'LLMAPIKEY' and use DefaultAzureCredential() for authentication. 
@@ -604,7 +604,7 @@ properties:
           - name: EVOAITEST__CORE__LLMPROVIDER
             value: "AzureOpenAI"
           - name: EVOAITEST__CORE__AZUREOPENAIENDPOINT
-            value: "https://twazncopenai2.cognitiveservices.azure.com"
+            value: "https://youropenai.cognitiveservices.azure.com"
           - name: EVOAITEST__CORE__AZUREOPENAIAPIKEYIDENTITY
             secretRef: llmapikey
           - name: EVOAITEST__CORE__BROWSERTIMEOUTMS
@@ -623,7 +623,7 @@ properties:
 **Problem:** "Azure OpenAI endpoint is required"
 ```bash
 # Solution: Set environment variable
-export AZURE_OPENAI_ENDPOINT="https://twazncopenai2.cognitiveservices.azure.com"
+export AZURE_OPENAI_ENDPOINT="https://youropenai.cognitiveservices.azure.com"
 ```
 
 **Problem:** "Azure OpenAI API key is required"

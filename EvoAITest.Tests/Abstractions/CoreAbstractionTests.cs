@@ -462,7 +462,7 @@ public class EvoAITestCoreOptionsTests
         var options = new EvoAITestCoreOptions
         {
             LLMProvider = "AzureOpenAI",
-            AzureOpenAIEndpoint = "https://twazncopenai2.cognitiveservices.azure.com",
+            AzureOpenAIEndpoint = "https://youropenai.cognitiveservices.azure.com",
             AzureOpenAIApiKey = "", // Missing API key
             AzureOpenAIDeployment = "gpt-5"
         };
@@ -483,7 +483,7 @@ public class EvoAITestCoreOptionsTests
         var options = new EvoAITestCoreOptions
         {
             LLMProvider = "AzureOpenAI",
-            AzureOpenAIEndpoint = "https://twazncopenai2.cognitiveservices.azure.com",
+            AzureOpenAIEndpoint = "https://youropenai.cognitiveservices.azure.com",
             AzureOpenAIApiKey = "test-key",
             AzureOpenAIDeployment = "" // Missing deployment
         };
@@ -580,7 +580,7 @@ public class EvoAITestCoreOptionsTests
         var options = new EvoAITestCoreOptions
         {
             LLMProvider = "AzureOpenAI",
-            AzureOpenAIEndpoint = "https://twazncopenai2.cognitiveservices.azure.com",
+            AzureOpenAIEndpoint = "https://youropenai.cognitiveservices.azure.com",
             AzureOpenAIApiKey = "test-api-key-12345",
             AzureOpenAIDeployment = "gpt-5",
             AzureOpenAIApiVersion = "2025-01-01-preview"
@@ -751,7 +751,7 @@ public class AzureOpenAIConfigurationIntegrationTests
         {
             ["EvoAITest:Core:LLMProvider"] = "AzureOpenAI",
             ["EvoAITest:Core:LLMModel"] = "gpt-5",
-            ["EvoAITest:Core:AzureOpenAIEndpoint"] = "https://twazncopenai2.cognitiveservices.azure.com",
+            ["EvoAITest:Core:AzureOpenAIEndpoint"] = "https://youropenai.cognitiveservices.azure.com",
             ["EvoAITest:Core:AzureOpenAIApiKey"] = "test-key-from-keyvault",
             ["EvoAITest:Core:AzureOpenAIDeployment"] = "gpt-5",
             ["EvoAITest:Core:AzureOpenAIApiVersion"] = "2025-01-01-preview"
@@ -768,7 +768,7 @@ public class AzureOpenAIConfigurationIntegrationTests
         // Assert
         options.LLMProvider.Should().Be("AzureOpenAI");
         options.LLMModel.Should().Be("gpt-5");
-        options.AzureOpenAIEndpoint.Should().Be("https://twazncopenai2.cognitiveservices.azure.com");
+        options.AzureOpenAIEndpoint.Should().Be("https://youropenai.cognitiveservices.azure.com");
         options.AzureOpenAIApiKey.Should().Be("test-key-from-keyvault");
         options.AzureOpenAIDeployment.Should().Be("gpt-5");
         options.AzureOpenAIApiVersion.Should().Be("2025-01-01-preview");
@@ -808,7 +808,7 @@ public class AzureOpenAIConfigurationIntegrationTests
         var configData = new Dictionary<string, string?>
         {
             ["EVOAITEST__CORE__LLMPROVIDER"] = "AzureOpenAI",
-            ["EVOAITEST__CORE__AZUREOPENAIENDPOINT"] = "https://twazncopenai2.cognitiveservices.azure.com",
+            ["EVOAITEST__CORE__AZUREOPENAIENDPOINT"] = "https://youropenai.cognitiveservices.azure.com",
             ["EVOAITEST__CORE__BROWSERTIMEOUTMS"] = "60000"
         };
 
@@ -822,7 +822,7 @@ public class AzureOpenAIConfigurationIntegrationTests
 
         // Assert
         options.LLMProvider.Should().Be("AzureOpenAI");
-        options.AzureOpenAIEndpoint.Should().Be("https://twazncopenai2.cognitiveservices.azure.com");
+        options.AzureOpenAIEndpoint.Should().Be("https://youropenai.cognitiveservices.azure.com");
         options.BrowserTimeoutMs.Should().Be(60000);
     }
 
@@ -877,7 +877,7 @@ public class AzureOpenAIConfigurationIntegrationTests
 public class ProviderSpecificValidationTests
 {
     [Theory]
-    [InlineData("https://twazncopenai2.cognitiveservices.azure.com", true)]
+    [InlineData("https://youropenai.cognitiveservices.azure.com", true)]
     [InlineData("https://myresource.openai.azure.com", true)]
     [InlineData("https://eastus.api.cognitive.microsoft.com/openai", true)]
     [InlineData("http://localhost:11434", false)] // HTTP not HTTPS

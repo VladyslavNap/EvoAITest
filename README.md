@@ -121,13 +121,13 @@ az keyvault secret set \
 #### 3. Configure Environment Variables
 ```powershell
 # PowerShell (Windows)
-$env:AZURE_OPENAI_ENDPOINT = "https://twazncopenai2.cognitiveservices.azure.com"
+$env:AZURE_OPENAI_ENDPOINT = "https://youropenai.cognitiveservices.azure.com"
 $env:EVOAITEST__CORE__LLMPROVIDER = "AzureOpenAI"
 ```
 
 ```bash
 # Bash (Linux/macOS)
-export AZURE_OPENAI_ENDPOINT="https://twazncopenai2.cognitiveservices.azure.com"
+export AZURE_OPENAI_ENDPOINT="https://youropenai.cognitiveservices.azure.com"
 export EVOAITEST__CORE__LLMPROVIDER="AzureOpenAI"
 ```
 
@@ -333,7 +333,7 @@ az containerapp update \
   --resource-group evoaitest-rg \
   --set-env-vars \
     EVOAITEST__CORE__LLMPROVIDER=AzureOpenAI \
-    AZURE_OPENAI_ENDPOINT=https://twazncopenai2.cognitiveservices.azure.com
+    AZURE_OPENAI_ENDPOINT=https://youropenai.cognitiveservices.azure.com
 ```
 
 ## Observability
@@ -384,7 +384,7 @@ meter.CreateHistogram<decimal>("evoaitest.llm.cost");
 
 #### 1. Azure OpenAI endpoint not set
 ```powershell
-$env:AZURE_OPENAI_ENDPOINT = "https://twazncopenai2.cognitiveservices.azure.com"
+$env:AZURE_OPENAI_ENDPOINT = "https://youropenai.cognitiveservices.azure.com"
 ```
 
 #### 2. Key Vault access denied

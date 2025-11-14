@@ -171,7 +171,7 @@ if (-not $SkipAzure) {
     Write-SectionHeader "Validating Azure OpenAI Configuration"
 
     $azureOpenAIEndpoint = $env:AZURE_OPENAI_ENDPOINT
-    $expectedEndpoint = "https://twazncopenai2.cognitiveservices.azure.com"
+    $expectedEndpoint = "https://youropenai.cognitiveservices.azure.com"
 
     if ($azureOpenAIEndpoint) {
         Write-Success "Environment Variable: AZURE_OPENAI_ENDPOINT is set"
