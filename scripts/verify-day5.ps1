@@ -359,7 +359,7 @@ Write-SectionHeader "Scanning for Hardcoded Secrets"
 
 $secretPatterns = @(
     @{ Pattern = "sk-[a-zA-Z0-9]{32,}"; Name = "OpenAI API Key" },
-    @{ Pattern = "[a-f0-9]{32}"; Name = "Azure Key (Hex)" },
+    @{ Pattern = "(key|apikey|api-key|subscription-key)\s*[:=]\s*['""]?[a-f0-9]{64,}['""]?"; Name = "Azure Key (Hex)" },
     @{ Pattern = "DefaultEndpointsProtocol=.*AccountKey=[^;]+"; Name = "Azure Storage Connection String" },
     @{ Pattern = "Password\s*=\s*['""][^'""]+['""]"; Name = "SQL Password" }
 )
