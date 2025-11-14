@@ -3,6 +3,8 @@
 ## Overview
 Comprehensive configuration system supporting multiple LLM providers with Azure Key Vault integration for production deployments.
 
+For milestone context and the full documentation map see [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) and [README.md](README.md). This guide focuses solely on configuration scenarios to avoid duplicating narrative content.
+
 ## Supported LLM Providers
 
 ### 1. Azure OpenAI (Production) ??

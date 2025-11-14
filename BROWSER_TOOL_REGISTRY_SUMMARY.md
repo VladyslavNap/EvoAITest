@@ -3,6 +3,8 @@
 ## Overview
 Created a comprehensive static registry of browser automation tools with full parameter definitions. This registry provides a centralized source of truth for all browser automation capabilities that can be used by LLMs.
 
+For usage snippets see [QUICK_REFERENCE.md](QUICK_REFERENCE.md); this document stays focused on the canonical tool metadata.
+
 ## File Created
 **Location:** `EvoAITest.Core\Models\BrowserToolRegistry.cs`
 

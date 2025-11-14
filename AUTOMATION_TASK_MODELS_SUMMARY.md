@@ -3,6 +3,8 @@
 ## Overview
 Created comprehensive models for representing automation tasks and their execution results in the BrowserAI framework. These models are designed for persistence with Entity Framework Core and full observability with OpenTelemetry/Aspire.
 
+Consult [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) for milestone context and [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for day-to-day usage examples; this document concentrates on model structure.
+
 ## File Created
 **Location:** `EvoAITest.Core\Models\AutomationTask.cs`
 

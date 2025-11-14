@@ -40,25 +40,25 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
               ?
     ????????????????????????????????????????????????????????
     ?              EvoAITest.Core                           ?
-    ?  • Browser Automation (Playwright)                   ?
-    ?  • Tool Registry (13 tools)                          ?
-    ?  • Configuration (Azure OpenAI + Ollama)             ?
+    ?  Â• Browser Automation (Playwright)                   ?
+    ?  Â• Tool Registry (13 tools)                          ?
+    ?  Â• Configuration (Azure OpenAI + Ollama)             ?
     ????????????????????????????????????????????????????????
               ?
               ?
     ????????????????????????????????????????????????????????
     ?              EvoAITest.LLM                            ?
-    ?  • ILLMProvider abstraction                          ?
-    ?  • Azure OpenAI implementation                       ?
-    ?  • Ollama implementation                             ?
+    ?  Â• ILLMProvider abstraction                          ?
+    ?  Â• Azure OpenAI implementation                       ?
+    ?  Â• Ollama implementation                             ?
     ????????????????????????????????????????????????????????
               ?
               ?
     ????????????????????????????????????????????????????????
     ?              EvoAITest.Agents                         ?
-    ?  • Task planning                                      ?
-    ?  • Execution orchestration                           ?
-    ?  • Tool invocation                                   ?
+    ?  Â• Task planning                                      ?
+    ?  Â• Execution orchestration                           ?
+    ?  Â• Tool invocation                                   ?
     ????????????????????????????????????????????????????????
 ```
 
@@ -418,19 +418,18 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 
 ## Documentation
 
-### Core Documentation
-- [Configuration Guide](EVOAITEST_CORE_CONFIGURATION_GUIDE.md) - Azure OpenAI, Ollama, Key Vault setup
-- [Service Configuration](EVOAITEST_CORE_SERVICE_CONFIG_SUMMARY.md) - Aspire integration
-- [Browser Tool Registry](BROWSER_TOOL_REGISTRY_SUMMARY.md) - 13 automation tools
-- [Automation Models](AUTOMATION_TASK_MODELS_SUMMARY.md) - Task and result models
-
-### Testing Documentation
-- [Unit Tests Summary](EVOAITEST_CORE_UNIT_TESTS_SUMMARY.md) - 48+ tests, all mocked
-- [Verification Script Guide](scripts/README-verify-day5.md) - Day 5 validation
-
-### Architecture Documentation
-- [ILLMProvider Update](ILLMPROVIDER_UPDATE_SUMMARY.md) - LLM abstraction
-- [Verification Script Summary](VERIFY_DAY5_SCRIPT_SUMMARY.md) - Script features
+- [Day 5 Implementation Summary](IMPLEMENTATION_SUMMARY.md) - milestone highlights and doc map.
+- [Day 5 Checklist](DAY5_CHECKLIST.md) - canonical list of delivered artefacts.
+- [Phase 1 & 2 Action Plan](Phase1-Phase2_DetailedActions.md) - sequencing for upcoming work.
+- [Quick Reference](QUICK_REFERENCE.md) - API and type cheatsheet.
+- [Configuration Guide](EVOAITEST_CORE_CONFIGURATION_GUIDE.md) - Azure OpenAI, Ollama, and Key Vault setup.
+- [Service Configuration Summary](EVOAITEST_CORE_SERVICE_CONFIG_SUMMARY.md) - DI helpers and Aspire integration notes.
+- [Browser Tool Registry](BROWSER_TOOL_REGISTRY_SUMMARY.md) - 13 automation tools with parameter metadata.
+- [Automation Models](AUTOMATION_TASK_MODELS_SUMMARY.md) - task and persistence models.
+- [Unit Test Summary](EVOAITEST_CORE_UNIT_TESTS_SUMMARY.md) - suite structure and coverage pointers.
+- [Verification Script Guide](scripts/README-verify-day5.md) - how to run verify-day5.ps1.
+- [Verification Script Summary](VERIFY_DAY5_SCRIPT_SUMMARY.md) - shorthand for the checks performed.
+- [ILLMProvider Update](ILLMPROVIDER_UPDATE_SUMMARY.md) - LLM abstraction changes.
 
 ## Technology Stack
 
