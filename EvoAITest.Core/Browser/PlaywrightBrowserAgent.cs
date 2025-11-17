@@ -402,6 +402,8 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
         }
         catch (Exception ex)
         {
+            if (ex is OperationCanceledException)
+                throw;
             _logger.LogWarning(ex, "Failed to extract accessibility tree");
             return string.Empty;
         }
