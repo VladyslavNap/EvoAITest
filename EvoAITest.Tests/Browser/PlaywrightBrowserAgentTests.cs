@@ -369,7 +369,6 @@ public class PlaywrightBrowserAgentTests : IAsyncLifetime
         await act.Should().NotThrowAsync();
 
         // Verify the text was typed
-        var inputValue = await _agent.GetTextAsync("#test-input");
         // Note: GetTextAsync might not work for input values, but we're testing the TypeAsync doesn't throw
     }
 
