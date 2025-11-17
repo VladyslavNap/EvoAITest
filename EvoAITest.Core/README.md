@@ -137,6 +137,41 @@ Console.WriteLine($"Interactive elements: {state.InteractiveElements.Count}");
 Console.WriteLine($"Console errors: {state.ConsoleMessages.Count(m => m.Type == ConsoleMessageType.Error)}");
 ```
 
+## Playwright Browser Agent
+
+Day 6 introduced a production-ready implementation of `IBrowserAgent` powered by Playwright 1.48.0.
+
+- **File**: `EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs`
+- **Capabilities**: headless Chromium launch, resilient navigation (retry-on-fail), accessibility tree capture, interactive element harvesting, HTML snapshot, and base64 screenshots.
+- **DI Registration**: `AddEvoAITestCore` now registers `IBrowserAgent` → `PlaywrightBrowserAgent`, so any consumer resolving `IBrowserAgent` receives the Playwright-backed instance automatically.
+
+### Usage
+
+```csharp
+// In Program.cs
+builder.Services.AddEvoAITestCore(builder.Configuration);
+
+// In a component/service
+public class BrowserAutomationService
+{
+    private readonly IBrowserAgent _browser;
+
+    public BrowserAutomationService(IBrowserAgent browser)
+    {
+        _browser = browser;
+    }
+
+    public async Task<PageState> CaptureAsync(string url)
+    {
+        await _browser.InitializeAsync();
+        await _browser.NavigateAsync(url);
+        var state = await _browser.GetPageStateAsync();
+        await _browser.DisposeAsync();
+        return state;
+    }
+}
+```
+
 ## Features
 
 - ? Browser-agnostic design

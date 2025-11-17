@@ -3,8 +3,8 @@
 The service extensions focus on wiring EvoAITest.Core into an Aspire-friendly host without repeating the guidance from the configuration guide. Use this note as a quick pointer and fall back to [EVOAITEST_CORE_CONFIGURATION_GUIDE.md](EVOAITEST_CORE_CONFIGURATION_GUIDE.md) for environment-specific values or validation messages.
 
 ## Key Extension Methods
-- `AddEvoAITestCore(configuration)` binds the `EvoAITest:Core` section, registers `IBrowserToolRegistry`, and adds the project's OpenTelemetry meter/activity source.
-- `AddBrowserAgent<TAgent>()` (helper) keeps browser agents scoped and reusable.
+- `AddEvoAITestCore(configuration)` binds the `EvoAITest:Core` section, registers `IBrowserToolRegistry`, wires the default `PlaywrightBrowserAgent`, and adds the project's OpenTelemetry meter/activity source.
+- `AddBrowserAgent<TAgent>()` (helper) keeps browser agents scoped and reusable if you need to override the default Playwright implementation.
 
 The full source lives in `EvoAITest.Core/Extensions/ServiceCollectionExtensions.cs`.
 
