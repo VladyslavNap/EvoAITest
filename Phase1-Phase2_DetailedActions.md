@@ -9,7 +9,7 @@
 - [Automation Models Primer](AUTOMATION_TASK_MODELS_SUMMARY.md) – data models, enums, and persistence notes.
 
 ## ✅ Days 1–6 Snapshot
-Day 5 artefacts still capture the foundation. Day 6 delivered the concrete Playwright browser agent (`EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs`), DI wiring, and regression tests (`EvoAITest.Tests/Browser/PlaywrightBrowserAgentTests.cs`). Keep the README “Latest Update (Day 6)” section handy when referencing the new automation surface.
+Day 5 artifacts still capture the foundation. Day 6 delivered the concrete Playwright browser agent (`EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs`), DI wiring, and regression tests (`EvoAITest.Tests/Browser/PlaywrightBrowserAgentTests.cs`). Keep the README “Latest Update (Day 6)” section handy when referencing the new automation surface.
 
 ---
 
