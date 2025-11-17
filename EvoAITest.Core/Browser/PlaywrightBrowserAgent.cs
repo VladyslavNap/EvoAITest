@@ -570,6 +570,8 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
         }
         catch (Exception ex)
         {
+            if (ex is OutOfMemoryException || ex is StackOverflowException || ex is ThreadAbortException)
+                throw;
             _logger.LogWarning(ex, "Failed to close Playwright {Resource}", resourceName);
         }
     }
