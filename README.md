@@ -27,7 +27,7 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
 ### Latest Update (Day 6)
-- `EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs` ships as the default `IBrowserAgent`, handling navigation, interaction, accessibility snapshots, and screenshots through Playwright 1.48.0.
+- `EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs` ships as the default `IBrowserAgent`, handling navigation, interaction, accessibility snapshots, and screenshots through Playwright 1.56.0.
 - `EvoAITest.Core/Extensions/ServiceCollectionExtensions.cs` now wires the Playwright agent into DI via `AddEvoAITestCore`, so consuming services get it automatically.
 - `EvoAITest.Tests/Browser/PlaywrightBrowserAgentTests.cs` covers initialization, navigation, state capture, and screenshot flows to keep the browser automation surface green.
 
