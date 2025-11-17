@@ -1,6 +1,6 @@
 # EvoAITest - Phase 1 & Phase 2 Action Plan
 
-> **Project Status**: Day 5 milestone is complete. Use the [Day 5 Implementation Checklist](DAY5_CHECKLIST.md) for the canonical inventory of artifacts and the [Day 5 Implementation Summary](IMPLEMENTATION_SUMMARY.md) for the narrative wrap‑up.
+> **Project Status**: Day 6 Playwright browser agent landed (code, DI, tests). Keep the [Day 5 Implementation Checklist](DAY5_CHECKLIST.md) plus the [Implementation Summary](IMPLEMENTATION_SUMMARY.md) for baseline context and use this roadmap for Day 7+ execution.
 
 ## How to Navigate the Docs
 - [README](README.md) – high-level overview, architecture, and environment setup.
@@ -8,8 +8,8 @@
 - [Browser Tool Registry Deep Dive](BROWSER_TOOL_REGISTRY_SUMMARY.md) – complete contract for the 13 tools.
 - [Automation Models Primer](AUTOMATION_TASK_MODELS_SUMMARY.md) – data models, enums, and persistence notes.
 
-## ✅ Days 1–5 Snapshot
-Completed work through Day 5 lives in the checklist and summary docs linked above. Refer back to them when you need specifics about the baseline environment, configuration, or tests.
+## ✅ Days 1–6 Snapshot
+Day 5 artifacts still capture the foundation. Day 6 delivered the concrete Playwright browser agent (`EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs`), DI wiring, and regression tests (`EvoAITest.Tests/Browser/PlaywrightBrowserAgentTests.cs`). Keep the README “Latest Update (Day 6)” section handy when referencing the new automation surface.
 
 ---
 
@@ -265,6 +265,8 @@ public class PlaywrightBrowserAgentTests
 ```
 feat: implement Playwright browser agent with page state extraction
 ```
+
+**Status**: ✅ Complete — PlaywrightBrowserAgent now powers default browser automation (DI + unit tests).
 
 ---
 
@@ -557,7 +559,7 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 ## 📝 SUMMARY OF REMAINING WORK
 
 ### Phase 1 Remaining (Days 6-21)
-- [ ] Day 6: Playwright browser implementation
+- [x] Day 6: Playwright browser implementation
 - [ ] Day 7: LLM provider implementations
 - [ ] Day 8: Tool executor service
 - [ ] Day 9: Planner agent (natural language → execution plan)
@@ -583,14 +585,14 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 
 ---
 
-## 🎯 IMMEDIATE NEXT STEPS (Day 6)
+## 🎯 IMMEDIATE NEXT STEPS (Day 7)
 
-1. **Install Playwright**: `dotnet add package Microsoft.Playwright`
-2. **Implement PlaywrightBrowserAgent**: Complete the browser wrapper
-3. **Write unit tests**: Test navigation, clicks, text extraction
-4. **Update DI configuration**: Register browser agent
-5. **Run verification**: Ensure tests pass
-6. **Commit**: `feat: implement Playwright browser agent`
+1. **Install Azure OpenAI SDK**: `dotnet add package Azure.AI.OpenAI --version 2.1.0`
+2. **Implement AzureOpenAIProvider**: Complete prompt substitution, cost tracking, and availability checks
+3. **Implement OllamaProvider**: Add HTTP client powered local provider with streaming support
+4. **Register providers in DI**: Update `EvoAITest.LLM` extensions + options binding
+5. **Add unit tests**: Cover prompt templating, tool parsing, and availability probes
+6. **Commit**: `feat: add Azure OpenAI + Ollama providers`
 
 ---
 
@@ -603,7 +605,7 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 | Core Models | ✅ Complete | ✅ | ✅ |
 | Tool Registry | ✅ Complete | ✅ | ✅ |
 | Configuration | ✅ Complete | ✅ | ✅ |
-| **Playwright Agent** | 🚧 **Next** | ⏳ | ⏳ |
+| **Playwright Agent** | ✅ Complete | ✅ | ✅ |
 | LLM Providers | ⏳ Pending | ⏳ | ⏳ |
 | Planner Agent | ⏳ Pending | ⏳ | ⏳ |
 | Executor Agent | ⏳ Pending | ⏳ | ⏳ |
@@ -613,6 +615,6 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 
 ---
 
-**Current Status**: ✅ Day 5 Complete | 🚧 Day 6 Starting  
-**Next Milestone**: Playwright Browser Agent Implementation  
+**Current Status**: ✅ Day 6 Complete | 🚧 Day 7 Starting  
+**Next Milestone**: LLM Provider Implementations  
 **Target**: Complete Phase 1 (21 days) by end of month

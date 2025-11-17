@@ -1,4 +1,5 @@
 using EvoAITest.Core.Abstractions;
+using EvoAITest.Core.Browser;
 using EvoAITest.Core.Options;
 using EvoAITest.Core.Services;
 using Microsoft.Extensions.Configuration;
@@ -49,9 +50,8 @@ public static class ServiceCollectionExtensions
             configuration.GetSection("EvoAITest:Core"));
 
         // 2. Register core services
-        // Note: IBrowserAgent implementation (PlaywrightBrowserAgent) should be registered
-        // by the consuming application based on their browser automation provider choice
-        // services.AddScoped<IBrowserAgent, PlaywrightBrowserAgent>();
+        // Register Playwright browser agent implementation
+        services.AddScoped<IBrowserAgent, PlaywrightBrowserAgent>();
 
         // Register browser tool registry
         services.TryAddSingleton<IBrowserToolRegistry, DefaultBrowserToolRegistry>();
