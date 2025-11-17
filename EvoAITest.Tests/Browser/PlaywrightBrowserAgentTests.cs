@@ -520,9 +520,9 @@ public class PlaywrightBrowserAgentTests : IAsyncLifetime
         pageState.Metadata.Should().BeOfType<Dictionary<string, object>>();
         
         // Accessibility tree should be in metadata if available
-        if (pageState.Metadata.ContainsKey("accessibilityTree"))
+        if (pageState.Metadata.TryGetValue("accessibilityTree", out var accessibilityTree))
         {
-            pageState.Metadata["accessibilityTree"].Should().NotBeNull();
+            accessibilityTree.Should().NotBeNull();
         }
     }
 }
