@@ -491,9 +491,14 @@ public sealed class OllamaProvider : ILLMProvider
 
             return new ToolCall(toolName, parameters, reasoning, correlationId);
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "Failed to parse individual tool call");
+            _logger.LogWarning(ex, "Failed to parse individual tool call (JSON error)");
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse individual tool call (invalid operation)");
             return null;
         }
     }
