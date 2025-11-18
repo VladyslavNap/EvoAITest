@@ -15,6 +15,7 @@ public sealed class LLMProviderFactory
     private readonly EvoAITestCoreOptions _options;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<LLMProviderFactory> _logger;
+    private ILLMProvider? _cachedProvider;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LLMProviderFactory"/> class.
@@ -51,13 +52,24 @@ public sealed class LLMProviderFactory
     /// <exception cref="InvalidOperationException">
     /// Thrown when the configured provider type is unknown or when provider creation fails.
     /// </exception>
+    /// <remarks>
+    /// This method caches the provider instance after the first call to avoid creating
+    /// expensive resources (HttpClient, Azure SDK clients) multiple times.
+    /// </remarks>
     public ILLMProvider CreateProvider()
     {
+        // Return cached provider if available
+        if (_cachedProvider is not null)
+        {
+            _logger.LogDebug("Returning cached LLM provider: {Provider}", _options.LLMProvider);
+            return _cachedProvider;
+        }
+
         _logger.LogInformation("Creating LLM provider: {Provider}", _options.LLMProvider);
 
         try
         {
-            return _options.LLMProvider switch
+            _cachedProvider = _options.LLMProvider switch
             {
                 "AzureOpenAI" => CreateAzureOpenAIProvider(),
                 "Ollama" => CreateOllamaProvider(),
@@ -66,6 +78,8 @@ public sealed class LLMProviderFactory
                     $"Unknown LLM provider: '{_options.LLMProvider}'. " +
                     "Valid values are: 'AzureOpenAI', 'Ollama', 'Local'.")
             };
+
+            return _cachedProvider;
         }
         catch (Exception ex)
         {
@@ -174,6 +188,10 @@ public sealed class LLMProviderFactory
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if the provider is available; otherwise, false.</returns>
+    /// <remarks>
+    /// This method uses the cached provider instance to avoid creating expensive
+    /// resources (HttpClient, Azure SDK clients) on each availability check.
+    /// </remarks>
     public async Task<bool> IsProviderAvailableAsync(CancellationToken cancellationToken = default)
     {
         try
