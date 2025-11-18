@@ -67,9 +67,12 @@ public sealed class LLMProviderFactory
                     "Valid values are: 'AzureOpenAI', 'Ollama', 'Local'.")
             };
         }
-        catch (Exception ex) when (ex is not InvalidOperationException)
+        catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create LLM provider: {Provider}", _options.LLMProvider);
+            // Preserve original InvalidOperationException, wrap others for context
+            if (ex is InvalidOperationException)
+                throw;
             throw new InvalidOperationException(
                 $"Failed to create LLM provider '{_options.LLMProvider}'. See inner exception for details.", ex);
         }
