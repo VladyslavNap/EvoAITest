@@ -47,12 +47,11 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
-    [Obsolete("Use AddLLMServices(IServiceCollection, IConfiguration) instead.")]
+    [Obsolete("Use AddLLMServices(IServiceCollection, IConfiguration) instead. Will be removed in v2.0.0. See README.md for migration guidance.")]
     public static IServiceCollection AddLLMServices(this IServiceCollection services)
     {
-        // Legacy method for backward compatibility
-        // LLM provider implementations will be registered separately
-        return services;
+        // For backward compatibility, register with empty configuration
+        return services.AddLLMServices(new ConfigurationBuilder().Build());
     }
 
     /// <summary>
