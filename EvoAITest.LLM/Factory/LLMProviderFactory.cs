@@ -15,6 +15,7 @@ public sealed class LLMProviderFactory
     private readonly EvoAITestCoreOptions _options;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<LLMProviderFactory> _logger;
+    private ILLMProvider? _cachedProvider;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LLMProviderFactory"/> class.
@@ -46,6 +47,7 @@ public sealed class LLMProviderFactory
 
     /// <summary>
     /// Creates an LLM provider instance based on the configured provider type.
+    /// Returns a cached instance if one has already been created.
     /// </summary>
     /// <returns>An instance of <see cref="ILLMProvider"/> based on configuration.</returns>
     /// <exception cref="InvalidOperationException">
@@ -53,11 +55,17 @@ public sealed class LLMProviderFactory
     /// </exception>
     public ILLMProvider CreateProvider()
     {
+        if (_cachedProvider != null)
+        {
+            _logger.LogDebug("Returning cached LLM provider instance");
+            return _cachedProvider;
+        }
+
         _logger.LogInformation("Creating LLM provider: {Provider}", _options.LLMProvider);
 
         try
         {
-            return _options.LLMProvider switch
+            _cachedProvider = _options.LLMProvider switch
             {
                 "AzureOpenAI" => CreateAzureOpenAIProvider(),
                 "Ollama" => CreateOllamaProvider(),
@@ -66,6 +74,7 @@ public sealed class LLMProviderFactory
                     $"Unknown LLM provider: '{_options.LLMProvider}'. " +
                     "Valid values are: 'AzureOpenAI', 'Ollama', 'Local'.")
             };
+            return _cachedProvider;
         }
         catch (Exception ex)
         {
@@ -178,8 +187,8 @@ public sealed class LLMProviderFactory
     {
         try
         {
-            var provider = CreateProvider();
-            return await provider.IsAvailableAsync(cancellationToken);
+            _cachedProvider ??= CreateProvider();
+            return await _cachedProvider.IsAvailableAsync(cancellationToken);
         }
         catch (Exception ex)
         {
