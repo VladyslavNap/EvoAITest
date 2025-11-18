@@ -21,6 +21,8 @@ public sealed class AzureOpenAIProvider : ILLMProvider
     private readonly ChatClient _chatClient;
     private readonly string _deploymentName;
     private readonly ILogger<AzureOpenAIProvider> _logger;
+    private readonly decimal _inputCostPer1k;
+    private readonly decimal _outputCostPer1k;
     private TokenUsage _lastUsage;
 
     /// <summary>
@@ -30,11 +32,15 @@ public sealed class AzureOpenAIProvider : ILLMProvider
     /// <param name="apiKey">Azure OpenAI API key (should be retrieved from Key Vault in production).</param>
     /// <param name="deploymentName">The deployment name for the model (e.g., gpt-4, gpt-5).</param>
     /// <param name="logger">Logger instance for diagnostics.</param>
+    /// <param name="inputCostPer1k">Optional cost per 1,000 input tokens. Defaults to 0.03 (GPT-4/GPT-5 pricing).</param>
+    /// <param name="outputCostPer1k">Optional cost per 1,000 output tokens. Defaults to 0.06 (GPT-4/GPT-5 pricing).</param>
     public AzureOpenAIProvider(
         string endpoint,
         string apiKey,
         string deploymentName,
-        ILogger<AzureOpenAIProvider> logger)
+        ILogger<AzureOpenAIProvider> logger,
+        decimal? inputCostPer1k = null,
+        decimal? outputCostPer1k = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint, nameof(endpoint));
         ArgumentException.ThrowIfNullOrWhiteSpace(apiKey, nameof(apiKey));
@@ -43,6 +49,8 @@ public sealed class AzureOpenAIProvider : ILLMProvider
 
         _deploymentName = deploymentName;
         _logger = logger;
+        _inputCostPer1k = inputCostPer1k ?? 0.03m;
+        _outputCostPer1k = outputCostPer1k ?? 0.06m;
         _lastUsage = new TokenUsage(0, 0, 0);
 
         _logger.LogInformation("Initializing Azure OpenAI provider with endpoint: {Endpoint}, deployment: {Deployment}",
@@ -63,6 +71,8 @@ public sealed class AzureOpenAIProvider : ILLMProvider
     /// <param name="endpoint">Azure OpenAI endpoint URL.</param>
     /// <param name="deploymentName">The deployment name for the model.</param>
     /// <param name="logger">Logger instance for diagnostics.</param>
+    /// <param name="inputCostPer1k">Optional cost per 1,000 input tokens. Defaults to 0.03 (GPT-4/GPT-5 pricing).</param>
+    /// <param name="outputCostPer1k">Optional cost per 1,000 output tokens. Defaults to 0.06 (GPT-4/GPT-5 pricing).</param>
     /// <remarks>
     /// This constructor uses DefaultAzureCredential for keyless authentication.
     /// Ensure the application has the appropriate Azure RBAC role assignment.
@@ -70,7 +80,9 @@ public sealed class AzureOpenAIProvider : ILLMProvider
     public AzureOpenAIProvider(
         string endpoint,
         string deploymentName,
-        ILogger<AzureOpenAIProvider> logger)
+        ILogger<AzureOpenAIProvider> logger,
+        decimal? inputCostPer1k = null,
+        decimal? outputCostPer1k = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint, nameof(endpoint));
         ArgumentException.ThrowIfNullOrWhiteSpace(deploymentName, nameof(deploymentName));
@@ -78,6 +90,8 @@ public sealed class AzureOpenAIProvider : ILLMProvider
 
         _deploymentName = deploymentName;
         _logger = logger;
+        _inputCostPer1k = inputCostPer1k ?? 0.03m;
+        _outputCostPer1k = outputCostPer1k ?? 0.06m;
         _lastUsage = new TokenUsage(0, 0, 0);
 
         _logger.LogInformation("Initializing Azure OpenAI provider with Managed Identity. Endpoint: {Endpoint}, Deployment: {Deployment}",
@@ -545,13 +559,8 @@ public sealed class AzureOpenAIProvider : ILLMProvider
 
     private decimal CalculateCost(int inputTokens, int outputTokens)
     {
-        // GPT-4/GPT-5 pricing (adjust based on actual deployment)
-        // These are example rates - update with actual Azure OpenAI pricing
-        const decimal inputCostPer1k = 0.03m;    // $0.03 per 1K input tokens
-        const decimal outputCostPer1k = 0.06m;   // $0.06 per 1K output tokens
-
-        var inputCost = (inputTokens / 1000m) * inputCostPer1k;
-        var outputCost = (outputTokens / 1000m) * outputCostPer1k;
+        var inputCost = (inputTokens / 1000m) * _inputCostPer1k;
+        var outputCost = (outputTokens / 1000m) * _outputCostPer1k;
 
         return inputCost + outputCost;
     }

@@ -95,7 +95,9 @@ public sealed class LLMProviderFactory
             return new AzureOpenAIProvider(
                 _options.AzureOpenAIEndpoint,
                 _options.AzureOpenAIDeployment,
-                logger);
+                logger,
+                _options.AzureOpenAIInputCostPer1k,
+                _options.AzureOpenAIOutputCostPer1k);
         }
 
         // Fall back to API key authentication
@@ -111,7 +113,9 @@ public sealed class LLMProviderFactory
             _options.AzureOpenAIEndpoint,
             _options.AzureOpenAIApiKey,
             _options.AzureOpenAIDeployment,
-            logger);
+            logger,
+            _options.AzureOpenAIInputCostPer1k,
+            _options.AzureOpenAIOutputCostPer1k);
     }
 
     /// <summary>
