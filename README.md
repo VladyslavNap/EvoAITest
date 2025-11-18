@@ -26,10 +26,10 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 6)
-- `EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs` ships as the default `IBrowserAgent`, handling navigation, interaction, accessibility snapshots, and screenshots through Playwright 1.56.0.
-- `EvoAITest.Core/Extensions/ServiceCollectionExtensions.cs` now wires the Playwright agent into DI via `AddEvoAITestCore`, so consuming services get it automatically.
-- `EvoAITest.Tests/Browser/PlaywrightBrowserAgentTests.cs` covers initialization, navigation, state capture, and screenshot flows to keep the browser automation surface green.
+### Latest Update (Day 7)
+- `EvoAITest.LLM/Providers/AzureOpenAIProvider.cs` now anchors the production path with the Azure.AI.OpenAI 2.x SDK, Entra ID (Managed Identity) fallback, streaming completions, embeddings, tool-call parsing, and token/cost accounting.
+- `EvoAITest.LLM/Providers/OllamaProvider.cs` unlocks offline/local development by speaking the Ollama HTTP API for completions, streaming, embeddings, and availability checks against any pulled local model.
+- `EvoAITest.LLM/Factory/LLMProviderFactory.cs` plus `EvoAITest.LLM/Extensions/ServiceCollectionExtensions.cs` provide configuration-bound DI via `AddLLMServices`, so `ILLMProvider` resolves to Azure OpenAI, Ollama, or local endpoints without code changes.
 
 ## Project Structure
 

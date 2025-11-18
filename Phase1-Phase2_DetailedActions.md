@@ -1,6 +1,6 @@
 # EvoAITest - Phase 1 & Phase 2 Action Plan
 
-> **Project Status**: Day 6 Playwright browser agent landed (code, DI, tests). Keep the [Day 5 Implementation Checklist](DAY5_CHECKLIST.md) plus the [Implementation Summary](IMPLEMENTATION_SUMMARY.md) for baseline context and use this roadmap for Day 7+ execution.
+> **Project Status**: Day 7 LLM provider factory + Azure/Ollama providers landed (code, DI, docs). Keep the [Day 5 Implementation Checklist](DAY5_CHECKLIST.md) plus the [Implementation Summary](IMPLEMENTATION_SUMMARY.md) for baseline context and use this roadmap for Day 8+ execution. Deep dives for the new stack live in [AZURE_OPENAI_PROVIDER_SUMMARY.md](AZURE_OPENAI_PROVIDER_SUMMARY.md), [OLLAMA_PROVIDER_SUMMARY.md](OLLAMA_PROVIDER_SUMMARY.md), and [LLM_PROVIDER_FACTORY_SUMMARY.md](LLM_PROVIDER_FACTORY_SUMMARY.md).
 
 ## How to Navigate the Docs
 - [README](README.md) – high-level overview, architecture, and environment setup.
@@ -8,8 +8,8 @@
 - [Browser Tool Registry Deep Dive](BROWSER_TOOL_REGISTRY_SUMMARY.md) – complete contract for the 13 tools.
 - [Automation Models Primer](AUTOMATION_TASK_MODELS_SUMMARY.md) – data models, enums, and persistence notes.
 
-## ✅ Days 1–6 Snapshot
-Day 5 artifacts still capture the foundation. Day 6 delivered the concrete Playwright browser agent (`EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs`), DI wiring, and regression tests (`EvoAITest.Tests/Browser/PlaywrightBrowserAgentTests.cs`). Keep the README “Latest Update (Day 6)” section handy when referencing the new automation surface.
+## ✅ Days 1–7 Snapshot
+Day 5 artifacts still capture the foundation. Day 6 delivered the concrete Playwright browser agent (`EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs`), DI wiring, and regression tests (`EvoAITest.Tests/Browser/PlaywrightBrowserAgentTests.cs`). Day 7 layered in the multi-provider LLM stack (Azure OpenAI + Ollama + `LLMProviderFactory`) along with configuration-bound DI registration. Keep the README “Latest Update (Day 7)” section handy when referencing either automation surface.
 
 ---
 
@@ -274,6 +274,13 @@ feat: implement Playwright browser agent with page state extraction
 
 **Goal**: Implement concrete LLM providers for Azure OpenAI and Ollama.
 
+Day 7 shipped the full stack:
+- `EvoAITest.LLM/Providers/AzureOpenAIProvider.cs` (Azure.AI.OpenAI 2.x + Entra ID fallback, streaming, embeddings, tool-call parsing, usage tracking)
+- `EvoAITest.LLM/Providers/OllamaProvider.cs` (local completions, streaming, embeddings, availability checks)
+- `EvoAITest.LLM/Factory/LLMProviderFactory.cs` (configuration-driven provider selection, availability probe helpers)
+- `EvoAITest.LLM/Extensions/ServiceCollectionExtensions.cs` (`AddLLMServices` binds `EvoAITestCoreOptions`, registers the factory, and exposes `ILLMProvider`)
+- Updated appsettings + options for provider-specific knobs (`EvoAITest.Core/Options/EvoAITestCoreOptions.cs`)
+
 **Action 7.1: Install Azure OpenAI SDK**
 ```bash
 cd EvoAITest.LLM
@@ -535,18 +542,31 @@ public class LLMProviderFactory
 
 Update `EvoAITest.LLM/Extensions/ServiceCollectionExtensions.cs`:
 ```csharp
-services.AddSingleton<LLMProviderFactory>();
-services.AddScoped<ILLMProvider>(sp =>
+public static IServiceCollection AddLLMServices(
+    this IServiceCollection services,
+    IConfiguration configuration)
 {
-    var factory = sp.GetRequiredService<LLMProviderFactory>();
-    return factory.CreateProvider();
-});
+    services.Configure<EvoAITestCoreOptions>(
+        configuration.GetSection("EvoAITest:Core"));
+
+    services.TryAddSingleton<LLMProviderFactory>();
+
+    services.TryAddScoped<ILLMProvider>(sp =>
+    {
+        var factory = sp.GetRequiredService<LLMProviderFactory>();
+        return factory.CreateProvider();
+    });
+
+    return services;
+}
 ```
 
 **Daily Commit:**
 ```
 feat: implement Azure OpenAI and Ollama providers with factory pattern
 ```
+
+**Status**: ✅ Complete — Azure OpenAI + Ollama providers, the configurable factory, and the DI extension now ship from `EvoAITest.LLM`.
 
 ---
 
@@ -560,7 +580,7 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 
 ### Phase 1 Remaining (Days 6-21)
 - [x] Day 6: Playwright browser implementation
-- [ ] Day 7: LLM provider implementations
+- [x] Day 7: LLM provider implementations
 - [ ] Day 8: Tool executor service
 - [ ] Day 9: Planner agent (natural language → execution plan)
 - [ ] Day 10: Executor agent (run automation steps)
@@ -585,14 +605,13 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 
 ---
 
-## 🎯 IMMEDIATE NEXT STEPS (Day 7)
+## 🎯 IMMEDIATE NEXT STEPS (Day 8)
 
-1. **Install Azure OpenAI SDK**: `dotnet add package Azure.AI.OpenAI --version 2.1.0`
-2. **Implement AzureOpenAIProvider**: Complete prompt substitution, cost tracking, and availability checks
-3. **Implement OllamaProvider**: Add HTTP client powered local provider with streaming support
-4. **Register providers in DI**: Update `EvoAITest.LLM` extensions + options binding
-5. **Add unit tests**: Cover prompt templating, tool parsing, and availability probes
-6. **Commit**: `feat: add Azure OpenAI + Ollama providers`
+1. **Design Tool Executor service**: Define inputs/outputs, error model, and telemetry hooks for coordinating `BrowserTool` invocations.
+2. **Implement ToolExecutor**: Leverage `IBrowserAgent` + registry metadata to run tool sequences with retry/backoff semantics.
+3. **Wire into DI + options**: Expose the executor via `EvoAITest.Core` extensions and add configuration flags for max concurrency/timeouts.
+4. **Add unit tests**: Cover successful runs, retry paths, cancellation, and logging breadcrumbs.
+5. **Commit**: `feat: add tool executor service`
 
 ---
 
@@ -606,7 +625,7 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 | Tool Registry | ✅ Complete | ✅ | ✅ |
 | Configuration | ✅ Complete | ✅ | ✅ |
 | **Playwright Agent** | ✅ Complete | ✅ | ✅ |
-| LLM Providers | ⏳ Pending | ⏳ | ⏳ |
+| LLM Providers | ✅ Complete | ✅ | ✅ |
 | Planner Agent | ⏳ Pending | ⏳ | ⏳ |
 | Executor Agent | ⏳ Pending | ⏳ | ⏳ |
 | Healer Agent | ⏳ Pending | ⏳ | ⏳ |
@@ -615,6 +634,6 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 
 ---
 
-**Current Status**: ✅ Day 6 Complete | 🚧 Day 7 Starting  
-**Next Milestone**: LLM Provider Implementations  
+**Current Status**: ✅ Day 7 Complete | 🚧 Day 8 Starting  
+**Next Milestone**: Tool Executor Service  
 **Target**: Complete Phase 1 (21 days) by end of month
