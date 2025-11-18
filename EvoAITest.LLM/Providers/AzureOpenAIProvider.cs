@@ -441,9 +441,14 @@ public sealed class AzureOpenAIProvider : ILLMProvider
 
             return new ToolCall(toolName, parameters, reasoning, correlationId);
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "Failed to parse individual tool call");
+            _logger.LogWarning(ex, "Failed to parse individual tool call: Invalid JSON format");
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse individual tool call: Invalid operation on JSON element");
             return null;
         }
     }
