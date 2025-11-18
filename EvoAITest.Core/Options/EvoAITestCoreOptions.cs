@@ -180,6 +180,48 @@ public sealed class EvoAITestCoreOptions
     /// </remarks>
     public string AzureOpenAIApiVersion { get; set; } = "2025-01-01-preview";
 
+    /// <summary>
+    /// Gets or sets the cost per 1,000 input tokens for Azure OpenAI.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Default: 0.03m ($0.03 per 1K input tokens for GPT-4/GPT-5)
+    /// </para>
+    /// <para>
+    /// Configure this based on your actual Azure OpenAI deployment pricing.
+    /// Pricing varies by model and region. Check Azure pricing documentation:
+    /// https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/
+    /// </para>
+    /// <para>
+    /// Example pricing (as of 2025):
+    /// - GPT-4: $0.03 per 1K input tokens
+    /// - GPT-4 Turbo: $0.01 per 1K input tokens
+    /// - GPT-3.5 Turbo: $0.0005 per 1K input tokens
+    /// </para>
+    /// </remarks>
+    public decimal? AzureOpenAIInputCostPer1k { get; set; } = 0.03m;
+
+    /// <summary>
+    /// Gets or sets the cost per 1,000 output tokens for Azure OpenAI.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Default: 0.06m ($0.06 per 1K output tokens for GPT-4/GPT-5)
+    /// </para>
+    /// <para>
+    /// Configure this based on your actual Azure OpenAI deployment pricing.
+    /// Pricing varies by model and region. Check Azure pricing documentation:
+    /// https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/
+    /// </para>
+    /// <para>
+    /// Example pricing (as of 2025):
+    /// - GPT-4: $0.06 per 1K output tokens
+    /// - GPT-4 Turbo: $0.03 per 1K output tokens
+    /// - GPT-3.5 Turbo: $0.0015 per 1K output tokens
+    /// </para>
+    /// </remarks>
+    public decimal? AzureOpenAIOutputCostPer1k { get; set; } = 0.06m;
+
     // ============================================================
     // Ollama Configuration (Local Development)
     // ============================================================
