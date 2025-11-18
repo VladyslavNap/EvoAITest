@@ -244,9 +244,19 @@ public sealed class AzureOpenAIProvider : ILLMProvider
 
             return isAvailable;
         }
-        catch (Exception ex)
+        catch (RequestFailedException ex)
         {
-            _logger.LogWarning(ex, "Azure OpenAI availability check failed");
+            _logger.LogWarning(ex, "Azure OpenAI availability check failed (RequestFailedException)");
+            return false;
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogWarning(ex, "Azure OpenAI availability check was canceled");
+            return false;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Azure OpenAI availability check failed (JsonException)");
             return false;
         }
     }
