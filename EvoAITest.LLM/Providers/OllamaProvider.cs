@@ -224,9 +224,14 @@ public sealed class OllamaProvider : ILLMProvider
             _logger.LogInformation("Ollama is available with model: {Model}", _model);
             return true;
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, "Ollama availability check failed. Is Ollama running at {BaseUrl}?", _baseUrl);
+            _logger.LogWarning(ex, "Ollama availability check failed due to HTTP error. Is Ollama running at {BaseUrl}?", _baseUrl);
+            return false;
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogWarning(ex, "Ollama availability check timed out. Is Ollama running at {BaseUrl}?", _baseUrl);
             return false;
         }
     }
