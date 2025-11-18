@@ -395,7 +395,15 @@ public sealed class AzureOpenAIProvider : ILLMProvider
 
                 options.Tools.Add(functionDefinition);
             }
-            catch (Exception ex)
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Failed to convert browser tool: {ToolName}", browserTool.Name);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Failed to convert browser tool: {ToolName}", browserTool.Name);
+            }
+            catch (JsonException ex)
             {
                 _logger.LogWarning(ex, "Failed to convert browser tool: {ToolName}", browserTool.Name);
             }
