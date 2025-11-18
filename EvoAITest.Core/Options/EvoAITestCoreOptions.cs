@@ -23,7 +23,7 @@ namespace EvoAITest.Core.Options;
 ///     "Core": {
 ///       "LLMProvider": "Ollama",
 ///       "OllamaEndpoint": "http://localhost:11434",
-///       "OllamaModel": "qwen2.5:32b"
+///       "OllamaModel": "qwen2.5-7b"
 ///     }
 ///   }
 /// }
@@ -210,25 +210,25 @@ public sealed class EvoAITestCoreOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Default: "qwen2.5:32b"
+    /// Default: "qwen2.5-7b"
     /// </para>
     /// <para>
     /// This can be any model installed in your local Ollama instance.
     /// </para>
     /// <para>
     /// Popular models:
+    /// - "qwen2.5-7b": Fast and capable for code/reasoning (7B parameters, requires 8GB RAM) - Recommended
     /// - "qwen2.5:32b": Large model for complex reasoning (32B parameters, requires 32GB RAM)
-    /// - "qwen2.5-7b": Fast and capable for code/reasoning
     /// - "llama2": General purpose, good balance
     /// - "mistral": Efficient and accurate
     /// - "codellama": Optimized for code generation
     /// </para>
     /// <para>
-    /// Install models: `ollama pull qwen2.5:32b`
+    /// Install models: `ollama pull qwen2.5-7b`
     /// List models: `ollama list`
     /// </para>
     /// </remarks>
-    public string OllamaModel { get; set; } = "qwen2.5:32b";
+    public string OllamaModel { get; set; } = "qwen2.5-7b";
 
     // ============================================================
     // Local LLM Configuration (Custom Endpoints)
@@ -465,7 +465,7 @@ public sealed class EvoAITestCoreOptions
                 {
                     throw new InvalidOperationException(
                         "Ollama model is required when LLMProvider is 'Ollama'. " +
-                        "Install a model with: ollama pull qwen2.5:32b");
+                        "Install a model with: ollama pull qwen2.5-7b");
                 }
                 break;
 
