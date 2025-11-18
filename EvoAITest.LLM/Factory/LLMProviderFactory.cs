@@ -15,6 +15,8 @@ public sealed class LLMProviderFactory
     private readonly EvoAITestCoreOptions _options;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<LLMProviderFactory> _logger;
+    private ILLMProvider? _cachedProvider;
+    private readonly object _lock = new object();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LLMProviderFactory"/> class.
@@ -46,6 +48,7 @@ public sealed class LLMProviderFactory
 
     /// <summary>
     /// Creates an LLM provider instance based on the configured provider type.
+    /// Returns a cached instance if one exists, otherwise creates a new one.
     /// </summary>
     /// <returns>An instance of <see cref="ILLMProvider"/> based on configuration.</returns>
     /// <exception cref="InvalidOperationException">
@@ -53,28 +56,45 @@ public sealed class LLMProviderFactory
     /// </exception>
     public ILLMProvider CreateProvider()
     {
-        _logger.LogInformation("Creating LLM provider: {Provider}", _options.LLMProvider);
-
-        try
+        // Return cached provider if available
+        if (_cachedProvider != null)
         {
-            return _options.LLMProvider switch
-            {
-                "AzureOpenAI" => CreateAzureOpenAIProvider(),
-                "Ollama" => CreateOllamaProvider(),
-                "Local" => CreateLocalProvider(),
-                _ => throw new InvalidOperationException(
-                    $"Unknown LLM provider: '{_options.LLMProvider}'. " +
-                    "Valid values are: 'AzureOpenAI', 'Ollama', 'Local'.")
-            };
+            return _cachedProvider;
         }
-        catch (Exception ex)
+
+        lock (_lock)
         {
-            _logger.LogError(ex, "Failed to create LLM provider: {Provider}", _options.LLMProvider);
-            // Preserve original InvalidOperationException, wrap others for context
-            if (ex is InvalidOperationException)
-                throw;
-            throw new InvalidOperationException(
-                $"Failed to create LLM provider '{_options.LLMProvider}'. See inner exception for details.", ex);
+            // Double-check after acquiring lock
+            if (_cachedProvider != null)
+            {
+                return _cachedProvider;
+            }
+
+            _logger.LogInformation("Creating LLM provider: {Provider}", _options.LLMProvider);
+
+            try
+            {
+                _cachedProvider = _options.LLMProvider switch
+                {
+                    "AzureOpenAI" => CreateAzureOpenAIProvider(),
+                    "Ollama" => CreateOllamaProvider(),
+                    "Local" => CreateLocalProvider(),
+                    _ => throw new InvalidOperationException(
+                        $"Unknown LLM provider: '{_options.LLMProvider}'. " +
+                        "Valid values are: 'AzureOpenAI', 'Ollama', 'Local'.")
+                };
+
+                return _cachedProvider;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create LLM provider: {Provider}", _options.LLMProvider);
+                // Preserve original InvalidOperationException, wrap others for context
+                if (ex is InvalidOperationException)
+                    throw;
+                throw new InvalidOperationException(
+                    $"Failed to create LLM provider '{_options.LLMProvider}'. See inner exception for details.", ex);
+            }
         }
     }
 
@@ -171,6 +191,7 @@ public sealed class LLMProviderFactory
 
     /// <summary>
     /// Checks if the configured provider is available.
+    /// Uses a cached provider instance to avoid creating and discarding resources.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if the provider is available; otherwise, false.</returns>
