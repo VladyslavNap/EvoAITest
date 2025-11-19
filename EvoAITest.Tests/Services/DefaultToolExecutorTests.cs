@@ -308,6 +308,7 @@ public class DefaultToolExecutorTests
         result.WasRetried.Should().BeTrue();
         
         var retryReasons = result.Metadata["retry_reasons"] as string[];
+        retryReasons.Should().NotBeNull("retry reasons should be present in metadata");
         retryReasons.Should().HaveCount(2, "should have 2 retry reasons");
     }
 
