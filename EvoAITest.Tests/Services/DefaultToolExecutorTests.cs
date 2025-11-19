@@ -240,6 +240,7 @@ public class DefaultToolExecutorTests
         result.Metadata.Should().ContainKey("retry_delays");
 
         var retryReasons = result.Metadata["retry_reasons"] as string[];
+        retryReasons.Should().NotBeNull("retry_reasons should not be null");
         retryReasons.Should().HaveCount(2, "should have 2 retry reasons");
         retryReasons.Should().AllSatisfy(r => r.Should().Contain("TimeoutException"));
 
@@ -346,9 +347,9 @@ public class DefaultToolExecutorTests
         }
 
         // Expected delays (with 25% jitter): ~100ms, ~200ms, ~400ms
-        delays[0].Should().BeInRange(75, 125, "first retry delay ~100ms ± jitter");
-        delays[1].Should().BeInRange(150, 250, "second retry delay ~200ms ± jitter");
-        delays[2].Should().BeInRange(300, 500, "third retry delay ~400ms ± jitter");
+        delays[0].Should().BeInRange(75, 125, "first retry delay ~100ms Â± jitter");
+        delays[1].Should().BeInRange(150, 250, "second retry delay ~200ms Â± jitter");
+        delays[2].Should().BeInRange(300, 500, "third retry delay ~400ms Â± jitter");
     }
 
     [Fact]
