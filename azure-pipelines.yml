@@ -1,0 +1,235 @@
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+    - ToolExecutor
+  paths:
+    exclude:
+    - '**.md'
+    - 'docs/**'
+
+pr:
+  branches:
+    include:
+    - main
+    - develop
+
+variables:
+  solution: 'EvoAITest.sln'
+  buildPlatform: 'Any CPU'
+  buildConfiguration: 'Release'
+  dotnetVersion: '10.0.x'
+
+stages:
+- stage: Build
+  displayName: 'Build and Unit Test'
+  jobs:
+  - job: Build
+    displayName: 'Build Solution'
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Install .NET SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '$(dotnetVersion)'
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore NuGet packages'
+      inputs:
+        command: 'restore'
+        projects: '$(solution)'
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Build solution'
+      inputs:
+        command: 'build'
+        projects: '$(solution)'
+        arguments: '--configuration $(buildConfiguration) --no-restore'
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Run Unit Tests'
+      inputs:
+        command: 'test'
+        projects: '$(solution)'
+        arguments: >
+          --configuration $(buildConfiguration)
+          --no-build
+          --filter "Category!=Integration"
+          --logger trx
+          --collect:"XPlat Code Coverage"
+          --results-directory $(Build.SourcesDirectory)/TestResults
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+        
+    - task: PublishTestResults@2
+      displayName: 'Publish Unit Test Results'
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: 'VSTest'
+        testResultsFiles: '**/unit-*.trx'
+        searchFolder: '$(Build.SourcesDirectory)/TestResults'
+        mergeTestResults: true
+        failTaskOnFailedTests: true
+        testRunTitle: 'Unit Tests'
+        
+    - task: PublishCodeCoverageResults@1
+      displayName: 'Publish Code Coverage'
+      condition: succeededOrFailed()
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: '$(Build.SourcesDirectory)/TestResults/**/coverage.cobertura.xml'
+
+- stage: IntegrationTest
+  displayName: 'Integration Tests'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - job: IntegrationTests
+    displayName: 'Run Integration Tests'
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Install .NET SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '$(dotnetVersion)'
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore NuGet packages'
+      inputs:
+        command: 'restore'
+        projects: '$(solution)'
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Build solution'
+      inputs:
+        command: 'build'
+        projects: '$(solution)'
+        arguments: '--configuration $(buildConfiguration) --no-restore'
+        
+    - task: PowerShell@2
+      displayName: 'Install Playwright Browsers'
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd EvoAITest.Tests/bin/$(buildConfiguration)/net10.0
+          pwsh playwright.ps1 install chromium --with-deps
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Run Integration Tests'
+      inputs:
+        command: 'test'
+        projects: '$(solution)'
+        arguments: >
+          --configuration $(buildConfiguration)
+          --no-build
+          --filter "Category=Integration"
+          --logger trx
+          --results-directory $(Build.SourcesDirectory)/TestResults
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+        
+    - task: PublishTestResults@2
+      displayName: 'Publish Integration Test Results'
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: 'VSTest'
+        testResultsFiles: '**/integration-*.trx'
+        searchFolder: '$(Build.SourcesDirectory)/TestResults'
+        mergeTestResults: true
+        failTaskOnFailedTests: true
+        testRunTitle: 'Integration Tests'
+
+- stage: Publish
+  displayName: 'Publish Artifacts'
+  dependsOn: 
+  - Build
+  - IntegrationTest
+  condition: and(succeeded(), in(variables['Build.SourceBranch'], 'refs/heads/main', 'refs/heads/develop'))
+  jobs:
+  - job: PublishArtifacts
+    displayName: 'Publish Build Artifacts'
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Install .NET SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '$(dotnetVersion)'
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish API Service'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: 'EvoAITest.ApiService/EvoAITest.ApiService.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/apiservice'
+        zipAfterPublish: true
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish Web App'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: 'EvoAITest.Web/EvoAITest.Web.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/webapp'
+        zipAfterPublish: true
+        
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish API Service Artifact'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/apiservice'
+        ArtifactName: 'apiservice'
+        publishLocation: 'Container'
+        
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Web App Artifact'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/webapp'
+        ArtifactName: 'webapp'
+        publishLocation: 'Container'
+
+- stage: CodeQuality
+  displayName: 'Code Quality Analysis'
+  dependsOn: []
+  condition: always()
+  jobs:
+  - job: CodeAnalysis
+    displayName: 'Code Quality Checks'
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Install .NET SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '$(dotnetVersion)'
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore packages'
+      inputs:
+        command: 'restore'
+        projects: '$(solution)'
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Build with warnings as errors'
+      inputs:
+        command: 'build'
+        projects: '$(solution)'
+        arguments: '--configuration $(buildConfiguration) --no-restore /warnaserror'
+      continueOnError: true
+      
+    - task: PowerShell@2
+      displayName: 'Check code formatting'
+      inputs:
+        targetType: 'inline'
+        script: |
+          dotnet format $(solution) --verify-no-changes --verbosity diagnostic
+      continueOnError: true

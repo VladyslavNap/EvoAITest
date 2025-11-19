@@ -23,12 +23,36 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     /// <remarks>
     /// <para>
-    /// This method registers EvoAITest-specific services and adds OpenTelemetry instrumentation
-    /// for the EvoAITest.Core assembly. Logging, health checks, and base OpenTelemetry configuration
-    /// are handled by EvoAITest.ServiceDefaults and should not be configured here.
+    /// This method registers EvoAITest-specific services including:
+    /// - <see cref="IBrowserAgent"/> (Playwright-based browser automation)
+    /// - <see cref="IBrowserToolRegistry"/> (13 browser automation tools)
+    /// - <see cref="IToolExecutor"/> (tool execution with retry logic and error handling)
     /// </para>
     /// <para>
-    /// Configuration should be provided in appsettings.json under "EvoAITest:Core".
+    /// OpenTelemetry instrumentation is added for the EvoAITest.Core assembly.
+    /// Logging, health checks, and base OpenTelemetry configuration are handled by
+    /// EvoAITest.ServiceDefaults and should not be configured here.
+    /// </para>
+    /// <para>
+    /// Configuration should be provided in appsettings.json:
+    /// <code>
+    /// {
+    ///   "EvoAITest": {
+    ///     "Core": {
+    ///       "LLMProvider": "AzureOpenAI",
+    ///       "BrowserTimeoutMs": 30000,
+    ///       "HeadlessMode": true
+    ///     },
+    ///     "ToolExecutor": {
+    ///       "MaxRetries": 3,
+    ///       "InitialRetryDelayMs": 500,
+    ///       "MaxRetryDelayMs": 10000,
+    ///       "UseExponentialBackoff": true,
+    ///       "TimeoutPerToolMs": 30000
+    ///     }
+    ///   }
+    /// }
+    /// </code>
     /// </para>
     /// <para>
     /// Example usage:
@@ -49,14 +73,21 @@ public static class ServiceCollectionExtensions
         services.Configure<EvoAITestCoreOptions>(
             configuration.GetSection("EvoAITest:Core"));
 
-        // 2. Register core services
+        // 2. Configure ToolExecutor options from configuration
+        services.Configure<ToolExecutorOptions>(
+            configuration.GetSection("EvoAITest:ToolExecutor"));
+
+        // 3. Register core services
         // Register Playwright browser agent implementation
-        services.AddScoped<IBrowserAgent, PlaywrightBrowserAgent>();
+        services.TryAddScoped<IBrowserAgent, PlaywrightBrowserAgent>();
 
         // Register browser tool registry
         services.TryAddSingleton<IBrowserToolRegistry, DefaultBrowserToolRegistry>();
 
-        // 3. Add OpenTelemetry instrumentation for EvoAITest.Core
+        // Register tool executor with retry logic and error handling
+        services.TryAddScoped<IToolExecutor, DefaultToolExecutor>();
+
+        // 4. Add OpenTelemetry instrumentation for EvoAITest.Core
         services.AddOpenTelemetry()
             .WithMetrics(metrics =>
             {
@@ -69,6 +100,64 @@ public static class ServiceCollectionExtensions
                 tracing.AddSource("EvoAITest.Core");
             });
 
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the browser automation tool executor to the service collection.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method registers <see cref="IToolExecutor"/> as a scoped service, which provides
+    /// browser automation tool execution with:
+    /// - Exponential backoff with jitter for retry logic
+    /// - Transient vs terminal error classification
+    /// - Comprehensive structured logging
+    /// - In-memory execution history per correlation ID
+    /// - Support for sequential execution and fallback strategies
+    /// </para>
+    /// <para>
+    /// The tool executor requires:
+    /// - <see cref="IBrowserAgent"/> for browser operations
+    /// - <see cref="IBrowserToolRegistry"/> for tool validation
+    /// - <see cref="ToolExecutorOptions"/> from configuration
+    /// </para>
+    /// <para>
+    /// This method is called automatically by <see cref="AddEvoAITestCore"/>.
+    /// Use this method directly only if you need to customize the registration or
+    /// register the tool executor separately from the core services.
+    /// </para>
+    /// <para>
+    /// Example usage:
+    /// <code>
+    /// builder.Services
+    ///     .AddBrowserAgent&lt;PlaywrightBrowserAgent&gt;()
+    ///     .AddToolExecutor();
+    /// </code>
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddToolExecutor(this IServiceCollection services)
+    {
+        services.TryAddScoped<IToolExecutor, DefaultToolExecutor>();
+        return services;
+    }
+
+    /// <summary>
+    /// Adds a custom tool executor implementation.
+    /// </summary>
+    /// <typeparam name="TExecutor">The tool executor implementation type.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// Use this method to register a custom implementation of <see cref="IToolExecutor"/>
+    /// instead of the default <see cref="DefaultToolExecutor"/>.
+    /// </remarks>
+    public static IServiceCollection AddToolExecutor<TExecutor>(this IServiceCollection services)
+        where TExecutor : class, IToolExecutor
+    {
+        services.TryAddScoped<IToolExecutor, TExecutor>();
         return services;
     }
 

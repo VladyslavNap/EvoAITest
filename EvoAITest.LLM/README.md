@@ -1,10 +1,10 @@
 # BrowserAI LLM Library
 
-LLM provider abstractions for AI-powered browser automation.
+LLM provider abstractions for AI-powered browser automation. Day 7 introduced production-ready `AzureOpenAIProvider` and developer-friendly `OllamaProvider`, both resolved through the configurable `LLMProviderFactory`.
 
 ## Overview
 
-EvoAITest.LLM provides unified interfaces for integrating Large Language Models into browser automation workflows. It supports multiple LLM providers with a consistent API.
+EvoAITest.LLM provides unified interfaces for integrating Large Language Models into browser automation workflows. The module now includes first-party providers (Azure OpenAI + Ollama) plus a factory that selects the correct implementation via the `EvoAITest:Core` configuration section.
 
 ## Key Components
 
@@ -68,10 +68,11 @@ dotnet add reference ../EvoAITest.LLM/EvoAITest.LLM.csproj
 Register services:
 
 ```csharp
-builder.Services.AddLLMServices();
-builder.Services.AddLLMProvider<OpenAIProvider>();
+builder.Services.AddLLMServices(builder.Configuration);
 builder.Services.AddPromptBuilder<DefaultPromptBuilder>();
 ```
+
+The registration binds `EvoAITestCoreOptions` from configuration, wires `LLMProviderFactory`, and exposes `ILLMProvider`. Set `EvoAITest:Core:LLMProvider` to `AzureOpenAI`, `Ollama`, or `Local` (plus the corresponding endpoint/model inputs) in `appsettings*.json` or environment variables to pick the provider without code changes.
 
 ## Usage Examples
 
@@ -155,17 +156,69 @@ Console.WriteLine($"Embedding dimensions: {embedding.Length}");
 
 Ready to integrate:
 
-- **OpenAI** - GPT-4, GPT-3.5-Turbo
-- **Azure OpenAI** - Enterprise-grade OpenAI
-- **Anthropic** - Claude 3 family
-- **Google** - Gemini models
-- **Local Models** - Ollama, LM Studio
+- **Azure OpenAI** (`EvoAITest.LLM/Providers/AzureOpenAIProvider.cs`) – Azure.AI.OpenAI 2.x SDK with Entra ID (Managed Identity) and API key auth, streaming completions, tool call parsing, embeddings, and token/cost usage.
+- **Ollama / Local HTTP** (`EvoAITest.LLM/Providers/OllamaProvider.cs`) – Local completions, streaming, embeddings, and availability checks against any model exposed via the Ollama API.
+- **Custom Local Endpoints** – Configure `LLMProvider = "Local"` with `LocalLLMEndpoint` to reuse the Ollama provider against compatible HTTP surfaces while a bespoke provider is built.
+
+## Provider Implementations
+
+### Azure OpenAI Provider
+
+Path: `EvoAITest.LLM/Providers/AzureOpenAIProvider.cs`
+
+- Uses `AzureOpenAIClient` + `ChatClient` for GPT-4/5 deployments.
+- Dual authentication: API key (Dev/Test) or `DefaultAzureCredential` (Managed Identity) when `AzureOpenAIApiKey` is empty.
+- Supports streaming completions, embeddings, JSON tool-call parsing, availability probes, and token/cost tracking.
+
+**Configuration (`appsettings.Development.json` example):**
+
+```json
+{
+  "EvoAITest": {
+    "Core": {
+      "LLMProvider": "AzureOpenAI",
+      "AzureOpenAIEndpoint": "https://your-resource.openai.azure.com",
+      "AzureOpenAIDeployment": "gpt-5",
+      "AzureOpenAIApiKey": "<use Key Vault/environment in production>"
+    }
+  }
+}
+```
+
+### Ollama Provider
+
+Path: `EvoAITest.LLM/Providers/OllamaProvider.cs`
+
+- Talks to the Ollama HTTP API for completions, streaming, embeddings, and model availability checks.
+- Automatically estimates token usage and logs helpful diagnostics when the local server/model is missing.
+
+**Configuration (local dev):**
+
+```json
+{
+  "EvoAITest": {
+    "Core": {
+      "LLMProvider": "Ollama",
+      "OllamaEndpoint": "http://localhost:11434",
+      "OllamaModel": "qwen2.5-7b"
+    }
+  }
+}
+```
+
+### LLM Provider Factory
+
+Path: `EvoAITest.LLM/Factory/LLMProviderFactory.cs`
+
+- Validates configuration on startup and logs provider creation details.
+- Exposes helper APIs like `GetConfiguredProviderName()`, `GetProviderInfo()`, and `IsProviderAvailableAsync()`.
+- Registered via `AddLLMServices` so consumers can simply inject `ILLMProvider`.
 
 ## Features
 
 - ? Unified provider interface
 - ? Streaming support
-- ? Function calling
+- ? Function calling / tool-call parsing
 - ? Vision inputs (provider-dependent)
 - ? Embeddings generation
 - ? Conversation management

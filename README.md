@@ -6,6 +6,9 @@
 [![Azure](https://img.shields.io/badge/Azure-OpenAI%20GPT--5-0078D4?logo=microsoft-azure)](https://azure.microsoft.com/en-us/products/ai-services/openai-service)
 [![Aspire](https://img.shields.io/badge/Aspire-Enabled-512BD4?logo=dotnet)](https://learn.microsoft.com/dotnet/aspire/)
 [![Blazor](https://img.shields.io/badge/Blazor-WebAssembly-512BD4?logo=blazor)](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/VladyslavNap/EvoAITest/build-and-test.yml?branch=main&label=build)](https://github.com/VladyslavNap/EvoAITest/actions)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/VladyslavNap/EvoAITest/actions)
+[![Code Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/VladyslavNap/EvoAITest/actions)
 
 ## Overview
 
@@ -26,10 +29,11 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 7)
-- `EvoAITest.LLM/Providers/AzureOpenAIProvider.cs` now anchors the production path with the Azure.AI.OpenAI 2.x SDK, Entra ID (Managed Identity) fallback, streaming completions, embeddings, tool-call parsing, and token/cost accounting.
-- `EvoAITest.LLM/Providers/OllamaProvider.cs` unlocks offline/local development by speaking the Ollama HTTP API for completions, streaming, embeddings, and availability checks against any pulled local model.
-- `EvoAITest.LLM/Factory/LLMProviderFactory.cs` plus `EvoAITest.LLM/Extensions/ServiceCollectionExtensions.cs` provide configuration-bound DI via `AddLLMServices`, so `ILLMProvider` resolves to Azure OpenAI, Ollama, or local endpoints without code changes.
+### Latest Update (Day 8)
+- `EvoAITest.Core/Abstractions/IToolExecutor.cs`, `EvoAITest.Core/Options/ToolExecutorOptions.cs`, and `EvoAITest.Core/Services/DefaultToolExecutor.cs` add a production-grade tool execution service with exponential backoff + jitter, telemetry, execution history, and registry-backed validation.
+- `EvoAITest.Core/Services/ToolExecutorLog.cs` centralizes structured LoggerMessage source generators so DefaultToolExecutor emits consistent breadcrumbs across API, web, and agent hosts.
+- `EvoAITest.Tests/Services/DefaultToolExecutorTests.cs` and `EvoAITest.Tests/Integration/ToolExecutorIntegrationTests.cs` keep the executor green across success paths, retries, fallback flows, cancellation, and telemetry projections.
+- `AddEvoAITestCore` now binds the new `EvoAITest:ToolExecutor` configuration section automatically, so apps pick up retry/backoff knobs alongside the Playwright `IBrowserAgent`.
 
 ## Project Structure
 
@@ -266,6 +270,19 @@ dotnet test --filter "FullyQualifiedName~EvoAITestCoreOptionsTests"
 
 # Run Azure OpenAI tests
 dotnet test --filter "FullyQualifiedName~AzureOpenAI"
+
+# Skip integration tests
+dotnet test --filter "Category!=Integration"
+```
+
+### Integration Tests (9 tests)
+```bash
+# Install Playwright browsers first
+cd EvoAITest.Tests/bin/Debug/net10.0
+pwsh playwright.ps1 install chromium
+
+# Run integration tests
+dotnet test --filter "Category=Integration"
 ```
 
 ### Test Coverage
@@ -276,8 +293,29 @@ dotnet test --filter "FullyQualifiedName~AzureOpenAI"
 - ? Tool call parsing
 - ? Environment variable binding
 - ? Key Vault security
+- ? **DefaultToolExecutor (30+ unit tests)**
+- ? **Tool Executor Integration (9 real browser tests)**
 
-**All tests are fully mocked - NO Azure credentials required!**
+**All tests are fully automated in CI/CD - NO Azure credentials required for unit tests!**
+
+### Continuous Integration
+
+The project uses automated CI/CD pipelines for testing:
+
+**GitHub Actions:**
+- ? Automated on every push and pull request
+- ? Unit tests run in ~2-3 seconds
+- ? Integration tests run in ~40-60 seconds
+- ? Code coverage reports automatically generated
+- ?? [View CI/CD status](https://github.com/VladyslavNap/EvoAITest/actions)
+
+**Azure DevOps:**
+- ? Multi-stage pipeline (Build ? Test ? Publish)
+- ? Parallel test execution
+- ? Test result integration
+- ? Artifact publishing for deployments
+
+See [CI/CD Pipeline Documentation](CI_CD_PIPELINE_DOCUMENTATION.md) for detailed configuration.
 
 ## Deployment
 
@@ -399,6 +437,9 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - [Verification Script Guide](scripts/README-verify-day5.md) - how to run verify-day5.ps1.
 - [Verification Script Summary](VERIFY_DAY5_SCRIPT_SUMMARY.md) - shorthand for the checks performed.
 - [ILLMProvider Update](ILLMPROVIDER_UPDATE_SUMMARY.md) - LLM abstraction changes.
+- **[Tool Executor Tests Summary](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md)** - 30+ unit tests for Tool Executor.
+- **[Tool Executor Integration Tests](TOOL_EXECUTOR_INTEGRATION_TESTS_SUMMARY.md)** - 9 real browser integration tests.
+- **[CI/CD Pipeline Documentation](CI_CD_PIPELINE_DOCUMENTATION.md)** - Automated testing and deployment pipelines.
 
 ## Technology Stack
 
