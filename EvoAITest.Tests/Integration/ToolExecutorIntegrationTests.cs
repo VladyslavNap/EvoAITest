@@ -388,7 +388,8 @@ public class ToolExecutorIntegrationTests : IAsyncLifetime
         var screenshot2Result = results[3];
         screenshot2Result.Result.Should().NotBeNull();
         screenshot2Result.Result.Should().BeOfType<string>();
-        var screenshot2 = screenshot2Result.Result as string;
+        if (screenshot2Result.Result is not string screenshot2)
+            throw new Xunit.Sdk.XunitException("Expected screenshot2Result.Result to be a string");
         screenshot2.Should().NotBeNullOrEmpty("second screenshot should be captured");
 
         // Validate base64 format
