@@ -381,11 +381,13 @@ public class ToolExecutorIntegrationTests : IAsyncLifetime
         // Verify screenshots were captured
         var screenshot1Result = results[1];
         screenshot1Result.Result.Should().NotBeNull();
+        screenshot1Result.Result.Should().BeOfType<string>();
         var screenshot1 = screenshot1Result.Result as string;
         screenshot1.Should().NotBeNullOrEmpty("first screenshot should be captured");
         
         var screenshot2Result = results[3];
         screenshot2Result.Result.Should().NotBeNull();
+        screenshot2Result.Result.Should().BeOfType<string>();
         var screenshot2 = screenshot2Result.Result as string;
         screenshot2.Should().NotBeNullOrEmpty("second screenshot should be captured");
 
