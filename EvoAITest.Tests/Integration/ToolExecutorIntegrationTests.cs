@@ -527,6 +527,7 @@ public class ToolExecutorIntegrationTests : IAsyncLifetime
         result.Metadata.Should().ContainKey("primary_error");
 
         var extractedText = result.Result as string;
+        extractedText.Should().NotBeNull("fallback should return text");
         extractedText.Should().Contain("Example Domain");
 
         _output.WriteLine($"Primary tool failed as expected");
