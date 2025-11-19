@@ -747,7 +747,19 @@ public sealed class DefaultToolExecutor : IToolExecutor
             return JsonSerializer.Deserialize<T>(json) 
                 ?? throw new InvalidCastException($"Failed to deserialize parameter '{parameterName}' to type {typeof(T).Name}");
         }
-        catch (Exception ex)
+        catch (InvalidCastException ex)
+        {
+            throw new ArgumentException(
+                $"Parameter '{parameterName}' in tool call '{toolCall.ToolName}' " +
+                $"cannot be converted to type {typeof(T).Name}", ex);
+        }
+        catch (JsonException ex)
+        {
+            throw new ArgumentException(
+                $"Parameter '{parameterName}' in tool call '{toolCall.ToolName}' " +
+                $"cannot be converted to type {typeof(T).Name}", ex);
+        }
+        catch (FormatException ex)
         {
             throw new ArgumentException(
                 $"Parameter '{parameterName}' in tool call '{toolCall.ToolName}' " +
@@ -841,7 +853,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
         // Cap at maximum delay
         var cappedDelay = Math.Min(exponentialDelay, _options.MaxRetryDelayMs);
         
-        // Add jitter (±25%) to prevent thundering herd
+        // Add jitter (Â±25%) to prevent thundering herd
         var jitterRange = cappedDelay * 0.25;
         var jitter = (_jitterRandom.NextDouble() * 2 - 1) * jitterRange; // Random between -25% and +25%
         var finalDelay = cappedDelay + jitter;
