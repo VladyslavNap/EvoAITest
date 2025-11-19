@@ -268,15 +268,21 @@ public class ToolExecutorIntegrationTests : IAsyncLifetime
         stateResult.Result.Should().NotBeNull();
         var pageState = stateResult.Result as PageState;
         pageState.Should().NotBeNull();
-        pageState!.Url.Should().Contain("example.com");
-        pageState.Title.Should().Be("Example Domain");
-        pageState.InteractiveElements.Should().NotBeEmpty("page has links");
-        
-        _output.WriteLine($"Page state captured:");
-        _output.WriteLine($"  URL: {pageState.Url}");
-        _output.WriteLine($"  Title: {pageState.Title}");
-        _output.WriteLine($"  Interactive elements: {pageState.InteractiveElements.Count}");
+        if (pageState is not null)
+        {
+            pageState.Url.Should().Contain("example.com");
+            pageState.Title.Should().Be("Example Domain");
+            pageState.InteractiveElements.Should().NotBeEmpty("page has links");
 
+            _output.WriteLine($"Page state captured:");
+            _output.WriteLine($"  URL: {pageState.Url}");
+            _output.WriteLine($"  Title: {pageState.Title}");
+            _output.WriteLine($"  Interactive elements: {pageState.InteractiveElements.Count}");
+        }
+        else
+        {
+            throw new Xunit.Sdk.XunitException("pageState was null after assertion.");
+        }
         // Verify get_page_html result
         var htmlResult = results[4];
         htmlResult.Result.Should().NotBeNull();
