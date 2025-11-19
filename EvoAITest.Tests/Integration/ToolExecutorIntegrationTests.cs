@@ -286,6 +286,7 @@ public class ToolExecutorIntegrationTests : IAsyncLifetime
         // Verify get_page_html result
         var htmlResult = results[4];
         htmlResult.Result.Should().NotBeNull();
+        htmlResult.Result.Should().BeOfType<string>("get_page_html should return a string");
         var html = htmlResult.Result as string;
         html.Should().NotBeNullOrEmpty();
         html.Should().Contain("<!DOCTYPE html>", "should contain DOCTYPE");
