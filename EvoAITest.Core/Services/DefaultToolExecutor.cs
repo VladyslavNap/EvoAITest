@@ -793,8 +793,24 @@ public sealed class DefaultToolExecutor : IToolExecutor
             var json = JsonSerializer.Serialize(value);
             return JsonSerializer.Deserialize<T>(json) ?? defaultValue;
         }
-        catch
+        catch (JsonException ex)
         {
+            _logger.LogWarning(ex, "Failed to deserialize parameter '{ParameterName}' in tool call '{ToolName}' to type {TypeName}. Returning default value.", parameterName, toolCall.ToolName, typeof(T).Name);
+            return defaultValue;
+        }
+        catch (InvalidCastException ex)
+        {
+            _logger.LogWarning(ex, "Failed to cast parameter '{ParameterName}' in tool call '{ToolName}' to type {TypeName}. Returning default value.", parameterName, toolCall.ToolName, typeof(T).Name);
+            return defaultValue;
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogWarning(ex, "Failed to format parameter '{ParameterName}' in tool call '{ToolName}' to type {TypeName}. Returning default value.", parameterName, toolCall.ToolName, typeof(T).Name);
+            return defaultValue;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error converting parameter '{ParameterName}' in tool call '{ToolName}' to type {TypeName}. Returning default value.", parameterName, toolCall.ToolName, typeof(T).Name);
             return defaultValue;
         }
     }
