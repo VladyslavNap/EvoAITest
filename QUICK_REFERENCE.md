@@ -6,16 +6,12 @@
 
 ```csharp
 // Program.cs or Startup.cs
-builder.Services.AddBrowserAICore(options =>
-{
-    options.Headless = true;
-    options.ViewportWidth = 1920;
-    options.ViewportHeight = 1080;
-});
-
-builder.Services.AddLLMServices();
+builder.Services.AddEvoAITestCore(builder.Configuration);
+builder.Services.AddLLMServices(builder.Configuration);
 builder.Services.AddAgentServices();
 ```
+
+> Configure the provider under `EvoAITest:Core` (LLM + browser) and the retry/backoff knobs under `EvoAITest:ToolExecutor` in `appsettings*.json`. Example: set `LLMProvider = "AzureOpenAI"` with endpoint/key or `"Ollama"` for local dev, then supply `ToolExecutor.MaxRetries`, `InitialRetryDelayMs`, etc. so the factory and executor resolve correctly.
 
 ### 2. Create a Task
 
@@ -86,6 +82,22 @@ await page.NavigateAsync("https://example.com");
 var element = await page.LocateAsync(ElementLocator.Css("input"));
 await element.FillAsync("text");
 await element.GetAttributeAsync("value");
+```
+
+### Execute Browser Tools with Retry/Backoff
+```csharp
+var executor = serviceProvider.GetRequiredService<IToolExecutor>();
+var toolCall = new ToolCall(
+    ToolName: "navigate",
+    Parameters: new Dictionary<string, object> { ["url"] = "https://example.com" },
+    Reasoning: "Open the landing page",
+    CorrelationId: Guid.NewGuid().ToString());
+
+var result = await executor.ExecuteToolAsync(toolCall, cancellationToken);
+if (!result.Success)
+{
+    logger.LogWarning("Tool failed after {Attempts} attempts: {Error}", result.AttemptCount, result.Error);
+}
 ```
 
 ### Capture State

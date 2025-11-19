@@ -95,13 +95,10 @@ dotnet add reference ../EvoAITest.Core/EvoAITest.Core.csproj
 Register services:
 
 ```csharp
-builder.Services.AddBrowserAICore(options =>
-{
-    options.Headless = true;
-    options.ViewportWidth = 1920;
-    options.ViewportHeight = 1080;
-});
+builder.Services.AddEvoAITestCore(builder.Configuration);
 ```
+
+> `AddEvoAITestCore` binds both `EvoAITest:Core` (Playwright agent + browser knobs) and `EvoAITest:ToolExecutor` (retry/backoff/options) so `IBrowserAgent`, `IBrowserToolRegistry`, and `IToolExecutor` are available via DI.
 
 ## Usage Examples
 
@@ -168,6 +165,39 @@ public class BrowserAutomationService
         var state = await _browser.GetPageStateAsync();
         await _browser.DisposeAsync();
         return state;
+    }
+}
+```
+
+## Tool Executor (Day 8)
+
+Day 8 introduced a first-party tool executor that bridges the `BrowserToolRegistry` with `IBrowserAgent`, adding production-grade resiliency around every automation step.
+
+- **Interfaces & Options**: `EvoAITest.Core/Abstractions/IToolExecutor.cs`, `EvoAITest.Core/Options/ToolExecutorOptions.cs`
+- **Implementation**: `EvoAITest.Core/Services/DefaultToolExecutor.cs` + `ToolExecutorLog.cs`
+- **Features**: registry validation, parameter checking, exponential backoff with jitter, transient vs terminal error classification, per-attempt timeouts, in-memory execution history, and OpenTelemetry-friendly tracing/meters.
+
+### Usage
+
+```csharp
+public class ToolRunner
+{
+    private readonly IToolExecutor _toolExecutor;
+
+    public ToolRunner(IToolExecutor toolExecutor)
+    {
+        _toolExecutor = toolExecutor;
+    }
+
+    public async Task<ToolExecutionResult> NavigateAsync(string url, string correlationId, CancellationToken ct)
+    {
+        var toolCall = new ToolCall(
+            ToolName: "navigate",
+            Parameters: new Dictionary<string, object> { ["url"] = url },
+            Reasoning: "Open target page",
+            CorrelationId: correlationId);
+
+        return await _toolExecutor.ExecuteToolAsync(toolCall, ct);
     }
 }
 ```

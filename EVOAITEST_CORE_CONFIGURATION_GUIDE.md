@@ -94,6 +94,28 @@ They come from environment variables and Key Vault.
 }
 ```
 
+### Tool Executor Options (All Environments)
+
+Add this sibling section to control retry/backoff behavior for `IToolExecutor`:
+
+```json
+{
+  "EvoAITest": {
+    "ToolExecutor": {
+      "MaxRetries": 3,
+      "InitialRetryDelayMs": 500,
+      "MaxRetryDelayMs": 10000,
+      "UseExponentialBackoff": true,
+      "TimeoutPerToolMs": 30000,
+      "EnableDetailedLogging": true,
+      "MaxHistorySize": 100
+    }
+  }
+}
+```
+
+> Additional knobs (e.g., `MaxConcurrentTools`) live in `EvoAITest.Core/Options/ToolExecutorOptions.cs`. All values are validated on startup, so invalid configs fail fast with actionable errors.
+
 ## Environment Variables
 
 ### Azure OpenAI (Production)
@@ -140,6 +162,18 @@ EVOAITEST__CORE__SCREENSHOTOUTPUTPATH=/mnt/screenshots
 
 # API Key comes from Key Vault reference (not environment variable)
 # Configure as Key Vault secret reference in Azure Container Apps
+```
+
+### Tool Executor Environment Variables
+
+```bash
+# Retry/backoff knobs (double underscore format)
+export EVOAITEST__TOOLEXECUTOR__MAXRETRIES=3
+export EVOAITEST__TOOLEXECUTOR__INITIALRETRYDELAYMS=500
+export EVOAITEST__TOOLEXECUTOR__MAXRETRYDELAYMS=10000
+export EVOAITEST__TOOLEXECUTOR__USEEXPONENTIALBACKOFF=true
+export EVOAITEST__TOOLEXECUTOR__TIMEOUTPERTOOLMS=30000
+export EVOAITEST__TOOLEXECUTOR__ENABLEDETAILEDLOGGING=true
 ```
 
 ## Azure Key Vault Integration

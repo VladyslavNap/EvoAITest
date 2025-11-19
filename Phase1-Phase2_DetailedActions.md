@@ -1,6 +1,6 @@
 # EvoAITest - Phase 1 & Phase 2 Action Plan
 
-> **Project Status**: Day 7 LLM provider factory + Azure/Ollama providers landed (code, DI, docs). Keep the [Day 5 Implementation Checklist](DAY5_CHECKLIST.md) plus the [Implementation Summary](IMPLEMENTATION_SUMMARY.md) for baseline context and use this roadmap for Day 8+ execution. Deep dives for the new stack live in [AZURE_OPENAI_PROVIDER_SUMMARY.md](AZURE_OPENAI_PROVIDER_SUMMARY.md), [OLLAMA_PROVIDER_SUMMARY.md](OLLAMA_PROVIDER_SUMMARY.md), and [LLM_PROVIDER_FACTORY_SUMMARY.md](LLM_PROVIDER_FACTORY_SUMMARY.md).
+> **Project Status**: Day 8 tool executor service + telemetry + tests landed (next up: Planner agent). Keep the [Day 5 Implementation Checklist](DAY5_CHECKLIST.md) plus the [Implementation Summary](IMPLEMENTATION_SUMMARY.md) for baseline context and use this roadmap for Day 9+ execution. Deep dives for the new stacks live in [AZURE_OPENAI_PROVIDER_SUMMARY.md](AZURE_OPENAI_PROVIDER_SUMMARY.md), [OLLAMA_PROVIDER_SUMMARY.md](OLLAMA_PROVIDER_SUMMARY.md), [LLM_PROVIDER_FACTORY_SUMMARY.md](LLM_PROVIDER_FACTORY_SUMMARY.md), [DEFAULT_TOOL_EXECUTOR_SUMMARY.md](DEFAULT_TOOL_EXECUTOR_SUMMARY.md), and [DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md).
 
 ## How to Navigate the Docs
 - [README](README.md) – high-level overview, architecture, and environment setup.
@@ -8,8 +8,8 @@
 - [Browser Tool Registry Deep Dive](BROWSER_TOOL_REGISTRY_SUMMARY.md) – complete contract for the 13 tools.
 - [Automation Models Primer](AUTOMATION_TASK_MODELS_SUMMARY.md) – data models, enums, and persistence notes.
 
-## ✅ Days 1–7 Snapshot
-Day 5 artifacts still capture the foundation. Day 6 delivered the concrete Playwright browser agent (`EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs`), DI wiring, and regression tests (`EvoAITest.Tests/Browser/PlaywrightBrowserAgentTests.cs`). Day 7 layered in the multi-provider LLM stack (Azure OpenAI + Ollama + `LLMProviderFactory`) along with configuration-bound DI registration. Keep the README “Latest Update (Day 7)” section handy when referencing either automation surface.
+## ✅ Days 1–8 Snapshot
+Day 5 artifacts still capture the foundation. Day 6 delivered the concrete Playwright browser agent (`EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs`), DI wiring, and regression tests (`EvoAITest.Tests/Browser/PlaywrightBrowserAgentTests.cs`). Day 7 layered in the multi-provider LLM stack (Azure OpenAI + Ollama + `LLMProviderFactory`) along with configuration-bound DI registration. Day 8 shipped the `IToolExecutor` contract, options, and the telemetry-heavy `DefaultToolExecutor` (plus unit + integration tests), wiring the automation stack together end-to-end.
 
 ---
 
@@ -570,9 +570,76 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 
 ---
 
-### Day 8-15: Agent Implementation (Planner, Executor, Healer)
+### Day 8: Tool Executor Service
 
-*(Continue with agent implementations following the same pattern...)*
+**Goal**: Deliver a resilient tool execution layer that validates registry calls, adds retry/backoff, exposes telemetry, and keeps full execution history for agents.
+
+Day 8 shipped the following artifacts:
+- `EvoAITest.Core/Abstractions/IToolExecutor.cs` – contract for single runs, sequences, fallback flows, and history lookups.
+- `EvoAITest.Core/Options/ToolExecutorOptions.cs` – 300+ lines of validated knobs (retries, exponential backoff, jitter, per-attempt timeouts, detailed logging, history limits).
+- `EvoAITest.Core/Services/DefaultToolExecutor.cs` + `ToolExecutorLog.cs` – scoped executor with LoggerMessage source generators, OpenTelemetry `ActivitySource` + meters, transient/terminal classification, and structured metadata.
+- Tests: `EvoAITest.Tests/Services/DefaultToolExecutorTests.cs` (~30 targeted unit specs) and `EvoAITest.Tests/Integration/ToolExecutorIntegrationTests.cs` (happy paths + retries + fallback + cancellation).
+
+**Action 8.1: Define contract + options**
+
+Create `EvoAITest.Core/Abstractions/IToolExecutor.cs` and `EvoAITest.Core/Options/ToolExecutorOptions.cs`:
+```csharp
+var toolCall = new ToolCall("navigate",
+    new Dictionary<string, object> { ["url"] = "https://example.com" },
+    "Open target site",
+    correlationId: Guid.NewGuid().ToString());
+
+var options = new ToolExecutorOptions
+{
+    MaxRetries = 3,
+    InitialRetryDelayMs = 500,
+    UseExponentialBackoff = true,
+    TimeoutPerToolMs = 30000
+};
+```
+
+**Action 8.2: Implement DefaultToolExecutor**
+
+`EvoAITest.Core/Services/DefaultToolExecutor.cs` executes tools with:
+- Registry + parameter validation before each attempt
+- Exponential backoff with ±25% jitter between retries
+- Structured logging via `ToolExecutorLog` source generators
+- `ToolExecutionResult` metadata describing attempts, delays, fallback usage, and correlation IDs
+- `ToolExecutionResult` history accessible via `GetExecutionHistoryAsync`
+
+**Action 8.3: Wire configuration + DI**
+
+`AddEvoAITestCore` now binds `EvoAITest:ToolExecutor` and registers the executor:
+```csharp
+builder.Services.AddEvoAITestCore(builder.Configuration);
+// appsettings.Development.json
+"EvoAITest": {
+  "ToolExecutor": {
+    "MaxRetries": 2,
+    "InitialRetryDelayMs": 500,
+    "MaxRetryDelayMs": 5000,
+    "UseExponentialBackoff": true,
+    "TimeoutPerToolMs": 20000,
+    "EnableDetailedLogging": true
+  }
+}
+```
+
+**Action 8.4: Add coverage**
+
+- Unit tests: `EvoAITest.Tests/Services/DefaultToolExecutorTests.cs` span success, retries, backoff math, parameter validation, fallback, cancellation, and telemetry metadata.
+- Integration tests: `EvoAITest.Tests/Integration/ToolExecutorIntegrationTests.cs` spin up the default executor against mocked agents/tool registries to ensure DI + metrics behave end-to-end.
+
+**Daily Commit:**
+```
+feat: implement DefaultToolExecutor with retry/backoff, options, and tests
+```
+
+**Status**: ✅ Complete — DefaultToolExecutor is now the scoped implementation resolving for `IToolExecutor` with full configuration + telemetry support baked in.
+
+---
+
+### Day 9-15: Agent Implementation (Planner, Executor, Healer)
 
 ---
 
@@ -581,7 +648,7 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 ### Phase 1 Remaining (Days 6-21)
 - [x] Day 6: Playwright browser implementation
 - [x] Day 7: LLM provider implementations
-- [ ] Day 8: Tool executor service
+- [x] Day 8: Tool executor service
 - [ ] Day 9: Planner agent (natural language → execution plan)
 - [ ] Day 10: Executor agent (run automation steps)
 - [ ] Day 11: Healer agent (error recovery)
@@ -605,13 +672,14 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 
 ---
 
-## 🎯 IMMEDIATE NEXT STEPS (Day 8)
+## 🎯 IMMEDIATE NEXT STEPS (Day 9)
 
-1. **Design Tool Executor service**: Define inputs/outputs, error model, and telemetry hooks for coordinating `BrowserTool` invocations.
-2. **Implement ToolExecutor**: Leverage `IBrowserAgent` + registry metadata to run tool sequences with retry/backoff semantics.
-3. **Wire into DI + options**: Expose the executor via `EvoAITest.Core` extensions and add configuration flags for max concurrency/timeouts.
-4. **Add unit tests**: Cover successful runs, retry paths, cancellation, and logging breadcrumbs.
-5. **Commit**: `feat: add tool executor service`
+1. **Define Planner contracts**: Finalize Planner agent interfaces + DTOs for plan steps, tool calls, and reasoning breadcrumbs.
+2. **Implement PlannerService**: Use `ILLMProvider` + `IToolExecutor` metadata to convert natural language prompts into ordered `ToolCall` sequences.
+3. **Add validation + heuristics**: Ensure planner outputs respect tool registry schema, guardrails, and max step counts.
+4. **Wire DI + configuration**: Register planner services inside `EvoAITest.Agents`, expose planner options, and surface via API/Web.
+5. **Add tests**: LLM mock-based unit tests for prompt templating, JSON parsing, guardrail enforcement, plus integration happy-paths.
+6. **Commit**: `feat: add planner agent with tool-aware plan generation`
 
 ---
 
@@ -626,6 +694,7 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 | Configuration | ✅ Complete | ✅ | ✅ |
 | **Playwright Agent** | ✅ Complete | ✅ | ✅ |
 | LLM Providers | ✅ Complete | ✅ | ✅ |
+| Tool Executor | ✅ Complete | ✅ | ✅ |
 | Planner Agent | ⏳ Pending | ⏳ | ⏳ |
 | Executor Agent | ⏳ Pending | ⏳ | ⏳ |
 | Healer Agent | ⏳ Pending | ⏳ | ⏳ |
@@ -634,6 +703,6 @@ feat: implement Azure OpenAI and Ollama providers with factory pattern
 
 ---
 
-**Current Status**: ✅ Day 7 Complete | 🚧 Day 8 Starting  
-**Next Milestone**: Tool Executor Service  
+**Current Status**: ✅ Day 8 Complete | 🚧 Day 9 Starting  
+**Next Milestone**: Planner Agent Skeleton  
 **Target**: Complete Phase 1 (21 days) by end of month

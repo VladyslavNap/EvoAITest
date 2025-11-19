@@ -1,7 +1,12 @@
+using EvoAITest.Core.Extensions;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
+
+// Add EvoAITest.Core services (Browser Agent, Tool Registry, Tool Executor)
+builder.Services.AddEvoAITestCore(builder.Configuration);
 
 // Add services to the container.
 builder.Services.AddProblemDetails();

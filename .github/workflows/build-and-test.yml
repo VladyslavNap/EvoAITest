@@ -1,0 +1,141 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop, ToolExecutor ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  SOLUTION_FILE: 'EvoAITest.sln'
+  
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+      
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+      
+    - name: Run Unit Tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category!=Integration" \
+          --logger "trx;LogFileName=unit-test-results.trx" \
+          --collect:"XPlat Code Coverage" \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+      
+    - name: Install Playwright browsers
+      run: |
+        cd EvoAITest.Tests/bin/Release/net10.0
+        pwsh playwright.ps1 install chromium --with-deps
+      
+    - name: Run Integration Tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Integration" \
+          --logger "trx;LogFileName=integration-test-results.trx" \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+      
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: |
+          **/unit-test-results.trx
+          **/integration-test-results.trx
+        
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          **/TestResults/**/*.trx
+          **/TestResults/**/*.xml
+          
+    - name: Upload Code Coverage
+      uses: codecov/codecov-action@v4
+      if: always()
+      with:
+        files: '**/TestResults/**/coverage.opencover.xml'
+        flags: unittests,integrationtests
+        name: codecov-evoaitest
+        
+  build-artifacts:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Publish API Service
+      run: |
+        dotnet publish EvoAITest.ApiService/EvoAITest.ApiService.csproj \
+          --configuration Release \
+          --output ./publish/apiservice
+          
+    - name: Publish Web App
+      run: |
+        dotnet publish EvoAITest.Web/EvoAITest.Web.csproj \
+          --configuration Release \
+          --output ./publish/web
+          
+    - name: Upload API Service Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: apiservice
+        path: ./publish/apiservice
+        
+    - name: Upload Web App Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: webapp
+        path: ./publish/web
+        
+  code-quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+      
+    - name: Run Analyzers
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore /warnaserror
+      continue-on-error: true
+      
+    - name: Check Code Formatting
+      run: dotnet format ${{ env.SOLUTION_FILE }} --verify-no-changes --verbosity diagnostic
+      continue-on-error: true
