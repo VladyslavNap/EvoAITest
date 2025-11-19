@@ -259,6 +259,7 @@ public class ToolExecutorIntegrationTests : IAsyncLifetime
         var textResult = results[2];
         textResult.Result.Should().NotBeNull();
         var headingText = textResult.Result as string;
+        headingText.Should().NotBeNull();
         headingText.Should().Contain("Example Domain", "heading should contain expected text");
         _output.WriteLine($"Extracted heading: {headingText}");
 
