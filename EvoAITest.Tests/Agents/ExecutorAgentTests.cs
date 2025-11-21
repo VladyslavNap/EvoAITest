@@ -930,10 +930,10 @@ public sealed class ExecutorAgentTests
 
         _mockToolExecutor
             .Setup(x => x.ExecuteToolAsync(It.IsAny<ToolCall>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ToolCall tc, CancellationToken ct) =>
+            .Returns(async (ToolCall tc, CancellationToken ct) =>
             {
                 // Simulate long-running operation to keep first execution active
-                Task.Delay(5000, ct).Wait(ct);
+                await Task.Delay(5000, ct);
                 return ToolExecutionResult.Succeeded(tc.ToolName, null, TimeSpan.FromSeconds(5), 1);
             });
 
