@@ -29,11 +29,10 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 8)
-- `EvoAITest.Core/Abstractions/IToolExecutor.cs`, `EvoAITest.Core/Options/ToolExecutorOptions.cs`, and `EvoAITest.Core/Services/DefaultToolExecutor.cs` add a production-grade tool execution service with exponential backoff + jitter, telemetry, execution history, and registry-backed validation.
-- `EvoAITest.Core/Services/ToolExecutorLog.cs` centralizes structured LoggerMessage source generators so DefaultToolExecutor emits consistent breadcrumbs across API, web, and agent hosts.
-- `EvoAITest.Tests/Services/DefaultToolExecutorTests.cs` and `EvoAITest.Tests/Integration/ToolExecutorIntegrationTests.cs` keep the executor green across success paths, retries, fallback flows, cancellation, and telemetry projections.
-- `AddEvoAITestCore` now binds the new `EvoAITest:ToolExecutor` configuration section automatically, so apps pick up retry/backoff knobs alongside the Playwright `IBrowserAgent`.
+### Latest Update (Day 10)
+- `EvoAITest.Agents/Agents/ExecutorAgent.cs` adds the default `IExecutor` that converts planner output into concrete `ToolCall`s, drives the `IToolExecutor`, captures screenshots/validation data, tracks execution statistics, and exposes pause/resume/cancel controls per task.
+- `EvoAITest.Agents/Extensions/ServiceCollectionExtensions.cs` now wires `ExecutorAgent` alongside `PlannerAgent`, so calling `builder.Services.AddAgentServices()` lights up both halves of the automation pipeline.
+- `EvoAITest.Tests/Agents/ExecutorAgentTests.cs` delivers 19 unit tests covering happy paths, retries, optional steps, validation, cancellation, and lifecycle APIs, and `EvoAITest.Tests/Agents/PlannerAgentTests.cs` gained a regression test that blocks empty plan payloads from the LLM.
 
 ## Project Structure
 
@@ -295,6 +294,7 @@ dotnet test --filter "Category=Integration"
 - ? Key Vault security
 - ? **DefaultToolExecutor (30+ unit tests)**
 - ? **Tool Executor Integration (9 real browser tests)**
+- ? **ExecutorAgent (19 orchestration-focused unit tests)**
 
 **All tests are fully automated in CI/CD - NO Azure credentials required for unit tests!**
 
@@ -437,6 +437,8 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - [Verification Script Guide](scripts/README-verify-day5.md) - how to run verify-day5.ps1.
 - [Verification Script Summary](VERIFY_DAY5_SCRIPT_SUMMARY.md) - shorthand for the checks performed.
 - [ILLMProvider Update](ILLMPROVIDER_UPDATE_SUMMARY.md) - LLM abstraction changes.
+- [Agent Implementation Summary](EvoAITest.Agents/IMPLEMENTATION_SUMMARY.md) - Planner (Day 9) and Executor (Day 10) deliverables.
+- [Executor Agent Guide](EvoAITest.Agents/Agents/ExecutorAgent_README.md) - plan execution, validation, and lifecycle controls.
 - **[Tool Executor Tests Summary](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md)** - 30+ unit tests for Tool Executor.
 - **[Tool Executor Integration Tests](TOOL_EXECUTOR_INTEGRATION_TESTS_SUMMARY.md)** - 9 real browser integration tests.
 - **[CI/CD Pipeline Documentation](CI_CD_PIPELINE_DOCUMENTATION.md)** - Automated testing and deployment pipelines.

@@ -19,9 +19,9 @@ public static class ServiceCollectionExtensions
     {
         // Register default implementations
         services.TryAddScoped<IPlanner, PlannerAgent>();
+        services.TryAddScoped<IExecutor, ExecutorAgent>();
         
         // Other agent implementations will be registered as they are implemented
-        // services.TryAddScoped<IExecutor, DefaultExecutor>();
         // services.TryAddScoped<IHealer, DefaultHealer>();
         // services.TryAddScoped<IAgent, BrowserAutomationAgent>();
 
