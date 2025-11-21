@@ -687,7 +687,14 @@ public sealed class ExecutorAgentTests
 
         // Cleanup: cancel the execution
         await _sut.CancelExecutionAsync(taskId);
-        await Task.Delay(100); // Give time for cancellation
+        try
+        {
+            await executionTask; // Await to observe any exceptions
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
     }
 
     [Fact]
