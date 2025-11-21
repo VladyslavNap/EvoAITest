@@ -463,6 +463,7 @@ public sealed class PlannerAgentTests
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
         }
+    }
 
     [Fact]
     public async Task PlanAsync_WithEmptySteps_ShouldThrowException()
