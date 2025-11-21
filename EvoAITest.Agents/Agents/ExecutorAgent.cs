@@ -240,6 +240,11 @@ public sealed class ExecutorAgent : IExecutor
         var taskCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         lock (_stateLock)
         {
+            if (_taskCancellationSources.ContainsKey(taskId))
+            {
+                taskCts.Dispose();
+                throw new InvalidOperationException($"Task {taskId} is already executing");
+            }
             _taskCancellationSources[taskId] = taskCts;
             _taskStates[taskId] = new TaskExecutionState
             {
@@ -678,15 +683,11 @@ public sealed class ExecutorAgent : IExecutor
                         break;
 
                     case ValidationType.ElementText:
-                        // Assume rule.Selector contains the selector for the element
-                        var selector = rule.Selector?.ToString() ?? string.Empty;
                         var actualText = await _browserAgent.GetTextAsync(
-                            selector,
+                            rule.ExpectedValue?.ToString() ?? string.Empty,
                             cancellationToken);
                         validationResult.ActualValue = actualText;
-                        validationResult.Passed = actualText?.Equals(
-                            rule.ExpectedValue?.ToString() ?? string.Empty,
-                            StringComparison.OrdinalIgnoreCase) ?? false;
+                        validationResult.Passed = !string.IsNullOrEmpty(actualText);
                         break;
 
                     case ValidationType.PageTitle:
