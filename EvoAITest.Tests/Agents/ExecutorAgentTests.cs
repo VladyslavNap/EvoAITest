@@ -938,7 +938,7 @@ public sealed class ExecutorAgentTests
             });
 
         // Start first execution in background
-        var firstExecution = Task.Run(async () => await _sut.ExecutePlanAsync(plan, context));
+        var firstExecution = Task.Run(() => _sut.ExecutePlanAsync(plan, context));
 
         // Wait a bit for first execution to register
         await Task.Delay(100);
