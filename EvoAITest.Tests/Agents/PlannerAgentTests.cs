@@ -440,28 +440,29 @@ public sealed class PlannerAgentTests
 
         var context = new EvoAITest.Agents.Abstractions.ExecutionContext();
 
-        var cts = new CancellationTokenSource();
-        cts.Cancel(); // Cancel immediately
+        using (var cts = new CancellationTokenSource())
+        {
+            cts.Cancel(); // Cancel immediately
 
-        _mockLLMProvider.Setup(p => p.CompleteAsync(It.IsAny<LLMRequest>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new TaskCanceledException());
+            _mockLLMProvider.Setup(p => p.CompleteAsync(It.IsAny<LLMRequest>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new TaskCanceledException());
 
-        // Act
-        var act = async () => await _sut.CreatePlanAsync(task, context, cts.Token);
+            // Act
+            var act = async () => await _sut.CreatePlanAsync(task, context, cts.Token);
 
-        // Assert
-        await act.Should().ThrowAsync<TaskCanceledException>();
+            // Assert
+            await act.Should().ThrowAsync<TaskCanceledException>();
 
-        // Verify cancellation was logged
-        _mockLogger.Verify(
-            x => x.Log(
-                LogLevel.Warning,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("cancelled")),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
-    }
+            // Verify cancellation was logged
+            _mockLogger.Verify(
+                x => x.Log(
+                    LogLevel.Warning,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("cancelled")),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Once);
+        }
 
     [Fact]
     public async Task PlanAsync_WithEmptySteps_ShouldThrowException()
