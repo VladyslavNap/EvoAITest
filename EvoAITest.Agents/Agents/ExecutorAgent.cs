@@ -432,7 +432,11 @@ public sealed class ExecutorAgent : IExecutor
             // Cleanup task state
             lock (_stateLock)
             {
-                _taskCancellationSources.Remove(taskId);
+                if (_taskCancellationSources.TryGetValue(taskId, out var cts))
+                {
+                    _taskCancellationSources.Remove(taskId);
+                    cts.Dispose();
+                }
                 _taskStates.Remove(taskId);
             }
         }
