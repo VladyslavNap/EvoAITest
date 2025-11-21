@@ -630,6 +630,7 @@ public sealed class PlannerAgent : IPlanner
 
             return new AgentStep
             {
+                Id = Guid.NewGuid().ToString(),
                 StepNumber = order,
                 Action = browserAction,
                 Reasoning = reasoning,
