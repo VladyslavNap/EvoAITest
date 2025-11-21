@@ -638,9 +638,14 @@ public sealed class PlannerAgent : IPlanner
                 IsOptional = false
             };
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "Failed to parse step from JSON element");
+            _logger.LogWarning(ex, "Failed to parse step from JSON element (JSON error)");
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse step from JSON element (invalid operation)");
             return null;
         }
     }
