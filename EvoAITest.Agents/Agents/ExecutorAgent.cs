@@ -678,11 +678,15 @@ public sealed class ExecutorAgent : IExecutor
                         break;
 
                     case ValidationType.ElementText:
+                        // Assume rule.Selector contains the selector for the element
+                        var selector = rule.Selector?.ToString() ?? string.Empty;
                         var actualText = await _browserAgent.GetTextAsync(
-                            rule.ExpectedValue?.ToString() ?? string.Empty,
+                            selector,
                             cancellationToken);
                         validationResult.ActualValue = actualText;
-                        validationResult.Passed = !string.IsNullOrEmpty(actualText);
+                        validationResult.Passed = actualText?.Equals(
+                            rule.ExpectedValue?.ToString() ?? string.Empty,
+                            StringComparison.OrdinalIgnoreCase) ?? false;
                         break;
 
                     case ValidationType.PageTitle:
