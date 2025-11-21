@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -30,6 +30,8 @@
   <ItemGroup>
     <ProjectReference Include="..\EvoAITest.AppHost\EvoAITest.AppHost.csproj" />
     <ProjectReference Include="..\EvoAITest.Core\EvoAITest.Core.csproj" />
+    <ProjectReference Include="..\EvoAITest.Agents\EvoAITest.Agents.csproj" />
+    <ProjectReference Include="..\EvoAITest.LLM\EvoAITest.LLM.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -38,6 +40,10 @@
     <Using Include="Aspire.Hosting.ApplicationModel" />
     <Using Include="Aspire.Hosting.Testing" />
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Unit\Agents\" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,5 @@
 using EvoAITest.Agents.Abstractions;
+using EvoAITest.Agents.Agents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -16,13 +17,13 @@ public static class ServiceCollectionExtensions
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddAgentServices(this IServiceCollection services)
     {
-        // Agent implementations will be registered separately
-        // services.TryAddScoped<IAgent, BrowserAutomationAgent>();
+        // Register default implementations
+        services.TryAddScoped<IPlanner, PlannerAgent>();
         
-        // Core agent services
-        // services.TryAddScoped<IPlanner, DefaultPlanner>();
+        // Other agent implementations will be registered as they are implemented
         // services.TryAddScoped<IExecutor, DefaultExecutor>();
         // services.TryAddScoped<IHealer, DefaultHealer>();
+        // services.TryAddScoped<IAgent, BrowserAutomationAgent>();
 
         return services;
     }
