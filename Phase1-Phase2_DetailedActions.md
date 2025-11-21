@@ -1,6 +1,6 @@
 # EvoAITest - Phase 1 & Phase 2 Action Plan
 
-> **Project Status**: Day 8 tool executor service + telemetry + tests landed (next up: Planner agent). Keep the [Day 5 Implementation Checklist](DAY5_CHECKLIST.md) plus the [Implementation Summary](IMPLEMENTATION_SUMMARY.md) for baseline context and use this roadmap for Day 9+ execution. Deep dives for the new stacks live in [AZURE_OPENAI_PROVIDER_SUMMARY.md](AZURE_OPENAI_PROVIDER_SUMMARY.md), [OLLAMA_PROVIDER_SUMMARY.md](OLLAMA_PROVIDER_SUMMARY.md), [LLM_PROVIDER_FACTORY_SUMMARY.md](LLM_PROVIDER_FACTORY_SUMMARY.md), [DEFAULT_TOOL_EXECUTOR_SUMMARY.md](DEFAULT_TOOL_EXECUTOR_SUMMARY.md), and [DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md).
+> **Project Status**: Day 10 Planner + Executor agents (with unit tests + docs) are complete; Day 11 Healer agent is up next. Keep the [Day 5 Implementation Checklist](DAY5_CHECKLIST.md) plus the [Implementation Summary](EvoAITest.Agents/IMPLEMENTATION_SUMMARY.md) for baseline context and use this roadmap for Day 11+ execution. Deep dives for the new stacks live in [AZURE_OPENAI_PROVIDER_SUMMARY.md](AZURE_OPENAI_PROVIDER_SUMMARY.md), [OLLAMA_PROVIDER_SUMMARY.md](OLLAMA_PROVIDER_SUMMARY.md), [LLM_PROVIDER_FACTORY_SUMMARY.md](LLM_PROVIDER_FACTORY_SUMMARY.md), [DEFAULT_TOOL_EXECUTOR_SUMMARY.md](DEFAULT_TOOL_EXECUTOR_SUMMARY.md), [DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md), and the new [ExecutorAgent guide](EvoAITest.Agents/Agents/ExecutorAgent_README.md).
 
 ## How to Navigate the Docs
 - [README](README.md) – high-level overview, architecture, and environment setup.
@@ -639,6 +639,20 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 
 ---
 
+### Day 9: Planner Agent (✅ Complete)
+
+- Delivered `EvoAITest.Agents/Agents/PlannerAgent.cs` (~750 LOC) using Azure OpenAI / Ollama with function calling to convert natural language requests into validated `ExecutionPlan` objects (with confidence, reasoning, expected outcomes, and metadata).
+- Added `PlannerAgent_README.md` plus expanded implementation summary coverage for prompts, validation, refinement, and troubleshooting.
+- Updated DI registration so `AddAgentServices()` wires up `IPlanner` -> `PlannerAgent`.
+- Extended `PlannerAgentTests` with additional edge cases, including a guard that rejects empty LLM payloads before the executor ever runs.
+
+### Day 10: Executor Agent (✅ Complete)
+
+- Added `EvoAITest.Agents/Agents/ExecutorAgent.cs`, the default `IExecutor` that maps `AgentStep` actions to registry-backed `ToolCall`s, drives `IToolExecutor`, runs validation rules, captures screenshots, and tracks execution statistics.
+- Implemented lifecycle APIs (`PauseExecutionAsync`, `ResumeExecutionAsync`, `CancelExecutionAsync`) with synchronized task state so Aspire dashboards / UI buttons can control running automations.
+- Created `EvoAITest.Tests/Agents/ExecutorAgentTests.cs` (19 specs) covering success paths, optional steps, retries, validation, cancellation, and constructor guards.
+- Authored `EvoAITest.Agents/Agents/ExecutorAgent_README.md` and refreshed the overall implementation summary/README to describe plan execution, telemetry, and troubleshooting steps.
+
 ### Day 9-15: Agent Implementation (Planner, Executor, Healer)
 
 ---
@@ -649,8 +663,8 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 - [x] Day 6: Playwright browser implementation
 - [x] Day 7: LLM provider implementations
 - [x] Day 8: Tool executor service
-- [ ] Day 9: Planner agent (natural language → execution plan)
-- [ ] Day 10: Executor agent (run automation steps)
+- [x] Day 9: Planner agent (natural language → execution plan)
+- [x] Day 10: Executor agent (run automation steps)
 - [ ] Day 11: Healer agent (error recovery)
 - [ ] Day 12: EF Core database models
 - [ ] Day 13: Database migrations
@@ -672,14 +686,14 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 
 ---
 
-## 🎯 IMMEDIATE NEXT STEPS (Day 9)
+## 🎯 IMMEDIATE NEXT STEPS (Day 11)
 
-1. **Define Planner contracts**: Finalize Planner agent interfaces + DTOs for plan steps, tool calls, and reasoning breadcrumbs.
-2. **Implement PlannerService**: Use `ILLMProvider` + `IToolExecutor` metadata to convert natural language prompts into ordered `ToolCall` sequences.
-3. **Add validation + heuristics**: Ensure planner outputs respect tool registry schema, guardrails, and max step counts.
-4. **Wire DI + configuration**: Register planner services inside `EvoAITest.Agents`, expose planner options, and surface via API/Web.
-5. **Add tests**: LLM mock-based unit tests for prompt templating, JSON parsing, guardrail enforcement, plus integration happy-paths.
-6. **Commit**: `feat: add planner agent with tool-aware plan generation`
+1. **Define Healer contracts**: Finalize healing strategies, error taxonomies, and DTOs for suggested fixes / replanned steps.
+2. **Implement HealerAgent**: Use LLM reasoning + execution history to propose locator alternatives, extended waits, or plan adjustments.
+3. **Integrate with Executor telemetry**: Feed `AgentStepResult` failures (screenshots, validation results, retry info) into the healer pipeline.
+4. **Wire DI + configuration**: Register the healer next to planner/executor and expose toggles for automatic vs manual healing.
+5. **Add tests**: Mock-based specs covering error analysis, strategy selection, and healed step execution.
+6. **Commit**: `feat: add healer agent with AI-driven recovery strategies`
 
 ---
 
@@ -695,14 +709,14 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 | **Playwright Agent** | ✅ Complete | ✅ | ✅ |
 | LLM Providers | ✅ Complete | ✅ | ✅ |
 | Tool Executor | ✅ Complete | ✅ | ✅ |
-| Planner Agent | ⏳ Pending | ⏳ | ⏳ |
-| Executor Agent | ⏳ Pending | ⏳ | ⏳ |
+| Planner Agent | ✅ Complete | ✅ | ✅ |
+| Executor Agent | ✅ Complete | ✅ | ⏳ |
 | Healer Agent | ⏳ Pending | ⏳ | ⏳ |
 | Database | ⏳ Pending | ⏳ | ⏳ |
 | API Endpoints | ⏳ Pending | ⏳ | ⏳ |
 
 ---
 
-**Current Status**: ✅ Day 8 Complete | 🚧 Day 9 Starting  
-**Next Milestone**: Planner Agent Skeleton  
+**Current Status**: ✅ Day 10 Complete | 🚧 Day 11 Starting  
+**Next Milestone**: Healer Agent Prototype  
 **Target**: Complete Phase 1 (21 days) by end of month
