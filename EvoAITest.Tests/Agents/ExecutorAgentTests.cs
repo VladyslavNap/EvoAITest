@@ -901,4 +901,64 @@ public sealed class ExecutorAgentTests
         result.Statistics.SuccessRate.Should().BeApproximately(0.666, 0.001);
         result.Statistics.AverageStepDurationMs.Should().BeGreaterThan(0);
     }
+
+    [Fact]
+    public async Task ExecutePlanAsync_WithDuplicateTaskId_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var taskId = "duplicate-task";
+        var plan = new ExecutionPlan
+        {
+            Id = "plan-duplicate",
+            TaskId = taskId,
+            Steps = new List<AgentStep>
+            {
+                new()
+                {
+                    Id = "step-1",
+                    StepNumber = 1,
+                    Action = new BrowserAction { Type = ActionType.Navigate, Value = "https://example.com" },
+                    Reasoning = "Navigate"
+                }
+            }
+        };
+
+        var context = new EvoAITest.Agents.Abstractions.ExecutionContext
+        {
+            SessionId = "session-duplicate"
+        };
+
+        _mockToolExecutor
+            .Setup(x => x.ExecuteToolAsync(It.IsAny<ToolCall>(), It.IsAny<CancellationToken>()))
+            .Returns(async (ToolCall tc, CancellationToken ct) =>
+            {
+                // Simulate long-running operation to keep first execution active
+                await Task.Delay(1000, ct);
+                return ToolExecutionResult.Succeeded(tc.ToolName, null, TimeSpan.FromSeconds(1), 1);
+            });
+
+        // Start first execution in background
+        var firstExecution = Task.Run(() => _sut.ExecutePlanAsync(plan, context));
+
+        // Wait a bit for first execution to register
+        await Task.Delay(100);
+
+        // Act - Try to execute the same task again
+        var act = async () => await _sut.ExecutePlanAsync(plan, context);
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"Task {taskId} is already executing");
+
+        // Cleanup: cancel the first execution
+        await _sut.CancelExecutionAsync(taskId);
+        try
+        {
+            await firstExecution;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+    }
 }
