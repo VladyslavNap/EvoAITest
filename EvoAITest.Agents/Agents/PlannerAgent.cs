@@ -133,6 +133,7 @@ public sealed class PlannerAgent : IPlanner
             // Build the execution plan
             var plan = new ExecutionPlan
             {
+                Id = Guid.NewGuid().ToString(),
                 TaskId = task.Id,
                 Steps = steps,
                 EstimatedDurationMs = EstimatePlanDuration(steps),
