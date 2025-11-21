@@ -459,7 +459,7 @@ public sealed class PlannerAgent : IPlanner
                 promptBuilder.AppendLine("  - Expected elements:");
                 foreach (var element in task.Expectations.ExpectedElements)
                 {
-                    promptBuilder.AppendLine($"    • {element}");
+                    promptBuilder.AppendLine($"    â€¢ {element}");
                 }
             }
         }
