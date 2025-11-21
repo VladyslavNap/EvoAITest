@@ -933,8 +933,8 @@ public sealed class ExecutorAgentTests
             .Returns(async (ToolCall tc, CancellationToken ct) =>
             {
                 // Simulate long-running operation to keep first execution active
-                await Task.Delay(5000, ct);
-                return ToolExecutionResult.Succeeded(tc.ToolName, null, TimeSpan.FromSeconds(5), 1);
+                await Task.Delay(1000, ct);
+                return ToolExecutionResult.Succeeded(tc.ToolName, null, TimeSpan.FromSeconds(1), 1);
             });
 
         // Start first execution in background
