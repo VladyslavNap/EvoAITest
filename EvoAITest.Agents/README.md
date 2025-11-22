@@ -40,6 +40,8 @@ Console.WriteLine($"Executed {result.StepResults.Count} steps");
 Console.WriteLine($"Success rate: {result.Statistics?.SuccessRate:P}");
 ```
 
+`ExecutorAgent` is the default `IExecutor`. It converts `AgentStep` objects into `ToolCall`s for the resiliency-focused `IToolExecutor`, captures screenshots/validation output through `IBrowserAgent`, tracks execution statistics, and exposes pause/resume/cancel operations for long-running tasks.
+
 #### IHealer
 Self-healing capabilities:
 
@@ -131,11 +133,12 @@ Register services:
 
 ```csharp
 builder.Services.AddAgentServices();
-builder.Services.AddAgent<BrowserAutomationAgent>();
-builder.Services.AddPlanner<AIPlanner>();
-builder.Services.AddExecutor<StepExecutor>();
+builder.Services.AddPlanner<PlannerAgent>();   // optional override
+builder.Services.AddExecutor<ExecutorAgent>(); // optional override
 builder.Services.AddHealer<SelfHealingAgent>();
 ```
+
+`AddAgentServices()` wires up the PlannerAgent + ExecutorAgent pair out of the box, so applications immediately benefit from plan generation and execution orchestration.
 
 ## Usage Examples
 
@@ -303,6 +306,13 @@ Console.WriteLine($"Avg step duration: {stats.AverageStepDurationMs}ms");
 - ? Rich execution statistics
 - ? Screenshot capture
 - ? Comprehensive error handling
+
+### ExecutorAgent Highlights
+- Pause/resume/cancel APIs with thread-safe task state tracking.
+- Automatic translation from planner actions to registry-backed tool calls (navigate, click, type, wait, verify, extract).
+- Evidence collection on every failure plus a final screenshot for the task summary.
+- Built-in validation runners (element exists, text, page title, data extracted) with per-rule telemetry.
+- Execution statistics surfaced via `ExecutionStatistics` for dashboards and health checks.
 
 ## Next Steps
 
