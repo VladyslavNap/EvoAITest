@@ -499,8 +499,15 @@ public sealed class HealerAgent : IHealer
             if (root.TryGetProperty("changes", out var changesProp))
             {
                 var changesJson = changesProp.GetRawText();
-                strategy.Parameters = JsonSerializer.Deserialize<Dictionary<string, object>>(changesJson)
-                    ?? new Dictionary<string, object>();
+                var jsonElements = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(changesJson)
+                    ?? new Dictionary<string, JsonElement>();
+                
+                // Convert JsonElements to objects for storage
+                strategy.Parameters = new Dictionary<string, object>();
+                foreach (var kvp in jsonElements)
+                {
+                    strategy.Parameters[kvp.Key] = kvp.Value;
+                }
             }
 
             return strategy;
@@ -600,8 +607,12 @@ public sealed class HealerAgent : IHealer
         if (strategy.Parameters.TryGetValue("locator_type", out var locatorTypeObj) &&
             strategy.Parameters.TryGetValue("locator_value", out var locatorValueObj))
         {
-            var locatorType = locatorTypeObj?.ToString() ?? "css";
-            var locatorValue = locatorValueObj?.ToString() ?? "";
+            var locatorType = locatorTypeObj is JsonElement jeType 
+                ? jeType.GetString() ?? "css"
+                : locatorTypeObj?.ToString() ?? "css";
+            var locatorValue = locatorValueObj is JsonElement jeValue
+                ? jeValue.GetString() ?? ""
+                : locatorValueObj?.ToString() ?? "";
 
             healedStep.Action.Target = locatorType.ToLowerInvariant() switch
             {
