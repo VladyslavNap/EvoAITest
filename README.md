@@ -29,10 +29,10 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 10)
-- `EvoAITest.Agents/Agents/ExecutorAgent.cs` adds the default `IExecutor` that converts planner output into concrete `ToolCall`s, drives the `IToolExecutor`, captures screenshots/validation data, tracks execution statistics, and exposes pause/resume/cancel controls per task.
-- `EvoAITest.Agents/Extensions/ServiceCollectionExtensions.cs` now wires `ExecutorAgent` alongside `PlannerAgent`, so calling `builder.Services.AddAgentServices()` lights up both halves of the automation pipeline.
-- `EvoAITest.Tests/Agents/ExecutorAgentTests.cs` delivers 19 unit tests covering happy paths, retries, optional steps, validation, cancellation, and lifecycle APIs, and `EvoAITest.Tests/Agents/PlannerAgentTests.cs` gained a regression test that blocks empty plan payloads from the LLM.
+### Latest Update (Day 11)
+- `EvoAITest.Agents/Agents/HealerAgent.cs` introduces the default `IHealer`, which uses LLM-backed diagnostics plus live page state to classify executor failures, recommend adaptive strategies (alternative locators, extended waits, replanning), and prevent infinite heal loops with per-step attempt tracking.
+- `EvoAITest.Agents/Extensions/ServiceCollectionExtensions.cs` now registers the Planner, Executor, and Healer trio via `AddAgentServices()`, giving every host the full plan → execute → heal pipeline out of the box.
+- `EvoAITest.Tests/Agents/HealerAgentTests.cs` adds 25 focused unit tests that cover error analysis, LLM prompt handling, cancellation, invalid responses, healing strategy application, and alternative suggestions, ensuring the self-healing stage stays deterministic.
 
 ## Project Structure
 
@@ -295,6 +295,7 @@ dotnet test --filter "Category=Integration"
 - ? **DefaultToolExecutor (30+ unit tests)**
 - ? **Tool Executor Integration (9 real browser tests)**
 - ? **ExecutorAgent (19 orchestration-focused unit tests)**
+- ? **HealerAgent (25 LLM-driven healing tests)**
 
 **All tests are fully automated in CI/CD - NO Azure credentials required for unit tests!**
 
@@ -437,8 +438,9 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - [Verification Script Guide](scripts/README-verify-day5.md) - how to run verify-day5.ps1.
 - [Verification Script Summary](VERIFY_DAY5_SCRIPT_SUMMARY.md) - shorthand for the checks performed.
 - [ILLMProvider Update](ILLMPROVIDER_UPDATE_SUMMARY.md) - LLM abstraction changes.
-- [Agent Implementation Summary](EvoAITest.Agents/IMPLEMENTATION_SUMMARY.md) - Planner (Day 9) and Executor (Day 10) deliverables.
+- [Agent Implementation Summary](EvoAITest.Agents/IMPLEMENTATION_SUMMARY.md) - Planner (Day 9), Executor (Day 10), and Healer (Day 11) deliverables.
 - [Executor Agent Guide](EvoAITest.Agents/Agents/ExecutorAgent_README.md) - plan execution, validation, and lifecycle controls.
+- [Healer Agent Guide](EvoAITest.Agents/Agents/HealerAgent_README.md) - LLM diagnostics, healing strategies, and remediation workflows.
 - **[Tool Executor Tests Summary](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md)** - 30+ unit tests for Tool Executor.
 - **[Tool Executor Integration Tests](TOOL_EXECUTOR_INTEGRATION_TESTS_SUMMARY.md)** - 9 real browser integration tests.
 - **[CI/CD Pipeline Documentation](CI_CD_PIPELINE_DOCUMENTATION.md)** - Automated testing and deployment pipelines.

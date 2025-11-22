@@ -100,5 +100,5 @@ await executor.CancelExecutionAsync(taskId);
 | `No active execution found` when pausing/resuming | `taskId` mismatch | Use the `ExecutionPlan.TaskId` returned by the planner and ensure only one executor instance handles that id. |
 | Validation failures for selectors | `ValidationResult.ErrorMessage` describes the failing rule | Inspect page state via the screenshots or rerun with longer waits (increase `AgentStep.TimeoutMs`). |
 
-## What's Next (Day 11 Preview)
-ExecutorAgent now feeds rich telemetry and historical context to the upcoming HealerAgent. Day 11 work will consume `AgentStepResult` failures, call back into the planner/executor pipeline with healed steps, and surface remediation guidance in the web UI.
+## Working with HealerAgent
+ExecutorAgent feeds its `AgentStepResult` telemetry directly into `HealerAgent`, which analyzes failures with the configured LLM, proposes adaptive strategies, and optionally hands back healed steps for execution. See `EvoAITest.Agents/Agents/HealerAgent_README.md` for the complete healing pipeline and troubleshooting guidance.

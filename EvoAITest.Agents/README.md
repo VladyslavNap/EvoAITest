@@ -54,6 +54,8 @@ if (healingResult.Success)
 }
 ```
 
+`HealerAgent` is the default `IHealer`. It inspects failed `AgentStepResult` instances, captures page state via `IBrowserAgent`, runs LLM-based diagnostics to classify the failure, then applies adaptive strategies (alternative locators, extended waits, retries, or replanning) while enforcing per-step attempt limits.
+
 ### Models
 
 #### AgentTask
@@ -135,10 +137,10 @@ Register services:
 builder.Services.AddAgentServices();
 builder.Services.AddPlanner<PlannerAgent>();   // optional override
 builder.Services.AddExecutor<ExecutorAgent>(); // optional override
-builder.Services.AddHealer<SelfHealingAgent>();
+builder.Services.AddHealer<HealerAgent>();     // optional override
 ```
 
-`AddAgentServices()` wires up the PlannerAgent + ExecutorAgent pair out of the box, so applications immediately benefit from plan generation and execution orchestration.
+`AddAgentServices()` wires up the PlannerAgent + ExecutorAgent + HealerAgent trio out of the box, so applications immediately benefit from planning, execution, and self-healing orchestration.
 
 ## Usage Examples
 
@@ -313,6 +315,13 @@ Console.WriteLine($"Avg step duration: {stats.AverageStepDurationMs}ms");
 - Evidence collection on every failure plus a final screenshot for the task summary.
 - Built-in validation runners (element exists, text, page title, data extracted) with per-rule telemetry.
 - Execution statistics surfaced via `ExecutionStatistics` for dashboards and health checks.
+
+### HealerAgent Highlights
+- LLM-powered diagnostics classify failure types (selectors, timeouts, navigation, authentication, structure changes) with severity and recommended strategies.
+- Captures real-time page state before proposing fixes, enabling accurate locator suggestions or scroll/refresh adjustments.
+- Adaptive strategy engine supports retries with backoff, alternative locators, extended waits, replanning hooks, and manual escalation guidance.
+- Max-healing-attempt enforcement (default 3 per step) prevents infinite loops while surfacing actionable telemetry.
+- 25 unit tests validate error analysis, cancellation, malformed LLM output handling, and alternative strategy suggestions.
 
 ## Next Steps
 

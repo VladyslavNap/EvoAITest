@@ -1,9 +1,9 @@
-# Day 9-10 Implementation Summary - Planner & Executor Agents
+# Day 9-11 Implementation Summary - Planner, Executor & Healer Agents
 
 ## Implementation Complete
 
 **Date**: Generated as requested  
-**Features**: PlannerAgent (natural language → plan) **and** ExecutorAgent (plan orchestration + lifecycle)  
+**Features**: PlannerAgent (natural language → plan), ExecutorAgent (plan orchestration + lifecycle), **and** HealerAgent (LLM-guided remediation)  
 **Status**: **COMPLETE**  
 **Build Status**: Successful with zero errors  
 
@@ -85,6 +85,39 @@ Added a regression test that rejects empty LLM responses (`PlanAsync_WithEmptySt
 ### 7. **ExecutorAgent_README.md**
 New doc explaining the Day 10 implementation details, lifecycle APIs, telemetry, and troubleshooting tips for the executor.
 
+### 8. **HealerAgent.cs**
+**Location**: `EvoAITest.Agents\Agents\HealerAgent.cs`  
+**Lines of Code**: ~895  
+**Purpose**: Default `IHealer` that ingests failed steps, calls the configured LLM for diagnostics, inspects live page state, and applies adaptive healing strategies (alternative locators, extended waits, retries, or replanning) with per-step attempt limits.
+
+**Key Features**:
+- Error analysis pipeline that classifies failures (element not found, timeout, navigation, auth, structure change, unknown) with severity.
+- LLM prompt builder combines failure context, recent AgentStep metadata, and captured page state for richer responses.
+- Adaptive strategy executor that can adjust selectors, extend waits, refresh/scroll, or request replanning guidance.
+- Anti-loop safeguards via `_healingAttempts` dictionary (default max 3) and comprehensive logging/telemetry.
+- `SuggestAlternativesAsync` API exposes additional strategies for operator review or future automations.
+
+**Public API**:
+```csharp
+Task<HealingResult> HealStepAsync(AgentStep failedStep, Exception error, ExecutionContext context, CancellationToken)
+Task<ErrorAnalysis> AnalyzeErrorAsync(Exception error, ExecutionContext context, CancellationToken)
+Task<IReadOnlyList<HealingStrategy>> SuggestAlternativesAsync(IReadOnlyList<AgentStepResult> failedAttempts, CancellationToken)
+```
+
+### 9. **HealerAgentTests.cs**
+**Location**: `EvoAITest.Tests\Agents\HealerAgentTests.cs`  
+**Contents**: 25 unit tests validating LLM prompt handling, error classification, healing strategy application, attempt limits, cancellation, and malformed response handling.
+
+**Notable Scenarios**:
+- Successfully healing with an alternative locator suggested by the LLM.
+- Handling non-healable errors and surfacing meaningful explanations.
+- Guarding against malformed JSON / null responses from the LLM.
+- Respecting cancellation tokens during analysis/healing.
+- Suggesting alternative strategies after repeated failures.
+
+### 10. **HealerAgent_README.md**
+New doc that covers the HealerAgent architecture, dependency graph, LLM prompts, healing strategy catalog, telemetry, troubleshooting, and usage examples.
+
 ---
 
 ## Architecture
@@ -140,6 +173,29 @@ ToolExecutionResult + metadata
 AgentStepResult (success/failure, retries, validation, evidence)
     ?
 AgentTaskResult (statistics, screenshots, status, extracted data)
+```
+
+### HealerAgent Dependencies
+```
+HealerAgent
+  ??? ILLMProvider (EvoAITest.LLM)   // GPT-5 / Ollama for diagnostics
+  ??? IBrowserAgent (EvoAITest.Core) // Page state, DOM snapshots, screenshots
+  ??? ILogger<HealerAgent>           // Healing telemetry + guardrails
+```
+
+### Healer Data Flow
+```
+Failed AgentStepResult + Exception
+    ?
+HealerAgent.AnalyzeErrorAsync()
+    ?
+LLM diagnostic prompt (step context + page state)
+    ?
+LLM response (root cause + strategies)
+    ?
+Strategy selection + validation (max attempts enforced)
+    ?
+HealingResult (updated AgentStep, explanation, alternatives)
 ```
 
 ---
@@ -226,6 +282,26 @@ else
 await executor.PauseExecutionAsync(taskId);   // Task moves to Paused state
 await executor.ResumeExecutionAsync(taskId);  // Execution continues
 await executor.CancelExecutionAsync(taskId);  // Linked CTS cancelled, status=Cancelled
+```
+
+### Heal a Failed Step with HealerAgent
+```csharp
+var healer = serviceProvider.GetRequiredService<IHealer>();
+
+if (!stepResult.Success && stepResult.Error is not null)
+{
+    var analysis = await healer.AnalyzeErrorAsync(stepResult.Error, context, cancellationToken);
+
+    if (analysis.IsHealable)
+    {
+        var healingResult = await healer.HealStepAsync(step, stepResult.Error, context, cancellationToken);
+
+        if (healingResult.Success && healingResult.HealedStep is not null)
+        {
+            await executor.ExecuteStepAsync(healingResult.HealedStep, context, cancellationToken);
+        }
+    }
+}
 ```
 
 ---
@@ -392,16 +468,18 @@ builder.Services.AddAgentServices(); // Registers PlannerAgent as IPlanner
 ### Metrics
 - **PlannerAgent**: ~750 LOC, full XML documentation, exhaustive null/cancellation guards.
 - **ExecutorAgent**: ~780 LOC, XML documentation across public APIs, explicit cancellation + lifecycle management.
+- **HealerAgent**: ~895 LOC, LLM prompt builder + adaptive strategy engine + telemetry.
 - **ExecutorAgentTests**: 19 xUnit tests (~900 LOC) covering success/failure/cancellation flows.
+- **HealerAgentTests**: 25 xUnit tests (~1k LOC) covering diagnostics, malformed responses, cancellation, and strategy suggestions.
 - **PlannerAgentTests**: Additional regression test for empty plan responses.
 - **Build Warnings/Errors**: 0 / 0 across solution.
 
 ### Design Patterns
-- **Dependency Injection**: Constructor injection for both agents, registered via `AddAgentServices`.
-- **Factory Pattern**: Planner converts LLM output to domain objects; executor maps actions to `ToolCall`s.
-- **Strategy Pattern**: Planner validation heuristics + executor validation rules.
-- **Template Method**: Executor orchestrates per-step workflow with overridable validation rules per step.
-- **State Pattern**: Executor maintains task state machine (Executing → Paused → Resumed/Cancelled).
+- **Dependency Injection**: Constructor injection for all three agents, registered via `AddAgentServices`.
+- **Factory Pattern**: Planner converts LLM output to domain objects; executor maps actions to `ToolCall`s; healer converts diagnostics to strategies.
+- **Strategy Pattern**: Planner validation heuristics, executor validation rules, and healer healing strategy selection.
+- **Template Method**: Executor orchestrates per-step workflow; healer orchestrates analyze → diagnose → apply strategy.
+- **State Pattern**: Executor maintains task state machine; healer tracks healing attempts per step.
 
 ---
 
@@ -411,26 +489,18 @@ builder.Services.AddAgentServices(); // Registers PlannerAgent as IPlanner
 - ? ILLMProvider (Azure OpenAI & Ollama)
 - ? IBrowserToolRegistry (13 tools)
 - ? ILogger<T> (Structured logging)
-- ? AgentTask model
-- ? ExecutionPlan model
-- ? AgentStep model
+- ? AgentTask / ExecutionPlan / AgentStep models
 - ? IToolExecutor + IBrowserAgent (via ExecutorAgent)
-- ? Planner ↔ Executor orchestration path
-
-### Ready for Integration
-- ? IHealer (Day 11) - Will provide feedback for refinement
-- ? Full Agent Orchestration - Planner → Executor → Healer loop
+- ? Planner ↔ Executor ↔ Healer orchestration loop
 
 ---
 
-## Next Steps (Day 11)
+## Next Steps (Day 12)
 
-### Healer Agent Implementation
-1. Analyze `AgentStepResult` failures returned by ExecutorAgent.
-2. Use LLM reasoning to suggest alternative locators, longer waits, or replanned steps.
-3. Optionally call back into PlannerAgent for replanning or directly mutate steps for ExecutorAgent retries.
-4. Surface healing metadata (strategy, confidence, applied changes) back to the orchestrator/UI.
-5. Extend documentation + tests to cover healing flows.
+### Database Model Layer
+1. Create EF Core entities for tasks, steps, executions, and healing history plus matching DbContext.
+2. Wire configuration/DI for AppHost + ApiService (SQL Server/SQLite) with connection resiliency.
+3. Add unit/integration coverage for model validation and CRUD flows.
 
 ---
 
@@ -439,19 +509,23 @@ builder.Services.AddAgentServices(); // Registers PlannerAgent as IPlanner
 ### New Files
 1. `EvoAITest.Agents\Agents\PlannerAgent.cs` (~750 lines)
 2. `EvoAITest.Agents\Agents\ExecutorAgent.cs` (~780 lines)
-3. `EvoAITest.Agents\Agents\PlannerAgent_README.md` (comprehensive docs)
-4. `EvoAITest.Agents\Agents\ExecutorAgent_README.md` (Day 10 guide)
-5. `EvoAITest.Agents\IMPLEMENTATION_SUMMARY.md` (this file)
+3. `EvoAITest.Agents\Agents\HealerAgent.cs` (~895 lines)
+4. `EvoAITest.Agents\Agents\PlannerAgent_README.md` (comprehensive docs)
+5. `EvoAITest.Agents\Agents\ExecutorAgent_README.md` (Day 10 guide)
+6. `EvoAITest.Agents\Agents\HealerAgent_README.md` (Day 11 guide)
+7. `EvoAITest.Agents\IMPLEMENTATION_SUMMARY.md` (this file)
 
 ### Modified Files
-1. `EvoAITest.Agents\Extensions\ServiceCollectionExtensions.cs` (registered Planner + Executor)
+1. `EvoAITest.Agents\Extensions\ServiceCollectionExtensions.cs` (registered Planner + Executor + Healer)
 2. `EvoAITest.Tests\Agents\PlannerAgentTests.cs` (empty-plan guard test)
 3. `EvoAITest.Tests\Agents\ExecutorAgentTests.cs` (new test suite)
-4. `EvoAITest.Tests\EvoAITest.Tests.csproj` (added references)
+4. `EvoAITest.Tests\Agents\HealerAgentTests.cs` (new suite)
+5. `EvoAITest.Tests\EvoAITest.Tests.csproj` (added references)
 
 ### Unchanged (Used as Reference)
 - `EvoAITest.Agents\Abstractions\IPlanner.cs`
 - `EvoAITest.Agents\Abstractions\IExecutor.cs`
+- `EvoAITest.Agents\Abstractions\IHealer.cs`
 - `EvoAITest.Agents\Models\*`
 - `EvoAITest.Core\Models\BrowserToolRegistry.cs`
 - `EvoAITest.LLM\Abstractions\ILLMProvider.cs`
@@ -474,10 +548,11 @@ dotnet build
 - ? Follows coding conventions
 
 ### Manual Testing Checklist
-- [ ] Run PlannerAgent + ExecutorAgent unit tests (`dotnet test EvoAITest.Tests/Agents`).
+- [ ] Run PlannerAgent + ExecutorAgent + HealerAgent unit tests (`dotnet test EvoAITest.Tests/Agents`).
 - [ ] Exercise Planner → Executor flow end-to-end with a sample login task.
 - [ ] Validate pause/resume/cancel APIs via integration harness or Aspire dashboard.
-- [ ] Review screenshots/validation output for failed steps.
+- [ ] Trigger a controlled failure and verify HealerAgent applies the recommended strategy.
+- [ ] Review screenshots/validation output and healing explanations for failed steps.
 - [ ] Re-run plan validation/refinement flows with updated heuristics.
 - [ ] Execute `scripts/verify-day5.ps1` to ensure baseline diagnostics still succeed.
 
@@ -485,24 +560,25 @@ dotnet build
 
 ## Success Criteria
 
-All Day 9-10 goals achieved:
+All Day 9-11 goals achieved:
 
 - [x] **PlannerAgent** converts natural language to execution plans with validation + telemetry.
 - [x] **ExecutorAgent** executes plans via `IToolExecutor`, handles retries, and captures evidence.
+- [x] **HealerAgent** diagnoses failures with LLMs, applies adaptive strategies, and documents outcomes.
 - [x] **Pause/Resume/Cancel** lifecycle implemented with synchronized task state.
-- [x] **Validation + screenshots** automatically attached to failed steps.
-- [x] **Agent DI registration** wires both planner and executor via `AddAgentServices`.
-- [x] **Unit tests** cover planner parsing edge cases and executor orchestration paths.
-- [x] **Documentation** updated (Planner + Executor READMEs, implementation summary).
+- [x] **Validation + screenshots + healing evidence** automatically attached to failed steps.
+- [x] **Agent DI registration** wires planner/executor/healer via `AddAgentServices`.
+- [x] **Unit tests** cover planner parsing edge cases, executor orchestration, and healer diagnostics.
+- [x] **Documentation** updated (Planner, Executor, Healer READMEs + implementation summary).
 - [x] **Build + analyzers** run clean.
 
 ---
 
 ## Conclusion
 
-PlannerAgent + ExecutorAgent now deliver the full plan/execution loop: natural language tasks become validated execution plans, and those plans execute with retries, evidence, and lifecycle controls. The stack is ready for Day 11's HealerAgent work, which will plug into the executor’s rich step telemetry.
+PlannerAgent, ExecutorAgent, and HealerAgent now deliver the full plan → execute → heal automation loop. Natural language tasks become validated plans, plans execute with telemetry/evidence, and failures route through LLM-backed remediation before surfacing to operators. The stack is ready for Day 12's data-layer work.
 
-**Status**: READY FOR DAY 11 (Healer Agent)
+**Status**: READY FOR DAY 12 (Data Layer)
 
 ---
 
