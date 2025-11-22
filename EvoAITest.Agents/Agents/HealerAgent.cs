@@ -647,7 +647,7 @@ public sealed class HealerAgent : IHealer
         }
 
         var delayMs = strategy.Parameters.TryGetValue("retry_delay_ms", out var delay)
-            ? Convert.ToInt32(delay)
+            ? delay is JsonElement je ? je.GetInt32() : Convert.ToInt32(delay)
             : 2000;
 
         healedStep.RetryConfig.RetryDelayMs = delayMs;
