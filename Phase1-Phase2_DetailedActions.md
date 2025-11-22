@@ -1,6 +1,6 @@
 # EvoAITest - Phase 1 & Phase 2 Action Plan
 
-> **Project Status**: Day 10 Planner + Executor agents (with unit tests + docs) are complete; Day 11 Healer agent is up next. Keep the [Day 5 Implementation Checklist](DAY5_CHECKLIST.md) plus the [Implementation Summary](EvoAITest.Agents/IMPLEMENTATION_SUMMARY.md) for baseline context and use this roadmap for Day 11+ execution. Deep dives for the new stacks live in [AZURE_OPENAI_PROVIDER_SUMMARY.md](AZURE_OPENAI_PROVIDER_SUMMARY.md), [OLLAMA_PROVIDER_SUMMARY.md](OLLAMA_PROVIDER_SUMMARY.md), [LLM_PROVIDER_FACTORY_SUMMARY.md](LLM_PROVIDER_FACTORY_SUMMARY.md), [DEFAULT_TOOL_EXECUTOR_SUMMARY.md](DEFAULT_TOOL_EXECUTOR_SUMMARY.md), [DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md), and the new [ExecutorAgent guide](EvoAITest.Agents/Agents/ExecutorAgent_README.md).
+> **Project Status**: Day 11 HealerAgent (self-healing stage, 25 unit tests, docs) is complete; Day 12 database modeling is next. Keep the [Day 5 Implementation Checklist](DAY5_CHECKLIST.md) plus the updated [Agent Implementation Summary](EvoAITest.Agents/IMPLEMENTATION_SUMMARY.md) for baseline context and use this roadmap for Day 12+ execution. Deep dives for the stacks live in [AZURE_OPENAI_PROVIDER_SUMMARY.md](AZURE_OPENAI_PROVIDER_SUMMARY.md), [OLLAMA_PROVIDER_SUMMARY.md](OLLAMA_PROVIDER_SUMMARY.md), [LLM_PROVIDER_FACTORY_SUMMARY.md](LLM_PROVIDER_FACTORY_SUMMARY.md), [DEFAULT_TOOL_EXECUTOR_SUMMARY.md](DEFAULT_TOOL_EXECUTOR_SUMMARY.md), [DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md), the [ExecutorAgent guide](EvoAITest.Agents/Agents/ExecutorAgent_README.md), and the new [HealerAgent guide](EvoAITest.Agents/Agents/HealerAgent_README.md).
 
 ## How to Navigate the Docs
 - [README](README.md) – high-level overview, architecture, and environment setup.
@@ -653,6 +653,13 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 - Created `EvoAITest.Tests/Agents/ExecutorAgentTests.cs` (19 specs) covering success paths, optional steps, retries, validation, cancellation, and constructor guards.
 - Authored `EvoAITest.Agents/Agents/ExecutorAgent_README.md` and refreshed the overall implementation summary/README to describe plan execution, telemetry, and troubleshooting steps.
 
+### Day 11: Healer Agent (✅ Complete)
+
+- Delivered `EvoAITest.Agents/Agents/HealerAgent.cs` (~895 LOC) which ingests executor failures, calls the configured LLM for diagnostics, inspects live page state, and applies adaptive strategies (alternative locators, extended waits, retries, or replanning) with per-step attempt limits.
+- Updated DI wiring so `AddAgentServices()` now registers Planner, Executor, and Healer defaults, enabling the full triad in every app host.
+- Added `EvoAITest.Tests/Agents/HealerAgentTests.cs` (25 tests) covering error analysis, LLM prompt handling, cancellation, max-attempt guardrails, invalid/malformed responses, and recovery suggestions.
+- Authored `EvoAITest.Agents/Agents/HealerAgent_README.md` plus expanded the Agent Implementation Summary to document the self-healing pipeline, telemetry, and troubleshooting paths.
+
 ### Day 9-15: Agent Implementation (Planner, Executor, Healer)
 
 ---
@@ -665,7 +672,7 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 - [x] Day 8: Tool executor service
 - [x] Day 9: Planner agent (natural language → execution plan)
 - [x] Day 10: Executor agent (run automation steps)
-- [ ] Day 11: Healer agent (error recovery)
+- [x] Day 11: Healer agent (error recovery)
 - [ ] Day 12: EF Core database models
 - [ ] Day 13: Database migrations
 - [ ] Day 14: Repository pattern
@@ -686,14 +693,14 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 
 ---
 
-## 🎯 IMMEDIATE NEXT STEPS (Day 11)
+## 🎯 IMMEDIATE NEXT STEPS (Day 12)
 
-1. **Define Healer contracts**: Finalize healing strategies, error taxonomies, and DTOs for suggested fixes / replanned steps.
-2. **Implement HealerAgent**: Use LLM reasoning + execution history to propose locator alternatives, extended waits, or plan adjustments.
-3. **Integrate with Executor telemetry**: Feed `AgentStepResult` failures (screenshots, validation results, retry info) into the healer pipeline.
-4. **Wire DI + configuration**: Register the healer next to planner/executor and expose toggles for automatic vs manual healing.
-5. **Add tests**: Mock-based specs covering error analysis, strategy selection, and healed step execution.
-6. **Commit**: `feat: add healer agent with AI-driven recovery strategies`
+1. **Define EF Core models**: Introduce persistence entities for tasks, plans, steps, executions, and healing history.
+2. **Configure DbContext**: Scaffold `EvoAITest.Core/Data/EvoAiTestDbContext` with DbSets, value converters, and Fluent API mappings.
+3. **Add validation & seeding**: Ensure model configuration enforces required fields, status enums, and optional seed data for demo scenarios.
+4. **Wire DI + configuration**: Register the DbContext (SQL Server / SQLite) across AppHost, ApiService, and tests with connection resiliency.
+5. **Testing**: Add unit tests for model configuration plus a lightweight in-memory integration test verifying CRUD + constraint enforcement.
+6. **Commit**: `feat: add EF Core models and DbContext for automation tasks`
 
 ---
 
@@ -711,12 +718,12 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 | Tool Executor | ✅ Complete | ✅ | ✅ |
 | Planner Agent | ✅ Complete | ✅ | ✅ |
 | Executor Agent | ✅ Complete | ✅ | ⏳ |
-| Healer Agent | ⏳ Pending | ⏳ | ⏳ |
+| Healer Agent | ✅ Complete | ✅ | ⏳ |
 | Database | ⏳ Pending | ⏳ | ⏳ |
 | API Endpoints | ⏳ Pending | ⏳ | ⏳ |
 
 ---
 
-**Current Status**: ✅ Day 10 Complete | 🚧 Day 11 Starting  
-**Next Milestone**: Healer Agent Prototype  
+**Current Status**: ✅ Day 11 Complete | 🚧 Day 12 Starting  
+**Next Milestone**: Database Model Layer  
 **Target**: Complete Phase 1 (21 days) by end of month

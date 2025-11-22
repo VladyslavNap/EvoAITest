@@ -678,8 +678,8 @@ public sealed class ExecutorAgent : IExecutor
                         break;
 
                     case ValidationType.ElementText:
-                        // Assume rule.Selector contains the selector for the element
-                        var selector = rule.Selector?.ToString() ?? string.Empty;
+                        // Use the step's action target as the selector
+                        var selector = step.Action?.Target?.Selector ?? string.Empty;
                         var actualText = await _browserAgent.GetTextAsync(
                             selector,
                             cancellationToken);
