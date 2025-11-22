@@ -682,7 +682,6 @@ public sealed class HealerAgent : IHealer
     private ErrorType ClassifyError(Exception error)
     {
         var errorMessage = error.Message ?? "";
-        var errorType = error.GetType().Name;
 
         if (errorMessage.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
             errorMessage.Contains("could not find", StringComparison.OrdinalIgnoreCase))
