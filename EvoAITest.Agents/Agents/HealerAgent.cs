@@ -626,7 +626,7 @@ public sealed class HealerAgent : IHealer
     {
         // Increase timeout
         var multiplier = strategy.Parameters.TryGetValue("timeout_multiplier", out var mult)
-            ? Convert.ToDouble(mult)
+            ? mult is JsonElement je ? je.GetDouble() : Convert.ToDouble(mult)
             : 2.0;
 
         healedStep.TimeoutMs = (int)Math.Min(healedStep.TimeoutMs * multiplier, 60000);
