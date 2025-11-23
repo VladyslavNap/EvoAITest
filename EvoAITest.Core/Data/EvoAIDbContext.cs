@@ -11,6 +11,14 @@ namespace EvoAITest.Core.Data;
 public sealed class EvoAIDbContext : DbContext
 {
     /// <summary>
+    /// JSON serializer options for consistent serialization/deserialization behavior.
+    /// </summary>
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="EvoAIDbContext"/> class.
     /// </summary>
     /// <param name="options">The options for this context.</param>
@@ -58,8 +66,8 @@ public sealed class EvoAIDbContext : DbContext
             entity.Property(e => e.Plan)
                 .HasColumnType("nvarchar(max)")
                 .HasConversion(
-                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                    v => JsonSerializer.Deserialize<List<ExecutionStep>>(v, (JsonSerializerOptions?)null) ?? new List<ExecutionStep>()
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<ExecutionStep>>(v, JsonOptions) ?? new List<ExecutionStep>()
                 );
 
             // Configure Status enum as string
