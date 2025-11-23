@@ -16,6 +16,7 @@
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Testing" Version="13.0.0" />
     <PackageReference Include="FluentAssertions" Version="8.8.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.0" />
     <PackageReference Include="Moq" Version="4.20.72" />

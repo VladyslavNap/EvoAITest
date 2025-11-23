@@ -29,10 +29,10 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 11)
-- `EvoAITest.Agents/Agents/HealerAgent.cs` introduces the default `IHealer`, which uses LLM-backed diagnostics plus live page state to classify executor failures, recommend adaptive strategies (alternative locators, extended waits, replanning), and prevent infinite heal loops with per-step attempt tracking.
-- `EvoAITest.Agents/Extensions/ServiceCollectionExtensions.cs` now registers the Planner, Executor, and Healer trio via `AddAgentServices()`, giving every host the full plan → execute → heal pipeline out of the box.
-- `EvoAITest.Tests/Agents/HealerAgentTests.cs` adds 25 focused unit tests that cover error analysis, LLM prompt handling, cancellation, invalid responses, healing strategy application, and alternative suggestions, ensuring the self-healing stage stays deterministic.
+### Latest Update (Day 12)
+- `EvoAITest.Core/Data/EvoAIDbContext.cs` and `EvoAITest.Core/Models/ExecutionHistory.cs` add the persistence layer: AutomationTasks + execution history entities, JSON columns for step results/metadata, automatic timestamp updates, and cascade deletes.
+- `EvoAITest.Core/Extensions/ServiceCollectionExtensions.cs` now wires `EvoAIDbContext` automatically whenever `ConnectionStrings:EvoAIDatabase` is present, with resilient SQL Server retries ready for Azure SQL or LocalDB.
+- `EvoAITest.Tests/Data/EvoAIDbContextTests.cs` delivers 12 EF Core tests covering inserts, relationships, cascade deletes, JSON columns, timestamps, and composite index queries so the database layer stays healthy.
 
 ## Project Structure
 
@@ -144,6 +144,26 @@ $env:EVOAITEST__CORE__OLLAMAMODEL = "qwen2.5-7b"
 cd EvoAITest.AppHost
 dotnet run
 ```
+
+## Database Setup
+
+### Connection String
+
+`AddEvoAITestCore` now registers `EvoAIDbContext` automatically when a connection string named `EvoAIDatabase` is present. Local development defaults to SQL Server LocalDB; production targets Azure SQL or any SQL Server-compatible host.
+
+```json
+{
+  "ConnectionStrings": {
+    "EvoAIDatabase": "Server=(localdb)\\mssqllocaldb;Database=EvoAITest;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True"
+  }
+}
+```
+
+- **Development**: keep the LocalDB connection string above or point to Docker SQL (`Server=localhost,1433;Database=EvoAITest;User Id=sa;Password=Your_password123;Encrypt=False`).
+- **Production**: supply the Azure SQL connection string (Managed Identity or SQL auth) and include retry options via Azure App Configuration if needed.
+- **Apps**: ApiService and AppHost inherit the connection string automatically; no extra DI wiring is required beyond `builder.Services.AddEvoAITestCore(builder.Configuration);`.
+
+> The EF Core data layer stores `AutomationTasks` plus `ExecutionHistory` (step results, screenshots, metadata). When migrations are introduced, run the standard `dotnet ef database update` flow after pulling changes.
 
 ## Configuration
 
@@ -296,6 +316,7 @@ dotnet test --filter "Category=Integration"
 - ? **Tool Executor Integration (9 real browser tests)**
 - ? **ExecutorAgent (19 orchestration-focused unit tests)**
 - ? **HealerAgent (25 LLM-driven healing tests)**
+- ? **EvoAIDbContext (12 EF Core data-layer tests)**
 
 **All tests are fully automated in CI/CD - NO Azure credentials required for unit tests!**
 
@@ -441,6 +462,7 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - [Agent Implementation Summary](EvoAITest.Agents/IMPLEMENTATION_SUMMARY.md) - Planner (Day 9), Executor (Day 10), and Healer (Day 11) deliverables.
 - [Executor Agent Guide](EvoAITest.Agents/Agents/ExecutorAgent_README.md) - plan execution, validation, and lifecycle controls.
 - [Healer Agent Guide](EvoAITest.Agents/Agents/HealerAgent_README.md) - LLM diagnostics, healing strategies, and remediation workflows.
+- [Data Persistence (EvoAITest.Core/README.md)](EvoAITest.Core/README.md#data-persistence-day-12) - EF Core DbContext, AutomationTask/ExecutionHistory entities, and SQL Server setup.
 - **[Tool Executor Tests Summary](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md)** - 30+ unit tests for Tool Executor.
 - **[Tool Executor Integration Tests](TOOL_EXECUTOR_INTEGRATION_TESTS_SUMMARY.md)** - 9 real browser integration tests.
 - **[CI/CD Pipeline Documentation](CI_CD_PIPELINE_DOCUMENTATION.md)** - Automated testing and deployment pipelines.
