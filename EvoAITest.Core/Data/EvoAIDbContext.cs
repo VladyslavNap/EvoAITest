@@ -146,4 +146,23 @@ public sealed class EvoAIDbContext : DbContext
 
         return await base.SaveChangesAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// Saves all changes made in this context to the database (synchronously).
+    /// Automatically updates UpdatedAt timestamps for AutomationTask entities.
+    /// </summary>
+    /// <returns>The number of state entries written to the database.</returns>
+    public override int SaveChanges()
+    {
+        // Automatically update UpdatedAt timestamp for modified AutomationTask entities
+        var entries = ChangeTracker.Entries<AutomationTask>()
+            .Where(e => e.State == EntityState.Modified);
+
+        foreach (var entry in entries)
+        {
+            entry.Entity.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        return base.SaveChanges();
+    }
 }
