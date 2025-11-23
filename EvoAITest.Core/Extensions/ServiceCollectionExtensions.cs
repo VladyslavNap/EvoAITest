@@ -24,6 +24,30 @@ public static class ServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The configuration.</param>
     /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method registers core services including browser automation, tool execution,
+    /// and database persistence. The <see cref="EvoAIDbContext"/> is registered only when
+    /// the "EvoAIDatabase" connection string is configured and not empty.
+    /// </para>
+    /// <para>
+    /// <strong>Important:</strong> If the "EvoAIDatabase" connection string is missing or empty,
+    /// the <see cref="EvoAIDbContext"/> will NOT be registered. This allows running the application
+    /// without database persistence. However, attempting to inject <see cref="EvoAIDbContext"/> when
+    /// it's not registered will result in a runtime error. Ensure your code checks for DbContext
+    /// availability or provides appropriate configuration.
+    /// </para>
+    /// <para>
+    /// Example configuration in appsettings.json:
+    /// <code>
+    /// {
+    ///   "ConnectionStrings": {
+    ///     "EvoAIDatabase": "Server=.;Database=EvoAITest;Trusted_Connection=True;"
+    ///   }
+    /// }
+    /// </code>
+    /// </para>
+    /// </remarks>
     public static IServiceCollection AddEvoAITestCore(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -44,7 +68,11 @@ public static class ServiceCollectionExtensions
         // Register tool executor
         services.TryAddScoped<IToolExecutor, DefaultToolExecutor>();
 
-        // Register DbContext with SQL Server
+        // Register DbContext with SQL Server (only if connection string is configured)
+        // Note: If the connection string is not configured, DbContext will NOT be registered.
+        // This allows running without database persistence but will cause runtime errors
+        // if code attempts to inject EvoAIDbContext. Ensure proper configuration or
+        // conditional DbContext usage in your application code.
         var connectionString = configuration.GetConnectionString("EvoAIDatabase");
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
