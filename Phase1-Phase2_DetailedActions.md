@@ -662,6 +662,14 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 
 ### Day 9-15: Agent Implementation (Planner, Executor, Healer)
 
+### Day 12: Data Persistence Layer (✅ Complete)
+
+- Added `EvoAITest.Core/Data/EvoAIDbContext.cs` with SQL Server configuration (retry-on-failure, command timeouts) plus automatic timestamp updates for `AutomationTask` entities.
+- Introduced `EvoAITest.Core/Models/ExecutionHistory.cs` and extended `AutomationTask` with EF Core metadata, JSON plan storage, and navigation properties.
+- Updated `AddEvoAITestCore` so the DbContext is registered whenever `ConnectionStrings:EvoAIDatabase` is supplied, giving every host a ready-to-use persistence layer.
+- Introduced `ConnectionStrings` entries in `EvoAITest.ApiService/appsettings*.json` for LocalDB/production scenarios.
+- Created `EvoAITest.Tests/Data/EvoAIDbContextTests.cs` (12 specs) that exercise CRUD, cascade deletes, composite indexes, JSON columns, and timestamp updates via the EF Core in-memory provider.
+
 ---
 
 ## 📝 SUMMARY OF REMAINING WORK
@@ -673,7 +681,7 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 - [x] Day 9: Planner agent (natural language → execution plan)
 - [x] Day 10: Executor agent (run automation steps)
 - [x] Day 11: Healer agent (error recovery)
-- [ ] Day 12: EF Core database models
+- [x] Day 12: EF Core database models
 - [ ] Day 13: Database migrations
 - [ ] Day 14: Repository pattern
 - [ ] Day 15: API endpoints (Task CRUD)
@@ -693,14 +701,14 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 
 ---
 
-## 🎯 IMMEDIATE NEXT STEPS (Day 12)
+## 🎯 IMMEDIATE NEXT STEPS (Day 13)
 
-1. **Define EF Core models**: Introduce persistence entities for tasks, plans, steps, executions, and healing history.
-2. **Configure DbContext**: Scaffold `EvoAITest.Core/Data/EvoAiTestDbContext` with DbSets, value converters, and Fluent API mappings.
-3. **Add validation & seeding**: Ensure model configuration enforces required fields, status enums, and optional seed data for demo scenarios.
-4. **Wire DI + configuration**: Register the DbContext (SQL Server / SQLite) across AppHost, ApiService, and tests with connection resiliency.
-5. **Testing**: Add unit tests for model configuration plus a lightweight in-memory integration test verifying CRUD + constraint enforcement.
-6. **Commit**: `feat: add EF Core models and DbContext for automation tasks`
+1. **Add migrations**: Scaffold initial EF Core migrations for `AutomationTasks` + `ExecutionHistory` and document the update workflow.
+2. **Repository/Service layer**: Create data-access helpers (query services/repositories) for API + agents, including pagination and filtering.
+3. **Seed data (optional)**: Provide sample tasks/executions for local testing or demos.
+4. **Connection resiliency**: Add health checks and diagnostics around the DbContext (e.g., `IHealthCheck`).
+5. **Testing**: Expand coverage with migration snapshot tests or lightweight integration tests against LocalDB/Azure SQL in CI.
+6. **Commit**: `feat: add database migrations and repositories`
 
 ---
 
@@ -719,11 +727,11 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 | Planner Agent | ✅ Complete | ✅ | ✅ |
 | Executor Agent | ✅ Complete | ✅ | ⏳ |
 | Healer Agent | ✅ Complete | ✅ | ⏳ |
-| Database | ⏳ Pending | ⏳ | ⏳ |
+| Database | ✅ Complete | ✅ | ⏳ |
 | API Endpoints | ⏳ Pending | ⏳ | ⏳ |
 
 ---
 
-**Current Status**: ✅ Day 11 Complete | 🚧 Day 12 Starting  
-**Next Milestone**: Database Model Layer  
+**Current Status**: ✅ Day 12 Complete | 🚧 Day 13 Starting  
+**Next Milestone**: Database Migrations & Repository Layer  
 **Target**: Complete Phase 1 (21 days) by end of month

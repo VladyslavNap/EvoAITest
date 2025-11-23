@@ -202,6 +202,55 @@ public class ToolRunner
 }
 ```
 
+## Data Persistence (Day 12)
+
+The core library now ships with an EF Core-backed persistence layer that stores automation tasks and their execution history for observability, auditing, and resume scenarios.
+
+- **DbContext**: `EvoAITest.Core/Data/EvoAIDbContext.cs`
+- **Entities**:
+  - `AutomationTask` – includes user metadata, natural language prompt, serialized execution plan, correlation IDs, timestamps, and navigation property to executions.
+  - `ExecutionHistory` – captures per-run status, duration, serialized step results, screenshots, metadata, and links back to the originating task.
+- **Indexes & JSON columns**: Both entities configure indexes for high-frequency queries and store plan/step data as JSON (`nvarchar(max)`).
+- **Automatic timestamps**: `SaveChangesAsync` updates `UpdatedAt` for any modified `AutomationTask`.
+
+### Configuration
+
+Add a connection string named `EvoAIDatabase` to your host application. `AddEvoAITestCore` detects the connection string and registers `EvoAIDbContext` (with SQL Server retries suitable for Azure SQL and LocalDB).
+
+```json
+{
+  "ConnectionStrings": {
+    "EvoAIDatabase": "Server=(localdb)\\mssqllocaldb;Database=EvoAITest;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True"
+  }
+}
+```
+
+### Usage
+
+```csharp
+// Program.cs
+builder.Services.AddEvoAITestCore(builder.Configuration);
+
+// In an application service
+public sealed class TaskRepository
+{
+    private readonly EvoAIDbContext _db;
+
+    public TaskRepository(EvoAIDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<AutomationTask>> GetPendingTasksAsync(CancellationToken ct)
+        => await _db.AutomationTasks
+            .Include(t => t.Executions)
+            .Where(t => t.Status == TaskStatus.Pending)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync(ct);
+}
+```
+
+### Testing
+
+`EvoAITest.Tests/Data/EvoAIDbContextTests.cs` contains 12 in-memory EF tests that verify entity configuration, cascade deletes, JSON column persistence, composite indexes, and automatic timestamp updates.
+
 ## Features
 
 - ? Browser-agnostic design

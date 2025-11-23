@@ -1,3 +1,7 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+
 namespace EvoAITest.Core.Models;
 
 /// <summary>
@@ -66,36 +70,51 @@ public enum ExecutionStatus
 /// Represents an automation task that can be persisted to a database.
 /// This is a mutable class designed for Entity Framework Core compatibility.
 /// </summary>
+[Table("AutomationTasks")]
+[Index(nameof(UserId))]
+[Index(nameof(Status))]
+[Index(nameof(CreatedAt))]
+[Index(nameof(UserId), nameof(Status))]
 public sealed class AutomationTask
 {
     /// <summary>
     /// Gets or sets the unique identifier for this task (Primary Key).
     /// </summary>
+    [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>
     /// Gets or sets the user ID who created this task.
     /// </summary>
+    [Required]
+    [MaxLength(256)]
     public string UserId { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the name of the task.
     /// </summary>
+    [Required]
+    [MaxLength(500)]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets a description of what this task does.
     /// </summary>
+    [Column(TypeName = "nvarchar(max)")]
     public string Description { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the original natural language prompt from the user describing their intent.
     /// </summary>
+    [Required]
+    [Column(TypeName = "nvarchar(max)")]
     public string NaturalLanguagePrompt { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the current status of the task.
     /// </summary>
+    [Required]
+    [Column(TypeName = "nvarchar(50)")]
     public TaskStatus Status { get; set; } = TaskStatus.Pending;
 
     /// <summary>
@@ -104,6 +123,7 @@ public sealed class AutomationTask
     /// <remarks>
     /// This will be serialized to JSON for EF Core storage.
     /// </remarks>
+    [Column(TypeName = "nvarchar(max)")]
     public List<ExecutionStep> Plan { get; set; } = new();
 
     /// <summary>
@@ -112,6 +132,7 @@ public sealed class AutomationTask
     /// <remarks>
     /// This can store additional context like browser state, session data, etc.
     /// </remarks>
+    [Column(TypeName = "nvarchar(max)")]
     public string Context { get; set; } = "{}";
 
     /// <summary>
@@ -121,27 +142,37 @@ public sealed class AutomationTask
     /// Used to correlate logs, traces, and metrics across the system.
     /// Compatible with OpenTelemetry and Aspire observability.
     /// </remarks>
+    [Required]
+    [MaxLength(100)]
     public string CorrelationId { get; set; } = Guid.NewGuid().ToString();
 
     /// <summary>
     /// Gets or sets the timestamp when this task was created.
     /// </summary>
+    [Required]
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
     /// Gets or sets the timestamp when this task was last updated.
     /// </summary>
+    [Required]
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
     /// Gets or sets the identifier of who created this task (for audit purposes).
     /// </summary>
+    [MaxLength(256)]
     public string CreatedBy { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the timestamp when this task was completed (null if not completed).
     /// </summary>
     public DateTimeOffset? CompletedAt { get; set; }
+
+    /// <summary>
+    /// Navigation property to execution history records for this task.
+    /// </summary>
+    public ICollection<ExecutionHistory> Executions { get; set; } = new List<ExecutionHistory>();
 
     /// <summary>
     /// Updates the task status and sets the UpdatedAt timestamp.

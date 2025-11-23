@@ -1,7 +1,10 @@
 using EvoAITest.Core.Abstractions;
 using EvoAITest.Core.Browser;
+using EvoAITest.Core.Data;
+using EvoAITest.Core.Models;
 using EvoAITest.Core.Options;
 using EvoAITest.Core.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -16,52 +19,11 @@ namespace EvoAITest.Core.Extensions;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds EvoAITest.Core services to the service collection with Aspire integration.
+    /// Adds EvoAITest Core services to the service collection.
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <param name="configuration">The configuration instance.</param>
+    /// <param name="configuration">The configuration.</param>
     /// <returns>The service collection for chaining.</returns>
-    /// <remarks>
-    /// <para>
-    /// This method registers EvoAITest-specific services including:
-    /// - <see cref="IBrowserAgent"/> (Playwright-based browser automation)
-    /// - <see cref="IBrowserToolRegistry"/> (13 browser automation tools)
-    /// - <see cref="IToolExecutor"/> (tool execution with retry logic and error handling)
-    /// </para>
-    /// <para>
-    /// OpenTelemetry instrumentation is added for the EvoAITest.Core assembly.
-    /// Logging, health checks, and base OpenTelemetry configuration are handled by
-    /// EvoAITest.ServiceDefaults and should not be configured here.
-    /// </para>
-    /// <para>
-    /// Configuration should be provided in appsettings.json:
-    /// <code>
-    /// {
-    ///   "EvoAITest": {
-    ///     "Core": {
-    ///       "LLMProvider": "AzureOpenAI",
-    ///       "BrowserTimeoutMs": 30000,
-    ///       "HeadlessMode": true
-    ///     },
-    ///     "ToolExecutor": {
-    ///       "MaxRetries": 3,
-    ///       "InitialRetryDelayMs": 500,
-    ///       "MaxRetryDelayMs": 10000,
-    ///       "UseExponentialBackoff": true,
-    ///       "TimeoutPerToolMs": 30000
-    ///     }
-    ///   }
-    /// }
-    /// </code>
-    /// </para>
-    /// <para>
-    /// Example usage:
-    /// <code>
-    /// builder.AddServiceDefaults(); // From EvoAITest.ServiceDefaults
-    /// builder.Services.AddEvoAITestCore(builder.Configuration);
-    /// </code>
-    /// </para>
-    /// </remarks>
     public static IServiceCollection AddEvoAITestCore(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -69,25 +31,35 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        // 1. Configure EvoAITest.Core options from configuration
-        services.Configure<EvoAITestCoreOptions>(
-            configuration.GetSection("EvoAITest:Core"));
+        // Register configuration options
+        services.Configure<EvoAITestCoreOptions>(configuration.GetSection("EvoAITest:Core"));
+        services.Configure<ToolExecutorOptions>(configuration.GetSection("EvoAITest:ToolExecutor"));
 
-        // 2. Configure ToolExecutor options from configuration
-        services.Configure<ToolExecutorOptions>(
-            configuration.GetSection("EvoAITest:ToolExecutor"));
-
-        // 3. Register core services
-        // Register Playwright browser agent implementation
+        // Register browser services
         services.TryAddScoped<IBrowserAgent, PlaywrightBrowserAgent>();
 
-        // Register browser tool registry
+        // Register tool registry
         services.TryAddSingleton<IBrowserToolRegistry, DefaultBrowserToolRegistry>();
 
-        // Register tool executor with retry logic and error handling
+        // Register tool executor
         services.TryAddScoped<IToolExecutor, DefaultToolExecutor>();
 
-        // 4. Add OpenTelemetry instrumentation for EvoAITest.Core
+        // Register DbContext with SQL Server
+        var connectionString = configuration.GetConnectionString("EvoAIDatabase");
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            services.AddDbContext<EvoAIDbContext>(options =>
+                options.UseSqlServer(connectionString, sqlOptions =>
+                {
+                    sqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromSeconds(30),
+                        errorNumbersToAdd: null);
+                    sqlOptions.CommandTimeout(60);
+                }));
+        }
+
+        // Add OpenTelemetry instrumentation for EvoAITest.Core
         services.AddOpenTelemetry()
             .WithMetrics(metrics =>
             {
