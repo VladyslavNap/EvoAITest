@@ -1,4 +1,6 @@
 using EvoAITest.Core.Extensions;
+using EvoAITest.Core.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +17,15 @@ builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+// Apply database migrations in development environment
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<EvoAIDbContext>();
+    await dbContext.Database.MigrateAsync();
+    app.Logger.LogInformation("Database migrations applied successfully");
+}
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();

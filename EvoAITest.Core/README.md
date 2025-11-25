@@ -251,6 +251,18 @@ public sealed class TaskRepository
 
 `EvoAITest.Tests/Data/EvoAIDbContextTests.cs` contains 12 in-memory EF tests that verify entity configuration, cascade deletes, JSON column persistence, composite indexes, and automatic timestamp updates.
 
+### Migrations & Tooling
+
+- Generate migrations from the Core project while targeting the ApiService as the startup host:
+  ```bash
+  dotnet ef migrations add InitialCreate -p EvoAITest.Core -s EvoAITest.ApiService
+  ```
+- Apply migrations (local/CI/prod):
+  ```bash
+  dotnet ef database update -p EvoAITest.Core -s EvoAITest.ApiService
+  ```
+- ApiService automatically runs `Database.Migrate()` in Development so LocalDB/Aspire SQL instances stay current without manual commands.
+
 ## Features
 
 - ? Browser-agnostic design

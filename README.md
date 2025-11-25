@@ -29,10 +29,10 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 12)
-- `EvoAITest.Core/Data/EvoAIDbContext.cs` and `EvoAITest.Core/Models/ExecutionHistory.cs` add the persistence layer: AutomationTasks + execution history entities, JSON columns for step results/metadata, automatic timestamp updates, and cascade deletes.
-- `EvoAITest.Core/Extensions/ServiceCollectionExtensions.cs` now wires `EvoAIDbContext` automatically whenever `ConnectionStrings:EvoAIDatabase` is present, with resilient SQL Server retries ready for Azure SQL or LocalDB.
-- `EvoAITest.Tests/Data/EvoAIDbContextTests.cs` delivers 12 EF Core tests covering inserts, relationships, cascade deletes, JSON columns, timestamps, and composite index queries so the database layer stays healthy.
+### Latest Update (Day 13)
+- `EvoAITest.Core/Migrations/20251124142707_InitialCreate` ships the first EF Core migration so AutomationTasks + ExecutionHistory tables can be created consistently across environments (check in also includes `migration.sql` snapshot).
+- `EvoAITest.ApiService/Program.cs` now applies pending migrations automatically in Development, ensuring LocalDB/SQL containers stay current without manual commands.
+- `EvoAITest.AppHost/AppHost.cs` provisions a SQL Server resource via .NET Aspire and wires it into the API; ApiService/AppHost/Core csproj files reference the necessary EF Core design packages so `dotnet ef` tooling works everywhere.
 
 ## Project Structure
 
@@ -163,7 +163,18 @@ dotnet run
 - **Production**: supply the Azure SQL connection string (Managed Identity or SQL auth) and include retry options via Azure App Configuration if needed.
 - **Apps**: ApiService and AppHost inherit the connection string automatically; no extra DI wiring is required beyond `builder.Services.AddEvoAITestCore(builder.Configuration);`.
 
-> The EF Core data layer stores `AutomationTasks` plus `ExecutionHistory` (step results, screenshots, metadata). When migrations are introduced, run the standard `dotnet ef database update` flow after pulling changes.
+> The EF Core data layer stores `AutomationTasks` plus `ExecutionHistory` (step results, screenshots, metadata). `dotnet ef` tooling now lives in the Core/ApiService csproj files, so you can run migrations from either project root.
+
+### Database Provisioning & Migrations
+
+- **Local (Aspire)**: `EvoAITest.AppHost` now orchestrates a SQL Server container and hands its connection string to ApiService automatically. Just run `dotnet run` from `EvoAITest.AppHost` and Aspire will stand up Redis + SQL + projects.
+- **Development hot-reload**: `EvoAITest.ApiService/Program.cs` applies pending migrations automatically when `ASPNETCORE_ENVIRONMENT=Development`, so LocalDB/Aspire SQL stay in sync.
+- **Manual migration workflow**:
+  ```bash
+  dotnet ef migrations add AddNewTable -p EvoAITest.Core -s EvoAITest.ApiService
+  dotnet ef database update -p EvoAITest.Core -s EvoAITest.ApiService
+  ```
+- **Production**: run `dotnet ef database update` (or Azure SQL dacpac) during deployment. The checked-in `migration.sql` mirrors the initial schema for teams that prefer SQL scripts.
 
 ## Configuration
 
