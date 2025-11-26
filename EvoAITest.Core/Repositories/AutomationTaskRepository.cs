@@ -188,14 +188,6 @@ public sealed class AutomationTaskRepository : IAutomationTaskRepository
 
         try
         {
-            // Check if task exists
-            var exists = await _context.AutomationTasks.AnyAsync(t => t.Id == task.Id, cancellationToken);
-            if (!exists)
-            {
-                _logger.LogWarning("Task {TaskId} not found for update", task.Id);
-                throw new InvalidOperationException($"Task {task.Id} not found.");
-            }
-
             // Update timestamp
             task.UpdatedAt = DateTimeOffset.UtcNow;
 
