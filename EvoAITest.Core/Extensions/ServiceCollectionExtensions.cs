@@ -86,11 +86,10 @@ public static class ServiceCollectionExtensions
                         errorNumbersToAdd: null);
                     sqlOptions.CommandTimeout(60);
                 }));
+
+            // Register repositories
+            services.TryAddScoped<IAutomationTaskRepository, AutomationTaskRepository>();
         }
-
-        // Register repositories
-        services.TryAddScoped<IAutomationTaskRepository, AutomationTaskRepository>();
-
         // Add OpenTelemetry instrumentation for EvoAITest.Core
         services.AddOpenTelemetry()
             .WithMetrics(metrics =>
