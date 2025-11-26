@@ -263,6 +263,33 @@ public sealed class TaskRepository
   ```
 - ApiService automatically runs `Database.Migrate()` in Development so LocalDB/Aspire SQL instances stay current without manual commands.
 
+## Repositories (Day 14)
+
+To keep data access consistent, the core library now exposes an `IAutomationTaskRepository` abstraction backed by `AutomationTaskRepository`. Consumers (API, agents, background services) can request the repository via DI and receive the DbContext + logger-enabled implementation automatically.
+
+- **Interfaces/Implementation**: `EvoAITest.Core/Repositories/IAutomationTaskRepository.cs` + `AutomationTaskRepository.cs`
+- **Registration**: `AddEvoAITestCore` always registers `IAutomationTaskRepository`; ensure DbContext is configured for repository functionality.
+- **Capabilities**:
+  - Get tasks by id/user/status/composite index (UserId + Status)
+  - CRUD operations with timestamp management + concurrency handling
+  - Execution history queries + inserts (cascade delete preserved)
+  - Telemetry-friendly logging, argument validation, and meaningful exception messages
+- **Unit Tests**: `EvoAITest.Tests/Repositories/AutomationTaskRepositoryTests.cs` (30 specs) cover constructor guards, query behaviors, CRUD flows, cascade deletes, and concurrency handling.
+
+### Usage Example
+
+```csharp
+public sealed class TaskService
+{
+    private readonly IAutomationTaskRepository _tasks;
+
+    public TaskService(IAutomationTaskRepository tasks) => _tasks = tasks;
+
+    public async Task<IReadOnlyList<AutomationTask>> GetPendingAsync(string userId, CancellationToken ct)
+        => await _tasks.GetByUserIdAndStatusAsync(userId, TaskStatus.Pending, ct);
+}
+```
+
 ## Features
 
 - ? Browser-agnostic design

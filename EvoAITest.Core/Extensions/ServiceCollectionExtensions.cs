@@ -3,6 +3,7 @@ using EvoAITest.Core.Browser;
 using EvoAITest.Core.Data;
 using EvoAITest.Core.Models;
 using EvoAITest.Core.Options;
+using EvoAITest.Core.Repositories;
 using EvoAITest.Core.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -85,8 +86,10 @@ public static class ServiceCollectionExtensions
                         errorNumbersToAdd: null);
                     sqlOptions.CommandTimeout(60);
                 }));
-        }
 
+            // Register repositories
+            services.TryAddScoped<IAutomationTaskRepository, AutomationTaskRepository>();
+        }
         // Add OpenTelemetry instrumentation for EvoAITest.Core
         services.AddOpenTelemetry()
             .WithMetrics(metrics =>
