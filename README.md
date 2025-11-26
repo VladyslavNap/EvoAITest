@@ -29,10 +29,10 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 13)
-- `EvoAITest.Core/Migrations/20251124142707_InitialCreate` ships the first EF Core migration so AutomationTasks + ExecutionHistory tables can be created consistently across environments (check in also includes `migration.sql` snapshot).
-- `EvoAITest.ApiService/Program.cs` now applies pending migrations automatically in Development, ensuring LocalDB/SQL containers stay current without manual commands.
-- `EvoAITest.AppHost/AppHost.cs` provisions a SQL Server resource via .NET Aspire and wires it into the API; ApiService/AppHost/Core csproj files reference the necessary EF Core design packages so `dotnet ef` tooling works everywhere.
+### Latest Update (Day 14)
+- `EvoAITest.Core/Repositories` adds `IAutomationTaskRepository` + `AutomationTaskRepository`, giving the API/agents a typed data-access surface for tasks + execution history (includes filtering by user/status, CRUD, cascade deletes, and telemetry).
+- `AddEvoAITestCore` now registers the repository alongside DbContext so consumers can inject it directly; ApiService’s configurations gained sane defaults for the database connection.
+- `EvoAITest.Tests/Repositories/AutomationTaskRepositoryTests.cs` (30 specs) validate the repository’s behaviors (queries, concurrency, cascade deletes, JSON columns) via InMemory EF, keeping the data layer regression-safe.
 
 ## Project Structure
 
@@ -328,6 +328,7 @@ dotnet test --filter "Category=Integration"
 - ? **ExecutorAgent (19 orchestration-focused unit tests)**
 - ? **HealerAgent (25 LLM-driven healing tests)**
 - ? **EvoAIDbContext (12 EF Core data-layer tests)**
+- ? **AutomationTaskRepository (30 EF-backed repository tests)**
 
 **All tests are fully automated in CI/CD - NO Azure credentials required for unit tests!**
 
@@ -474,6 +475,7 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - [Executor Agent Guide](EvoAITest.Agents/Agents/ExecutorAgent_README.md) - plan execution, validation, and lifecycle controls.
 - [Healer Agent Guide](EvoAITest.Agents/Agents/HealerAgent_README.md) - LLM diagnostics, healing strategies, and remediation workflows.
 - [Data Persistence (EvoAITest.Core/README.md)](EvoAITest.Core/README.md#data-persistence-day-12) - EF Core DbContext, AutomationTask/ExecutionHistory entities, and SQL Server setup.
+- [Repository Layer (EvoAITest.Core/README.md#repositories-day-14)](EvoAITest.Core/README.md#repositories-day-14) - AutomationTask repository API, DI registration, and query examples.
 - **[Tool Executor Tests Summary](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md)** - 30+ unit tests for Tool Executor.
 - **[Tool Executor Integration Tests](TOOL_EXECUTOR_INTEGRATION_TESTS_SUMMARY.md)** - 9 real browser integration tests.
 - **[CI/CD Pipeline Documentation](CI_CD_PIPELINE_DOCUMENTATION.md)** - Automated testing and deployment pipelines.

@@ -670,6 +670,18 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 - Introduced `ConnectionStrings` entries in `EvoAITest.ApiService/appsettings*.json` for LocalDB/production scenarios.
 - Created `EvoAITest.Tests/Data/EvoAIDbContextTests.cs` (12 specs) that exercise CRUD, cascade deletes, composite indexes, JSON columns, and timestamp updates via the EF Core in-memory provider.
 
+### Day 13: Database Migrations & Aspire SQL (✅ Complete)
+
+- Added `EvoAITest.Core/Migrations/20251124142707_InitialCreate` plus `migration.sql` so teams can bootstrap Azure SQL or LocalDB consistently.
+- `EvoAITest.AppHost/AppHost.cs` now provisions SQL Server via Aspire and shares the connection string with ApiService automatically.
+- `EvoAITest.ApiService/Program.cs` applies pending migrations automatically in development ensuring LocalDB/Aspire SQL instances stay current.
+
+### Day 14: Repository Layer (✅ Complete)
+
+- Created `IAutomationTaskRepository` + `AutomationTaskRepository` to encapsulate task + execution history queries.
+- Registered the repository via `AddEvoAITestCore`, so API/agents can inject it directly.
+- Added `EvoAITest.Tests/Repositories/AutomationTaskRepositoryTests.cs` (30 specs) that validate queries, concurrency handling, cascade deletes, and logging behavior via EF InMemory.
+
 ---
 
 ## 📝 SUMMARY OF REMAINING WORK
@@ -682,8 +694,8 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 - [x] Day 10: Executor agent (run automation steps)
 - [x] Day 11: Healer agent (error recovery)
 - [x] Day 12: EF Core database models
-- [ ] Day 13: Database migrations
-- [ ] Day 14: Repository pattern
+- [x] Day 13: Database migrations
+- [x] Day 14: Repository pattern
 - [ ] Day 15: API endpoints (Task CRUD)
 - [ ] Day 16: API endpoints (Execution)
 - [ ] Day 17: Docker containerization
@@ -701,14 +713,14 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 
 ---
 
-## 🎯 IMMEDIATE NEXT STEPS (Day 13)
+## 🎯 IMMEDIATE NEXT STEPS (Day 15)
 
-1. **Add migrations**: Scaffold initial EF Core migrations for `AutomationTasks` + `ExecutionHistory` and document the update workflow.
-2. **Repository/Service layer**: Create data-access helpers (query services/repositories) for API + agents, including pagination and filtering.
-3. **Seed data (optional)**: Provide sample tasks/executions for local testing or demos.
-4. **Connection resiliency**: Add health checks and diagnostics around the DbContext (e.g., `IHealthCheck`).
-5. **Testing**: Expand coverage with migration snapshot tests or lightweight integration tests against LocalDB/Azure SQL in CI.
-6. **Commit**: `feat: add database migrations and repositories`
+1. **Repository consumers**: Wire the AutomationTaskRepository into ApiService endpoints and agent pipelines.
+2. **Seed / demo data**: Optional EF seeders for local demos + integration tests.
+3. **API endpoints**: Begin Task CRUD API (Day 15 deliverable) backed by the repository.
+4. **Health checks**: Add DbContext health check + diagnostics to ApiService and AppHost dashboards.
+5. **Testing**: Expand repository integration tests against Aspire-provisioned SQL in CI.
+6. **Commit**: `feat: add task CRUD endpoints backed by repository`
 
 ---
 
@@ -728,10 +740,11 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 | Executor Agent | ✅ Complete | ✅ | ⏳ |
 | Healer Agent | ✅ Complete | ✅ | ⏳ |
 | Database | ✅ Complete | ✅ | ⏳ |
+| Repository Layer | ✅ Complete | ✅ | ⏳ |
 | API Endpoints | ⏳ Pending | ⏳ | ⏳ |
 
 ---
 
-**Current Status**: ✅ Day 12 Complete | 🚧 Day 13 Starting  
-**Next Milestone**: Database Migrations & Repository Layer  
+**Current Status**: ✅ Day 14 Complete | 🚧 Day 15 Starting  
+**Next Milestone**: Task CRUD API (Repository consumers)  
 **Target**: Complete Phase 1 (21 days) by end of month
