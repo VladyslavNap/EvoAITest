@@ -268,7 +268,7 @@ public sealed class TaskRepository
 To keep data access consistent, the core library now exposes an `IAutomationTaskRepository` abstraction backed by `AutomationTaskRepository`. Consumers (API, agents, background services) can request the repository via DI and receive the DbContext + logger-enabled implementation automatically.
 
 - **Interfaces/Implementation**: `EvoAITest.Core/Repositories/IAutomationTaskRepository.cs` + `AutomationTaskRepository.cs`
-- **Registration**: `AddEvoAITestCore` registers `IAutomationTaskRepository` when DbContext is enabled.
+- **Registration**: `AddEvoAITestCore` always registers `IAutomationTaskRepository`; ensure DbContext is configured for repository functionality.
 - **Capabilities**:
   - Get tasks by id/user/status/composite index (UserId + Status)
   - CRUD operations with timestamp management + concurrency handling
