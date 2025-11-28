@@ -682,6 +682,14 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 - Registered the repository via `AddEvoAITestCore`, so API/agents can inject it directly.
 - Added `EvoAITest.Tests/Repositories/AutomationTaskRepositoryTests.cs` (30 specs) that validate queries, concurrency handling, cascade deletes, and logging behavior via EF InMemory.
 
+### Day 15: Task CRUD API (✅ Complete)
+
+- Added `EvoAITest.ApiService/Endpoints/TaskEndpoints.cs` with minimal APIs for creating, listing, updating, deleting, and fetching execution history for automation tasks.
+- Introduced `EvoAITest.ApiService/Models/TaskModels.cs` (Create/Update requests, Task/ExecutionHistory responses) with data annotations + helper mappers.
+- Updated `Program.cs` to register the endpoint group via `MapTaskEndpoints` so routing, OpenAPI metadata, and logging are centralized.
+- Refreshed ApiService `appsettings*.json` connection strings so both development and production map to SQL Server consistently.
+- Wired the repository + DbContext through DI, ensuring each endpoint uses the tested data layer.
+
 ---
 
 ## 📝 SUMMARY OF REMAINING WORK
@@ -696,7 +704,7 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 - [x] Day 12: EF Core database models
 - [x] Day 13: Database migrations
 - [x] Day 14: Repository pattern
-- [ ] Day 15: API endpoints (Task CRUD)
+- [x] Day 15: API endpoints (Task CRUD)
 - [ ] Day 16: API endpoints (Execution)
 - [ ] Day 17: Docker containerization
 - [ ] Day 18: CI/CD pipeline
@@ -713,14 +721,14 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 
 ---
 
-## 🎯 IMMEDIATE NEXT STEPS (Day 15)
+## 🎯 IMMEDIATE NEXT STEPS (Day 16)
 
-1. **Repository consumers**: Wire the AutomationTaskRepository into ApiService endpoints and agent pipelines.
-2. **Seed / demo data**: Optional EF seeders for local demos + integration tests.
-3. **API endpoints**: Begin Task CRUD API (Day 15 deliverable) backed by the repository.
-4. **Health checks**: Add DbContext health check + diagnostics to ApiService and AppHost dashboards.
-5. **Testing**: Expand repository integration tests against Aspire-provisioned SQL in CI.
-6. **Commit**: `feat: add task CRUD endpoints backed by repository`
+1. **Execution endpoints**: Add `/api/executions` (start, cancel, status) routes wired into planner/executor services.
+2. **Task seeding/demo data**: Optional EF seeding for local demos and integration scenarios.
+3. **Health checks**: Add DbContext + repository health checks to ApiService + AppHost dashboards.
+4. **Integration tests**: Begin exercising TaskEndpoints via WebApplicationFactory to lock down HTTP behavior.
+5. **Authentication polish**: Replace placeholder claim fallbacks with proper auth (AAD/B2C) scaffolding.
+6. **Commit**: `feat: add execution endpoints and health checks`
 
 ---
 
@@ -741,10 +749,10 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 | Healer Agent | ✅ Complete | ✅ | ⏳ |
 | Database | ✅ Complete | ✅ | ⏳ |
 | Repository Layer | ✅ Complete | ✅ | ⏳ |
-| API Endpoints | ⏳ Pending | ⏳ | ⏳ |
+| API Endpoints (Task CRUD) | ✅ Complete | ✅ | ⏳ |
 
 ---
 
-**Current Status**: ✅ Day 14 Complete | 🚧 Day 15 Starting  
-**Next Milestone**: Task CRUD API (Repository consumers)  
+**Current Status**: ✅ Day 15 Complete | 🚧 Day 16 Starting  
+**Next Milestone**: Execution API & Health Checks  
 **Target**: Complete Phase 1 (21 days) by end of month
