@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -28,24 +29,14 @@ namespace EvoAITest.Tests.Endpoints;
 [TestClass]
 public sealed class TaskEndpointsTests
 {
-    private static CustomWebApplicationFactory _factory = null!;
+    private CustomWebApplicationFactory _factory = null!;
     private HttpClient _client = null!;
-
-    [ClassInitialize]
-    public static void ClassInit(TestContext context)
-    {
-        _factory = new CustomWebApplicationFactory();
-    }
-
-    [ClassCleanup]
-    public static void ClassCleanup()
-    {
-        _factory?.Dispose();
-    }
 
     [TestInitialize]
     public void TestInit()
     {
+        // Create a fresh factory and database for each test
+        _factory = new CustomWebApplicationFactory();
         _client = _factory.CreateClient();
     }
 
@@ -53,6 +44,7 @@ public sealed class TaskEndpointsTests
     public void TestCleanup()
     {
         _client?.Dispose();
+        _factory?.Dispose();
     }
 
     #region Create Task Tests
@@ -482,33 +474,46 @@ public sealed class TaskEndpointsTests
         {
             builder.UseEnvironment("Testing");
 
+            // Override the configuration to remove the database connection string
+            // This prevents the SQL Server provider from being registered
+            builder.ConfigureAppConfiguration((context, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    // Set an empty connection string to prevent SQL Server registration
+                    ["ConnectionStrings:EvoAIDatabase"] = null
+                });
+            });
+
             builder.ConfigureTestServices(services =>
             {
-                // Remove the existing DbContext registration
-                var dbContextDescriptor = services.SingleOrDefault(
-                    d => d.ServiceType == typeof(DbContextOptions<EvoAIDbContext>));
-                if (dbContextDescriptor != null)
+                // Remove any existing DbContext registrations
+                var descriptorsToRemove = services.Where(d =>
+                    d.ServiceType == typeof(DbContextOptions<EvoAIDbContext>) ||
+                    d.ServiceType == typeof(EvoAIDbContext) ||
+                    d.ServiceType.FullName?.Contains("EvoAIDbContext") == true ||
+                    d.ImplementationType?.FullName?.Contains("EvoAIDbContext") == true).ToList();
+
+                foreach (var descriptor in descriptorsToRemove)
                 {
-                    services.Remove(dbContextDescriptor);
+                    services.Remove(descriptor);
                 }
 
-                // Remove the existing DbContext
-                var dbContextService = services.SingleOrDefault(
-                    d => d.ServiceType == typeof(EvoAIDbContext));
-                if (dbContextService != null)
-                {
-                    services.Remove(dbContextService);
-                }
-
-                // Add in-memory database for testing
+                // Add in-memory database for testing with a unique name per factory instance
+                var dbName = $"TestDb_{Guid.NewGuid()}";
                 services.AddDbContext<EvoAIDbContext>(options =>
                 {
-                    options.UseInMemoryDatabase($"TestDb_{Guid.NewGuid()}");
+                    options.UseInMemoryDatabase(dbName);
                 });
 
-                // Configure test authentication
-                services.AddAuthentication("Test")
-                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
+                // Configure test authentication as the default
+                services.AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = "Test";
+                    options.DefaultChallengeScheme = "Test";
+                    options.DefaultScheme = "Test";
+                })
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
 
                 // Re-register the repository with the new DbContext
                 services.AddScoped<IAutomationTaskRepository, AutomationTaskRepository>();

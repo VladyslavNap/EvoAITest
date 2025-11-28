@@ -111,7 +111,7 @@ public static class TaskEndpoints
             {
                 UserId = userId,
                 Name = request.Name,
-                Description = request.Description,
+                Description = request.Description ?? string.Empty,
                 NaturalLanguagePrompt = request.NaturalLanguagePrompt,
                 Status = TaskStatus.Pending,
                 CreatedBy = user.Identity?.Name ?? "Unknown"
