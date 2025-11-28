@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EvoAITest.ApiService.Filters;
 using EvoAITest.ApiService.Models;
 using EvoAITest.Core.Models;
 using EvoAITest.Core.Repositories;
@@ -25,6 +26,7 @@ public static class TaskEndpoints
 
         // POST /api/tasks - Create new task
         group.MapPost("/", CreateTask)
+            .AddEndpointFilter<ValidationFilter<CreateTaskRequest>>()
             .WithName("CreateTask")
             .WithSummary("Create a new automation task")
             .WithDescription("Creates a new automation task for the authenticated user")
@@ -52,6 +54,7 @@ public static class TaskEndpoints
 
         // PUT /api/tasks/{id} - Update task
         group.MapPut("/{id:guid}", UpdateTask)
+            .AddEndpointFilter<ValidationFilter<UpdateTaskRequest>>()
             .WithName("UpdateTask")
             .WithSummary("Update an existing task")
             .WithDescription("Updates an existing automation task")
@@ -263,7 +266,10 @@ public static class TaskEndpoints
                 return Results.Forbid();
             }
 
-            // Apply updates
+            // Apply updates to the entity retrieved with AsNoTracking.
+            // The UpdateAsync method will attach and update the entity in the database.
+            // This pattern is intentional: we fetch untracked for read, modify in memory,
+            // then re-attach for update to avoid tracking overhead during the read phase.
             if (!string.IsNullOrWhiteSpace(request.Name))
             {
                 task.Name = request.Name;
