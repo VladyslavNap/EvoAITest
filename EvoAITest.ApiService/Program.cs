@@ -1,5 +1,6 @@
 using EvoAITest.Core.Extensions;
 using EvoAITest.Core.Data;
+using EvoAITest.ApiService.Endpoints;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
-// Add EvoAITest.Core services (Browser Agent, Tool Registry, Tool Executor)
+// Add EvoAITest.Core services (Browser Agent, Tool Registry, Tool Executor, DbContext, Repositories)
 builder.Services.AddEvoAITestCore(builder.Configuration);
 
 // Add services to the container.
@@ -34,6 +35,9 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+// Map API endpoints
+app.MapTaskEndpoints();
 
 string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
 
