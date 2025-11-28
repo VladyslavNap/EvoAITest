@@ -153,16 +153,10 @@ public static class TaskEndpoints
 
             List<AutomationTask> tasks;
 
-            if (status.HasValue)
-            {
-                // Filter by status
-                tasks = await repository.GetByUserIdAndStatusAsync(userId, status.Value, cancellationToken);
-            }
-            else
-            {
-                // Get all tasks for user
-                tasks = await repository.GetByUserIdAsync(userId, cancellationToken);
-            }
+            // Filter by status if provided, otherwise get all tasks for user
+            tasks = status.HasValue
+                ? await repository.GetByUserIdAndStatusAsync(userId, status.Value, cancellationToken)
+                : await repository.GetByUserIdAsync(userId, cancellationToken);
 
             logger.LogDebug("Retrieved {TaskCount} tasks for user {UserId}", tasks.Count, userId);
 
