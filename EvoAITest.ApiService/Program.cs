@@ -1,5 +1,6 @@
 using EvoAITest.Core.Extensions;
 using EvoAITest.Core.Data;
+using EvoAITest.ApiService.Endpoints;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,11 +8,17 @@ var builder = WebApplication.CreateBuilder(args);
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
-// Add EvoAITest.Core services (Browser Agent, Tool Registry, Tool Executor)
+// Add EvoAITest.Core services (Browser Agent, Tool Registry, Tool Executor, DbContext, Repositories)
 builder.Services.AddEvoAITestCore(builder.Configuration);
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
+
+// Add authentication and authorization for API endpoints.
+// In production, configure a proper authentication scheme (e.g., JWT Bearer).
+// For development, the API endpoints fall back to "anonymous-user" if no authenticated user is present.
+builder.Services.AddAuthentication();
+builder.Services.AddAuthorization();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -30,10 +37,19 @@ if (app.Environment.IsDevelopment())
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
 
+// Enable authentication and authorization middleware.
+// Note: In development, requests without authentication will fall back to "anonymous-user".
+// In production, configure proper authentication (e.g., JWT Bearer) to secure endpoints.
+app.UseAuthentication();
+app.UseAuthorization();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+// Map API endpoints
+app.MapTaskEndpoints();
 
 string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
 
@@ -58,4 +74,12 @@ app.Run();
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+namespace EvoAITest.ApiService
+{
+    /// <summary>
+    /// Partial class declaration to enable WebApplicationFactory-based testing.
+    /// </summary>
+    public partial class Program { }
 }

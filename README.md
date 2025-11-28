@@ -29,10 +29,10 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 14)
-- `EvoAITest.Core/Repositories` adds `IAutomationTaskRepository` + `AutomationTaskRepository`, giving the API/agents a typed data-access surface for tasks + execution history (includes filtering by user/status, CRUD, cascade deletes, and telemetry).
-- `AddEvoAITestCore` now registers the repository alongside DbContext so consumers can inject it directly; ApiService’s configurations gained sane defaults for the database connection.
-- `EvoAITest.Tests/Repositories/AutomationTaskRepositoryTests.cs` (30 specs) validate the repository’s behaviors (queries, concurrency, cascade deletes, JSON columns) via InMemory EF, keeping the data layer regression-safe.
+### Latest Update (Day 15)
+- `EvoAITest.ApiService/Endpoints/TaskEndpoints.cs` now exposes RESTful CRUD routes for automation tasks (`/api/tasks`), including history lookups, OpenAPI metadata, consistent logging, and claims-aware authorization.
+- `EvoAITest.ApiService/Models/TaskModels.cs` adds strongly-typed request/response DTOs with data annotations so payloads are validated before the repository runs.
+- `Program.cs` wires the new endpoints via `MapTaskEndpoints`, pulling in the EF-backed `IAutomationTaskRepository` registered by `AddEvoAITestCore`, plus updated connection strings for local/production SQL Server.
 
 ## Project Structure
 
@@ -175,6 +175,36 @@ dotnet run
   dotnet ef database update -p EvoAITest.Core -s EvoAITest.ApiService
   ```
 - **Production**: run `dotnet ef database update` (or Azure SQL dacpac) during deployment. The checked-in `migration.sql` mirrors the initial schema for teams that prefer SQL scripts.
+
+## Task Management API
+
+The ApiService now exposes RESTful task endpoints under `/api/tasks`. Every route requires an authenticated user (falls back to a development identity if claims are missing) and includes OpenAPI metadata by default.
+
+| Method | Route | Description | Response |
+|--------|-------|-------------|----------|
+| `POST` | `/api/tasks` | Create a new automation task | `201 Created` + `TaskResponse` |
+| `GET` | `/api/tasks` | List tasks for the current user (optional `status=` filter) | `200 OK` + `TaskResponse[]` |
+| `GET` | `/api/tasks/{id}` | Get task details | `200 OK`, `404 Not Found`, `403 Forbidden` |
+| `PUT` | `/api/tasks/{id}` | Update task metadata/status | `200 OK`, `400 Bad Request`, `404 Not Found` |
+| `DELETE` | `/api/tasks/{id}` | Delete a task (cascade execution history) | `204 No Content`, `404 Not Found` |
+| `GET` | `/api/tasks/{id}/history` | Fetch execution history entries ordered by `StartedAt` | `200 OK` + `ExecutionHistoryResponse[]` |
+
+### Sample Create Request
+
+```bash
+# Note: In production, include a valid Bearer token in the Authorization header.
+# In development, requests without authentication fall back to "anonymous-user".
+curl -X POST https://localhost:5001/api/tasks \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-token>" \
+  -d '{
+        "name": "Login journey",
+        "description": "Exercise the full dashboard login",
+        "naturalLanguagePrompt": "Open dashboard, log in as admin, capture KPI widgets"
+      }'
+```
+
+Request/response contracts live in `EvoAITest.ApiService/Models/TaskModels.cs`, ensuring consistent casing, validation, and telemetry-friendly payloads.
 
 ## Configuration
 
@@ -476,6 +506,7 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - [Healer Agent Guide](EvoAITest.Agents/Agents/HealerAgent_README.md) - LLM diagnostics, healing strategies, and remediation workflows.
 - [Data Persistence (EvoAITest.Core/README.md)](EvoAITest.Core/README.md#data-persistence-day-12) - EF Core DbContext, AutomationTask/ExecutionHistory entities, and SQL Server setup.
 - [Repository Layer (EvoAITest.Core/README.md#repositories-day-14)](EvoAITest.Core/README.md#repositories-day-14) - AutomationTask repository API, DI registration, and query examples.
+- [Task API Endpoints](EvoAITest.ApiService/Endpoints/TaskEndpoints.cs) - Minimal API routes, response codes, and inline OpenAPI metadata.
 - **[Tool Executor Tests Summary](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md)** - 30+ unit tests for Tool Executor.
 - **[Tool Executor Integration Tests](TOOL_EXECUTOR_INTEGRATION_TESTS_SUMMARY.md)** - 9 real browser integration tests.
 - **[CI/CD Pipeline Documentation](CI_CD_PIPELINE_DOCUMENTATION.md)** - Automated testing and deployment pipelines.

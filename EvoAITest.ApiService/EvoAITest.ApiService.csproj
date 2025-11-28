@@ -6,6 +6,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- Expose internals for testing with WebApplicationFactory -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="EvoAITest.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\EvoAITest.ServiceDefaults\EvoAITest.ServiceDefaults.csproj" />
     <ProjectReference Include="..\EvoAITest.Core\EvoAITest.Core.csproj" />

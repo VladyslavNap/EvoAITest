@@ -101,6 +101,52 @@ File: src/EvoAITest.Tests/Agents/PlannerAgentTests.csNamespace: EvoAITest.Tests.
  - Call PlanAsync 
 - Assert OperationCanceledException thrownUse Moq for ILLMProvider mocking.
 Use FluentAssertions for readable assertions.
+
+Day 15: Task CRUD API (REST Endpoints)
+--------------------------------------
+
+**Context:** Repositories, DbContext, and migrations exist. We now need minimal APIs inside `EvoAITest.ApiService` so users can create/list/update/delete tasks and inspect execution history. Endpoints must respect authorization, return DTOs, and emit OpenAPI metadata.
+
+### Implementation Prompt
+
+```
+Generate the TaskEndpoints extension class.
+File: src/EvoAITest.ApiService/Endpoints/TaskEndpoints.cs
+Namespace: EvoAITest.ApiService.Endpoints
+
+Requirements:
+1. Add `MapTaskEndpoints(this WebApplication app)` that:
+   - Creates a route group `/api/tasks`
+   - Adds OpenAPI tagging, summaries, and response metadata
+   - Requires an authenticated user (fall back to dev user if claims missing)
+2. Routes:
+   - POST `/api/tasks` -> Create task from CreateTaskRequest; returns 201 + TaskResponse
+   - GET `/api/tasks` -> List current user's tasks, optional `status` query
+   - GET `/api/tasks/{id}` -> Fetch single task (200/404/403)
+   - PUT `/api/tasks/{id}` -> Update name/description/status
+   - DELETE `/api/tasks/{id}` -> Cascade delete task + executions
+   - GET `/api/tasks/{id}/history` -> Return execution history ordered by `StartedAt`
+3. Each handler should:
+   - Resolve `IAutomationTaskRepository`
+   - Extract `userId` from `ClaimTypes.NameIdentifier` or `sub`, fallback `anonymous-user`
+   - Log start/end via `ILogger<Program>`
+   - Handle not-found/user mismatch with 404/403 responses
+   - Convert entities to DTOs using helpers (see TaskModels)
+4. Add request/response DTOs in `EvoAITest.ApiService/Models/TaskModels.cs` with data annotations + static `FromEntity` helpers.
+5. Register endpoints in `Program.cs` using `app.MapTaskEndpoints();`
+```
+
+### Testing Prompt
+
+```
+Describe manual/integration steps:
+- POST returns 201 + Location header, payload validated (name + prompt required)
+- GET `/api/tasks?status=Executing` filters via repository composite index
+- PUT rejects updates for other users (403) and logs warning
+- DELETE removes task + related execution history (verify via repository)
+- GET history returns newest-first and includes metadata fields.
+Mention Day 16 follow-up: WebApplicationFactory-based integration tests + execution control endpoints.
+```
 Day 10: Executor Agent (Run Automation Steps)
 
 Context-Setting Prompt
@@ -465,7 +511,8 @@ Generate complete repository implementation with comprehensive error handling.
 ---
 # Week 4: API Development (Days 15-16)
 ## Day 15: API Endpoints (Task CRUD)
-### Implementation PromptGenerate REST API endpoints for AutomationTask CRUD operations.
+### Implementation Prompt
+Generate REST API endpoints for AutomationTask CRUD operations.
 File: src/EvoAITest.ApiService/Endpoints/TaskEndpoints.csNamespace: EvoAITest.ApiService.EndpointsRequirements:
 Minimal API Endpoints:
 POST /api/tasks - Create new task
