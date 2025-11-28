@@ -690,6 +690,13 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 - Refreshed ApiService `appsettings*.json` connection strings so both development and production map to SQL Server consistently.
 - Wired the repository + DbContext through DI, ensuring each endpoint uses the tested data layer.
 
+### Day 16: Execution API (✅ Complete)
+
+- Created `EvoAITest.ApiService/Endpoints/ExecutionEndpoints.cs` to expose synchronous execution, background execution, healing retries, status polling, and cancellation routes that orchestrate Planner → Executor → Healer.
+- Added `ExecutionEndpoints_README.md` describing the workflows, sample curl commands, and DTOs.
+- Updated `Program.cs` to call `app.MapExecutionEndpoints()` and enabled auth middleware scaffolding.
+- ApiService `.csproj` now exposes internals to the test project to unblock WebApplicationFactory-based integration tests planned for Day 17.
+
 ---
 
 ## 📝 SUMMARY OF REMAINING WORK
@@ -705,7 +712,7 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 - [x] Day 13: Database migrations
 - [x] Day 14: Repository pattern
 - [x] Day 15: API endpoints (Task CRUD)
-- [ ] Day 16: API endpoints (Execution)
+- [x] Day 16: API endpoints (Execution)
 - [ ] Day 17: Docker containerization
 - [ ] Day 18: CI/CD pipeline
 - [ ] Day 19: Integration tests
@@ -721,14 +728,14 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 
 ---
 
-## 🎯 IMMEDIATE NEXT STEPS (Day 16)
+## 🎯 IMMEDIATE NEXT STEPS (Day 17)
 
-1. **Execution endpoints**: Add `/api/executions` (start, cancel, status) routes wired into planner/executor services.
-2. **Task seeding/demo data**: Optional EF seeding for local demos and integration scenarios.
-3. **Health checks**: Add DbContext + repository health checks to ApiService + AppHost dashboards.
-4. **Integration tests**: Begin exercising TaskEndpoints via WebApplicationFactory to lock down HTTP behavior.
-5. **Authentication polish**: Replace placeholder claim fallbacks with proper auth (AAD/B2C) scaffolding.
-6. **Commit**: `feat: add execution endpoints and health checks`
+1. **Docker & Aspire hardening**: Containerize ApiService + AppHost and validate SQL/Redis resource provisioning end-to-end.
+2. **Health checks**: Add DbContext + execution pipeline health checks exposed via `/health`.
+3. **Integration tests**: Use `WebApplicationFactory` to exercise Task + Execution endpoints (requires new test suite).
+4. **Authentication polish**: Replace development claim fallbacks with real JWT/B2C configuration.
+5. **Observability**: Add structured logs/metrics around execution endpoints (duration, success/failure counts).
+6. **Commit**: `feat: dockerize ApiService and add execution health checks`
 
 ---
 
@@ -750,9 +757,10 @@ feat: implement DefaultToolExecutor with retry/backoff, options, and tests
 | Database | ✅ Complete | ✅ | ⏳ |
 | Repository Layer | ✅ Complete | ✅ | ⏳ |
 | API Endpoints (Task CRUD) | ✅ Complete | ✅ | ⏳ |
+| API Endpoints (Execution) | ✅ Complete | ✅ | ⏳ |
 
 ---
 
-**Current Status**: ✅ Day 15 Complete | 🚧 Day 16 Starting  
-**Next Milestone**: Execution API & Health Checks  
+**Current Status**: ✅ Day 16 Complete | 🚧 Day 17 Starting  
+**Next Milestone**: Docker + Execution Health Checks  
 **Target**: Complete Phase 1 (21 days) by end of month

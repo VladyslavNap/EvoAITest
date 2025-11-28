@@ -29,10 +29,10 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 15)
-- `EvoAITest.ApiService/Endpoints/TaskEndpoints.cs` now exposes RESTful CRUD routes for automation tasks (`/api/tasks`), including history lookups, OpenAPI metadata, consistent logging, and claims-aware authorization.
-- `EvoAITest.ApiService/Models/TaskModels.cs` adds strongly-typed request/response DTOs with data annotations so payloads are validated before the repository runs.
-- `Program.cs` wires the new endpoints via `MapTaskEndpoints`, pulling in the EF-backed `IAutomationTaskRepository` registered by `AddEvoAITestCore`, plus updated connection strings for local/production SQL Server.
+### Latest Update (Day 16)
+- `EvoAITest.ApiService/Endpoints/ExecutionEndpoints.cs` introduces execution APIs (sync, background, heal, cancel, history) that wire Planner → Executor → Healer and expose status/history routes under `/api/tasks/{id}` and `/api/executions/{executionId}`.
+- `Program.cs` now maps both task CRUD and execution endpoints, so the API hosts the full lifecycle (create → execute → inspect).
+- `ExecutionEndpoints_README.md` documents request/response contracts for each route so integrators have a quick reference.
 
 ## Project Structure
 
@@ -176,9 +176,11 @@ dotnet run
   ```
 - **Production**: run `dotnet ef database update` (or Azure SQL dacpac) during deployment. The checked-in `migration.sql` mirrors the initial schema for teams that prefer SQL scripts.
 
-## Task Management API
+## Task & Execution APIs
 
-The ApiService now exposes RESTful task endpoints under `/api/tasks`. Every route requires an authenticated user (falls back to a development identity if claims are missing) and includes OpenAPI metadata by default.
+The ApiService now exposes two cohesive API surfaces:
+
+### Task CRUD (`/api/tasks`)
 
 | Method | Route | Description | Response |
 |--------|-------|-------------|----------|
@@ -189,22 +191,41 @@ The ApiService now exposes RESTful task endpoints under `/api/tasks`. Every rout
 | `DELETE` | `/api/tasks/{id}` | Delete a task (cascade execution history) | `204 No Content`, `404 Not Found` |
 | `GET` | `/api/tasks/{id}/history` | Fetch execution history entries ordered by `StartedAt` | `200 OK` + `ExecutionHistoryResponse[]` |
 
-### Sample Create Request
+### Execution Workflow (`/api/tasks/{id}/execute…` + `/api/executions/{executionId}`)
+
+| Method | Route | Description | Response |
+|--------|-------|-------------|----------|
+| `POST` | `/api/tasks/{id}/execute` | Generate a plan + run synchronously | `200 OK` + `AgentTaskResult` |
+| `POST` | `/api/tasks/{id}/execute/background` | Start execution asynchronously | `202 Accepted` + `BackgroundExecutionResponse` |
+| `GET` | `/api/tasks/{id}/execute/status` | Poll background execution status | `200 OK` + `ExecutionStatus` |
+| `POST` | `/api/tasks/{id}/execute/heal` | Retry using HealerAgent analysis | `200 OK` + `AgentTaskResult` or `400/404` |
+| `POST` | `/api/tasks/{id}/execute/cancel` | Cancel a running execution | `204 No Content` |
+| `GET` | `/api/tasks/{id}/executions` | List execution attempts for a task | `200 OK` + `ExecutionHistoryDto[]` |
+| `GET` | `/api/executions/{executionId}` | Detailed execution results (steps, screenshots, metadata) | `200 OK` + `ExecutionDetailsDto` |
+
+### Sample Requests
 
 ```bash
-# Note: In production, include a valid Bearer token in the Authorization header.
-# In development, requests without authentication fall back to "anonymous-user".
+# Create a task (include Authorization header in production)
 curl -X POST https://localhost:5001/api/tasks \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-token>" \
   -d '{
         "name": "Login journey",
-        "description": "Exercise the full dashboard login",
-        "naturalLanguagePrompt": "Open dashboard, log in as admin, capture KPI widgets"
+        "description": "Exercise the dashboard login",
+        "naturalLanguagePrompt": "Open dashboard, log in, capture KPI widgets"
       }'
+
+# Execute synchronously
+curl -X POST https://localhost:5001/api/tasks/{taskId}/execute
+
+# Kick off background execution
+curl -X POST https://localhost:5001/api/tasks/{taskId}/execute/background
+
+# Poll for status
+curl "https://localhost:5001/api/tasks/{taskId}/execute/status?executionId={execId}"
 ```
 
-Request/response contracts live in `EvoAITest.ApiService/Models/TaskModels.cs`, ensuring consistent casing, validation, and telemetry-friendly payloads.
+Task DTOs live in `Models/TaskModels.cs`. Execution-specific DTOs (`BackgroundExecutionResponse`, `ExecutionStatus`, `ExecutionHistoryDto`, `ExecutionDetailsDto`) are documented in `Endpoints/ExecutionEndpoints_README.md`.
 
 ## Configuration
 
@@ -359,6 +380,7 @@ dotnet test --filter "Category=Integration"
 - ? **HealerAgent (25 LLM-driven healing tests)**
 - ? **EvoAIDbContext (12 EF Core data-layer tests)**
 - ? **AutomationTaskRepository (30 EF-backed repository tests)**
+- ? **ExecutionEndpoints (manual test checklist + upcoming integration tests)**
 
 **All tests are fully automated in CI/CD - NO Azure credentials required for unit tests!**
 
@@ -507,6 +529,7 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - [Data Persistence (EvoAITest.Core/README.md)](EvoAITest.Core/README.md#data-persistence-day-12) - EF Core DbContext, AutomationTask/ExecutionHistory entities, and SQL Server setup.
 - [Repository Layer (EvoAITest.Core/README.md#repositories-day-14)](EvoAITest.Core/README.md#repositories-day-14) - AutomationTask repository API, DI registration, and query examples.
 - [Task API Endpoints](EvoAITest.ApiService/Endpoints/TaskEndpoints.cs) - Minimal API routes, response codes, and inline OpenAPI metadata.
+- [Execution API Guide](EvoAITest.ApiService/Endpoints/ExecutionEndpoints_README.md) - Planner/Executor/Healer orchestration routes, background status polling, and sample payloads.
 - **[Tool Executor Tests Summary](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md)** - 30+ unit tests for Tool Executor.
 - **[Tool Executor Integration Tests](TOOL_EXECUTOR_INTEGRATION_TESTS_SUMMARY.md)** - 9 real browser integration tests.
 - **[CI/CD Pipeline Documentation](CI_CD_PIPELINE_DOCUMENTATION.md)** - Automated testing and deployment pipelines.
