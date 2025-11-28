@@ -192,8 +192,11 @@ The ApiService now exposes RESTful task endpoints under `/api/tasks`. Every rout
 ### Sample Create Request
 
 ```bash
+# Note: In production, include a valid Bearer token in the Authorization header.
+# In development, requests without authentication fall back to "anonymous-user".
 curl -X POST https://localhost:5001/api/tasks \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-token>" \
   -d '{
         "name": "Login journey",
         "description": "Exercise the full dashboard login",
