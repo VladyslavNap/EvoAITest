@@ -806,7 +806,10 @@ creds: ${{ secrets.AZURE_CREDENTIALS }}
 
 Generate complete CI/CD pipeline with all deployment steps.
 ---
-## Day 19: Integration Tests### Implementation PromptGenerate integration tests for EvoAITest using WebApplicationFactory.
+## Day 19: Integration Tests
+
+### Implementation Prompt
+Generate integration tests for EvoAITest using WebApplicationFactory.
 File: src/EvoAITest.Tests/Integration/ApiIntegrationTests.csRequirements:
 Test Setup:
 Use WebApplicationFactory<Program>
@@ -876,7 +879,8 @@ MockBrowserAgent: Simulates browser actions without real browser
 Generate comprehensive integration test suite.
 ---
 ## Day 20: Example Automation (Login)
-### Implementation PromptGenerate a complete working example: Login automation for example.com.
+### Implementation Prompt
+Generate a complete working example: Login automation for example.com.
 File: examples/LoginAutomationExample.csRequirements:
 Example Code:
 
