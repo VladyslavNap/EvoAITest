@@ -806,7 +806,9 @@ creds: ${{ secrets.AZURE_CREDENTIALS }}
 
 Generate complete CI/CD pipeline with all deployment steps.
 ---
-## Day 19: Integration Tests### Implementation Prompt
+## Day 19: Integration Tests
+
+### Implementation Prompt
 Generate integration tests for EvoAITest using WebApplicationFactory.
 File: src/EvoAITest.Tests/Integration/ApiIntegrationTests.csRequirements:
 Test Setup:
