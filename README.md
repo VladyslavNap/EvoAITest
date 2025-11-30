@@ -29,10 +29,11 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 15)
-- `EvoAITest.ApiService/Endpoints/TaskEndpoints.cs` now exposes RESTful CRUD routes for automation tasks (`/api/tasks`), including history lookups, OpenAPI metadata, consistent logging, and claims-aware authorization.
-- `EvoAITest.ApiService/Models/TaskModels.cs` adds strongly-typed request/response DTOs with data annotations so payloads are validated before the repository runs.
-- `Program.cs` wires the new endpoints via `MapTaskEndpoints`, pulling in the EF-backed `IAutomationTaskRepository` registered by `AddEvoAITestCore`, plus updated connection strings for local/production SQL Server.
+### Latest Update (Day 16)
+- `EvoAITest.ApiService/Endpoints/ExecutionEndpoints.cs` exposes synchronous/background execution, healing retries, cancellation, and history/detail routes that orchestrate Planner → Executor → Healer.
+- `Program.cs` now maps both task CRUD and execution endpoints, enables authentication/authorization scaffolding, and exposes `Program` internals for WebApplicationFactory testing.
+- `EvoAITest.Tests/Integration/ApiIntegrationTests.cs` adds end-to-end coverage (task creation → execution → healing → history) using WebApplicationFactory + in-memory EF.
+- `examples/LoginExample` is a runnable CLI sample that demonstrates natural-language login automation, tying together planning, execution, and reporting.
 
 ## Project Structure
 
@@ -345,6 +346,13 @@ pwsh playwright.ps1 install chromium
 dotnet test --filter "Category=Integration"
 ```
 
+### API Integration Tests (WebApplicationFactory)
+```bash
+# Spin up the full ApiService stack in-memory
+dotnet test --filter "FullyQualifiedName~ApiIntegrationTests"
+```
+These tests exercise the Task + Execution endpoints end-to-end using WebApplicationFactory, in-memory EF, and mocked planners/executors/healers.
+
 ### Test Coverage
 - ? BrowserToolRegistry (13 tools)
 - ? AutomationTask lifecycle
@@ -359,6 +367,7 @@ dotnet test --filter "Category=Integration"
 - ? **HealerAgent (25 LLM-driven healing tests)**
 - ? **EvoAIDbContext (12 EF Core data-layer tests)**
 - ? **AutomationTaskRepository (30 EF-backed repository tests)**
+- ? **API Integration (WebApplicationFactory)** - Task + execution flows
 
 **All tests are fully automated in CI/CD - NO Azure credentials required for unit tests!**
 
@@ -507,6 +516,8 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - [Data Persistence (EvoAITest.Core/README.md)](EvoAITest.Core/README.md#data-persistence-day-12) - EF Core DbContext, AutomationTask/ExecutionHistory entities, and SQL Server setup.
 - [Repository Layer (EvoAITest.Core/README.md#repositories-day-14)](EvoAITest.Core/README.md#repositories-day-14) - AutomationTask repository API, DI registration, and query examples.
 - [Task API Endpoints](EvoAITest.ApiService/Endpoints/TaskEndpoints.cs) - Minimal API routes, response codes, and inline OpenAPI metadata.
+- [Execution API Guide](EvoAITest.ApiService/Endpoints/ExecutionEndpoints_README.md) - Planner/Executor/Healer orchestration routes, background status polling, and sample payloads.
+- [Login Automation Example](examples/LoginExample/README.md) - CLI sample showing natural-language planning → execution → reporting.
 - **[Tool Executor Tests Summary](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md)** - 30+ unit tests for Tool Executor.
 - **[Tool Executor Integration Tests](TOOL_EXECUTOR_INTEGRATION_TESTS_SUMMARY.md)** - 9 real browser integration tests.
 - **[CI/CD Pipeline Documentation](CI_CD_PIPELINE_DOCUMENTATION.md)** - Automated testing and deployment pipelines.
