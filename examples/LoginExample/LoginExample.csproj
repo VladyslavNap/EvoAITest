@@ -9,9 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EvoAITest.Core\EvoAITest.Core.csproj" />
-    <ProjectReference Include="..\EvoAITest.LLM\EvoAITest.LLM.csproj" />
-    <ProjectReference Include="..\EvoAITest.Agents\EvoAITest.Agents.csproj" />
+    <ProjectReference Include="..\..\EvoAITest.Core\EvoAITest.Core.csproj" />
+    <ProjectReference Include="..\..\EvoAITest.LLM\EvoAITest.LLM.csproj" />
+    <ProjectReference Include="..\..\EvoAITest.Agents\EvoAITest.Agents.csproj" />
   </ItemGroup>
 
   <ItemGroup>
