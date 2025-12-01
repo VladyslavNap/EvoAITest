@@ -14,10 +14,22 @@ public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Adds LLM services to the service collection with configuration-based provider selection.
+    /// Supports multi-model routing, automatic fallback, and Azure Key Vault integration.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The application configuration.</param>
     /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method registers the LLM provider with advanced features:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description>Multi-model routing - Route to GPT-4 for planning, Qwen for code generation</description></item>
+    /// <item><description>Automatic fallback - Fall back to Ollama when Azure OpenAI is rate-limited</description></item>
+    /// <item><description>Circuit breakers - Prevent cascading failures with health management</description></item>
+    /// <item><description>Azure Key Vault - Secure API key storage with managed identity</description></item>
+    /// </list>
+    /// </remarks>
     public static IServiceCollection AddLLMServices(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -33,11 +45,10 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<ILLMProvider>(sp =>
         {
             var factory = sp.GetRequiredService<LLMProviderFactory>();
-            return factory.CreateProvider();
+            
+            // Use Task.Run to avoid deadlocks in contexts with synchronization contexts
+            return Task.Run(() => factory.CreateProviderAsync()).GetAwaiter().GetResult();
         });
-
-        // Prompt builder (when implemented)
-        // services.TryAddScoped<IPromptBuilder, DefaultPromptBuilder>();
 
         return services;
     }

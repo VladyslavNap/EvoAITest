@@ -158,6 +158,49 @@ Ready to integrate:
 
 - **Azure OpenAI** (`EvoAITest.LLM/Providers/AzureOpenAIProvider.cs`) – Azure.AI.OpenAI 2.x SDK with Entra ID (Managed Identity) and API key auth, streaming completions, tool call parsing, embeddings, and token/cost usage.
 - **Ollama / Local HTTP** (`EvoAITest.LLM/Providers/OllamaProvider.cs`) – Local completions, streaming, embeddings, and availability checks against any model exposed via the Ollama API.
+- **Routing Provider** (`EvoAITest.LLM/Providers/RoutingLLMProvider.cs`) – Multi-model router that chooses GPT-5 vs Qwen/Mistral based on task type, cost, and configured strategy, with built-in fallback logic.
+
+## Advanced Routing & Resilience
+
+### Multi-Model Routing
+
+When `EnableMultiModelRouting = true`, `RoutingLLMProvider` inspects each `LLMRequest` and chooses the ideal model:
+
+- Planning / reasoning → GPT-5 (Azure OpenAI)
+- Code / extraction → Qwen2.5-7b (Ollama) or other configured local models
+- Task-based vs cost-optimized strategies control prioritization
+
+### Automatic Fallback & Circuit Breakers
+
+- `EnableProviderFallback` keeps requests flowing by falling back to the secondary provider when the primary fails or hits rate limits.
+- Circuit breaker settings (`CircuitBreakerFailureThreshold`, `CircuitBreakerOpenDurationSeconds`) ensure unhealthy providers are paused before they cause cascading failures.
+- `LLMRequestTimeoutSeconds` enforces per-request limits so callers can abort long-running prompts cleanly.
+
+### Configuration Example
+
+```json
+{
+  "EvoAITest": {
+    "Core": {
+      "LLMProvider": "AzureOpenAI",
+      "LLMModel": "gpt-5",
+      "EnableMultiModelRouting": true,
+      "RoutingStrategy": "TaskBased",
+      "EnableProviderFallback": true,
+      "CircuitBreakerFailureThreshold": 5,
+      "CircuitBreakerOpenDurationSeconds": 30,
+      "OllamaEndpoint": "http://localhost:11434",
+      "OllamaModel": "qwen2.5-7b"
+    }
+  }
+}
+```
+
+See `EVOAITEST_CORE_CONFIGURATION_GUIDE.md` for the full option matrix.
+
+### Tests
+
+The new routing/fallback behaviors are covered by `EvoAITest.Tests/LLM/*`, and the API surface is exercised end-to-end via `ApiIntegrationTests` to ensure planner/executor flows work regardless of provider.
 - **Custom Local Endpoints** – Configure `LLMProvider = "Local"` with `LocalLLMEndpoint` to reuse the Ollama provider against compatible HTTP surfaces while a bespoke provider is built.
 
 ## Provider Implementations
