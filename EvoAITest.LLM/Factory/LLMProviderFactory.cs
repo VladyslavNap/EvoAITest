@@ -19,7 +19,7 @@ namespace EvoAITest.LLM.Factory;
 /// The factory supports advanced features:
 /// </para>
 /// <list type="bullet">
-/// <item><description>Multi-model routing - Route requests to appropriate models (GPT-5 for planning, Qwen for code)</description></item>
+/// <item><description>Multi-model routing - Route requests to appropriate models (GPT-4 for planning, Qwen for code)</description></item>
 /// <item><description>Automatic fallback - Fall back to Ollama when Azure OpenAI is rate-limited or offline</description></item>
 /// <item><description>Circuit breakers - Prevent cascading failures with automatic provider health management</description></item>
 /// <item><description>Azure Key Vault - Secure API key storage with managed identity support</description></item>
@@ -31,7 +31,7 @@ public sealed class LLMProviderFactory
     private readonly EvoAITestCoreOptions _options;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<LLMProviderFactory> _logger;
-    private SecretClient? _keyVaultClient;
+    private readonly SecretClient? _keyVaultClient;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LLMProviderFactory"/> class.
@@ -341,10 +341,15 @@ public sealed class LLMProviderFactory
     /// Legacy synchronous method for backward compatibility.
     /// </summary>
     /// <returns>An instance of <see cref="ILLMProvider"/> based on configuration.</returns>
+    /// <remarks>
+    /// This method uses Task.Run to avoid deadlocks in contexts with synchronization contexts.
+    /// For new code, use CreateProviderAsync instead.
+    /// </remarks>
     [Obsolete("Use CreateProviderAsync instead for proper async support")]
     public ILLMProvider CreateProvider()
     {
-        return CreateProviderAsync().GetAwaiter().GetResult();
+        // Avoid deadlocks by running async code on a thread pool thread.
+        return Task.Run(() => CreateProviderAsync()).GetAwaiter().GetResult();
     }
 
     /// <summary>

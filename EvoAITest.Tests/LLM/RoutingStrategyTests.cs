@@ -25,8 +25,6 @@ public sealed class RoutingStrategyTests
         var gpt5Mock = CreateProviderMock("Azure OpenAI", "gpt-5", supportsStreaming: true, supportsFunctionCalling: true);
         var ollamaMock = CreateProviderMock("Ollama", "qwen2.5-7b", supportsStreaming: true, supportsFunctionCalling: true);
 
-        var providers = new List<ILLMProvider> { gpt5Mock.Object, ollamaMock.Object };
-
         // Act
         var score = strategy.ScoreProvider(context, gpt5Mock.Object);
 
@@ -162,11 +160,9 @@ public sealed class RoutingStrategyTests
         };
 
         var azureProvider = CreateProviderMock("Azure OpenAI", "gpt-5", maxContextTokens: 32768).Object;
-        var ollamaProvider = CreateProviderMock("Ollama", "qwen2.5-7b", maxContextTokens: 8192).Object;
 
         // Act
         var azureScore = strategy.ScoreProvider(context, azureProvider);
-        var ollamaScore = strategy.ScoreProvider(context, ollamaProvider);
 
         // Assert
         azureScore.Should().BeGreaterThan(0.5); // Quality over cost for complex tasks

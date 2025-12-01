@@ -512,8 +512,16 @@ public sealed class EvoAITestCoreOptions
     /// Gets or sets a value indicating whether to use managed identity for Azure OpenAI.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// When true, DefaultAzureCredential will be used for authentication.
-    /// This is the recommended approach for production deployments.
+    /// This is the recommended approach for production deployments in Azure.
+    /// </para>
+    /// <para>
+    /// For local development without Azure managed identity configured, set this to false
+    /// and provide an API key via <see cref="AzureOpenAIApiKey"/> or Key Vault instead.
+    /// If enabled in an environment without managed identity, the factory will automatically
+    /// fall back to API key authentication if available.
+    /// </para>
     /// </remarks>
     public bool UseAzureOpenAIManagedIdentity { get; set; } = true;
 
@@ -526,7 +534,7 @@ public sealed class EvoAITestCoreOptions
     /// </summary>
     /// <remarks>
     /// When enabled, requests will be routed to different models based on task type
-    /// (e.g., GPT-5 for planning, Qwen for code generation).
+    /// (e.g., GPT-4 for planning, Qwen for code generation).
     /// </remarks>
     public bool EnableMultiModelRouting { get; set; } = false;
 

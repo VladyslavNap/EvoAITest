@@ -24,7 +24,7 @@ public static class ServiceCollectionExtensions
     /// This method registers the LLM provider with advanced features:
     /// </para>
     /// <list type="bullet">
-    /// <item><description>Multi-model routing - Route to GPT-5 for planning, Qwen for code generation</description></item>
+    /// <item><description>Multi-model routing - Route to GPT-4 for planning, Qwen for code generation</description></item>
     /// <item><description>Automatic fallback - Fall back to Ollama when Azure OpenAI is rate-limited</description></item>
     /// <item><description>Circuit breakers - Prevent cascading failures with health management</description></item>
     /// <item><description>Azure Key Vault - Secure API key storage with managed identity</description></item>
@@ -46,8 +46,8 @@ public static class ServiceCollectionExtensions
         {
             var factory = sp.GetRequiredService<LLMProviderFactory>();
             
-            // Use async factory method for proper initialization
-            return factory.CreateProviderAsync().GetAwaiter().GetResult();
+            // Use Task.Run to avoid deadlocks in contexts with synchronization contexts
+            return Task.Run(() => factory.CreateProviderAsync()).GetAwaiter().GetResult();
         });
 
         return services;

@@ -18,7 +18,7 @@ namespace EvoAITest.LLM.Providers;
 /// </para>
 /// <para>
 /// Key features:
-/// - Multi-model routing based on task type (e.g., GPT-5 for planning, Qwen for code)
+/// - Multi-model routing based on task type (e.g., GPT-4 for planning, Qwen for code)
 /// - Automatic fallback when primary provider fails or is rate-limited
 /// - Circuit breaker pattern to prevent cascading failures
 /// - Streaming support for large responses
@@ -33,6 +33,7 @@ public sealed class RoutingLLMProvider : ILLMProvider
     private readonly ILogger<RoutingLLMProvider> _logger;
     private readonly RoutingProviderOptions _options;
     private TokenUsage _lastUsage = new(0, 0, 0);
+    private ILLMProvider? _lastUsedProvider;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RoutingLLMProvider"/> class.
@@ -116,6 +117,7 @@ public sealed class RoutingLLMProvider : ILLMProvider
         var provider = _providers.FirstOrDefault();
         if (provider == null)
         {
+            _logger.LogWarning("No providers available for ParseToolCallsAsync - returning empty list");
             return new List<ToolCall>();
         }
 
@@ -126,7 +128,9 @@ public sealed class RoutingLLMProvider : ILLMProvider
     public string GetModelName()
     {
         // Return the name of the most recently used provider
-        return _providers.FirstOrDefault()?.GetModelName() ?? "routing-provider";
+        return _lastUsedProvider?.GetModelName() 
+            ?? _providers.FirstOrDefault()?.GetModelName() 
+            ?? "routing-provider";
     }
 
     /// <inheritdoc/>
@@ -192,6 +196,7 @@ public sealed class RoutingLLMProvider : ILLMProvider
             yield break;
         }
 
+        _lastUsedProvider = provider;
         var breaker = _circuitBreakers.GetOrCreateBreaker(provider.Name);
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -202,14 +207,40 @@ public sealed class RoutingLLMProvider : ILLMProvider
             provider.Name, context.TaskType, context.Complexity);
 
         var hasError = false;
-        await foreach (var chunk in provider.StreamCompleteAsync(request, cts.Token))
+        IAsyncEnumerator<LLMStreamChunk>? enumerator = null;
+        
+        try
         {
-            if (hasError)
+            enumerator = provider.StreamCompleteAsync(request, cts.Token).GetAsyncEnumerator(cts.Token);
+            
+            while (true)
             {
-                yield break;
-            }
+                LLMStreamChunk chunk;
+                try
+                {
+                    if (!await enumerator.MoveNextAsync())
+                    {
+                        break;
+                    }
+                    chunk = enumerator.Current;
+                }
+                catch (Exception ex)
+                {
+                    hasError = true;
+                    _logger.LogError(ex, "Error during streaming completion with provider {Provider}", provider.Name);
+                    breaker.RecordFailure(ex);
+                    yield break;
+                }
 
-            yield return chunk;
+                yield return chunk;
+            }
+        }
+        finally
+        {
+            if (enumerator != null)
+            {
+                await enumerator.DisposeAsync();
+            }
         }
 
         if (!hasError)
@@ -266,8 +297,9 @@ public sealed class RoutingLLMProvider : ILLMProvider
     {
         var attemptedProviders = new HashSet<string>();
         Exception? lastException = null;
+        var maxAttempts = Math.Max(_providers.Count, _options.MaxRetries);
 
-        while (attemptedProviders.Count < _providers.Count)
+        while (attemptedProviders.Count < maxAttempts)
         {
             var provider = await SelectProviderWithFallbackAsync(context, cancellationToken);
             
@@ -300,6 +332,7 @@ public sealed class RoutingLLMProvider : ILLMProvider
                 
                 breaker.RecordSuccess();
                 _lastUsage = provider.GetLastTokenUsage();
+                _lastUsedProvider = provider;
 
                 _logger.LogInformation(
                     "Request completed successfully with {Provider}. Tokens: {Input}/{Output}, Cost: ${Cost:F4}",

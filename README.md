@@ -209,9 +209,9 @@ Request/response contracts live in `EvoAITest.ApiService/Models/TaskModels.cs`, 
 
 ## LLM Routing & Resilience
 
-The LLM layer now supports intelligent routing, automatic fallback, and circuit breakers so production workloads can mix GPT-5 with cost-effective models safely.
+The LLM layer now supports intelligent routing, automatic fallback, and circuit breakers so production workloads can mix GPT-4 with cost-effective models safely.
 
-- `EnableMultiModelRouting`: when `true`, `RoutingLLMProvider` sends planning tasks to GPT-5 while code/extraction prompts go to Qwen/Mistral.
+- `EnableMultiModelRouting`: when `true`, `RoutingLLMProvider` sends planning tasks to GPT-4 while code/extraction prompts go to Qwen/Mistral.
 - `EnableProviderFallback`: keeps requests flowing by falling back to Ollama when Azure OpenAI is rate-limited or unhealthy (circuit breaker thresholds configurable).
 - `RoutingStrategy`: `"TaskBased"` (default) or `"CostOptimized"` to prioritize price/performance.
 - `CircuitBreakerFailureThreshold` / `CircuitBreakerOpenDurationSeconds`: guard against cascading failures.
