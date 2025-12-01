@@ -206,29 +206,9 @@ public sealed class EvoAITestCoreOptions
     public string OllamaEndpoint { get; set; } = "http://localhost:11434";
 
     /// <summary>
-    /// Gets or sets the Ollama model to use.
+    /// Gets or sets the Ollama model name (e.g., "qwen2.5-7b", "llama3", "mistral").
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Default: "qwen2.5:32b"
-    /// </para>
-    /// <para>
-    /// This can be any model installed in your local Ollama instance.
-    /// </para>
-    /// <para>
-    /// Popular models:
-    /// - "qwen2.5:32b": Large model for complex reasoning (32B parameters, requires 32GB RAM)
-    /// - "qwen2.5-7b": Fast and capable for code/reasoning
-    /// - "llama2": General purpose, good balance
-    /// - "mistral": Efficient and accurate
-    /// - "codellama": Optimized for code generation
-    /// </para>
-    /// <para>
-    /// Install models: `ollama pull qwen2.5:32b`
-    /// List models: `ollama list`
-    /// </para>
-    /// </remarks>
-    public string OllamaModel { get; set; } = "qwen2.5:32b";
+    public string OllamaModel { get; set; } = "qwen2.5-7b";
 
     // ============================================================
     // Local LLM Configuration (Custom Endpoints)
@@ -506,6 +486,138 @@ public sealed class EvoAITestCoreOptions
             throw new InvalidOperationException(
                 "ScreenshotOutputPath is required. " +
                 "Set to a writable directory path (e.g., '/tmp/screenshots' for Linux, 'C:\\\\temp\\\\screenshots' for Windows).");
+        }
+    }
+
+    // ============================================================
+    // Managed Identity and Key Vault Configuration (For Production)
+    // ============================================================
+
+    /// <summary>
+    /// Gets or sets the Azure Key Vault endpoint for secure key storage.
+    /// </summary>
+    /// <remarks>
+    /// When specified, API keys will be retrieved from Azure Key Vault instead of configuration.
+    /// Format: https://{vault-name}.vault.azure.net/
+    /// </remarks>
+    public string? KeyVaultEndpoint { get; set; }
+
+    /// <summary>
+    /// Gets or sets the name of the secret in Key Vault containing the Azure OpenAI API key.
+    /// </summary>
+    /// <value>Default is "AzureOpenAI-ApiKey".</value>
+    public string KeyVaultSecretName { get; set; } = "AzureOpenAI-ApiKey";
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to use managed identity for Azure OpenAI.
+    /// </summary>
+    /// <remarks>
+    /// When true, DefaultAzureCredential will be used for authentication.
+    /// This is the recommended approach for production deployments.
+    /// </remarks>
+    public bool UseAzureOpenAIManagedIdentity { get; set; } = true;
+
+    // ============================================================
+    // Advanced Configuration
+    // ============================================================
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to enable multi-model routing.
+    /// </summary>
+    /// <remarks>
+    /// When enabled, requests will be routed to different models based on task type
+    /// (e.g., GPT-5 for planning, Qwen for code generation).
+    /// </remarks>
+    public bool EnableMultiModelRouting { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to enable automatic fallback to secondary providers.
+    /// </summary>
+    /// <remarks>
+    /// When enabled, requests will automatically fall back to Ollama if Azure OpenAI
+    /// is rate-limited, offline, or experiencing errors.
+    /// </remarks>
+    public bool EnableProviderFallback { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the routing strategy to use when multi-model routing is enabled.
+    /// </summary>
+    /// <value>
+    /// Valid values: "TaskBased", "CostOptimized". Default is "TaskBased".
+    /// </value>
+    public string RoutingStrategy { get; set; } = "TaskBased";
+
+    /// <summary>
+    /// Gets or sets the circuit breaker failure threshold.
+    /// </summary>
+    /// <remarks>
+    /// Number of consecutive failures before a provider's circuit breaker opens.
+    /// Default is 5 failures.
+    /// </remarks>
+    public int CircuitBreakerFailureThreshold { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets the circuit breaker open duration in seconds.
+    /// </summary>
+    /// <remarks>
+    /// How long the circuit stays open before attempting recovery.
+    /// Default is 30 seconds.
+    /// </remarks>
+    public int CircuitBreakerOpenDurationSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets the request timeout in seconds for LLM operations.
+    /// </summary>
+    /// <value>Default is 60 seconds.</value>
+    public int LLMRequestTimeoutSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// Validates the LLM configuration.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when configuration is invalid.</exception>
+    public void ValidateLLMConfiguration()
+    {
+        if (string.IsNullOrWhiteSpace(LLMProvider))
+        {
+            throw new InvalidOperationException("LLMProvider must be specified in configuration");
+        }
+
+        if (LLMProvider == "AzureOpenAI")
+        {
+            if (string.IsNullOrWhiteSpace(AzureOpenAIEndpoint))
+            {
+                throw new InvalidOperationException(
+                    "AzureOpenAIEndpoint must be specified when using Azure OpenAI provider");
+            }
+
+            if (string.IsNullOrWhiteSpace(AzureOpenAIDeployment))
+            {
+                throw new InvalidOperationException(
+                    "AzureOpenAIDeployment must be specified when using Azure OpenAI provider");
+            }
+
+            // API key is optional if using managed identity or Key Vault
+            if (!UseAzureOpenAIManagedIdentity &&
+                string.IsNullOrWhiteSpace(KeyVaultEndpoint) &&
+                string.IsNullOrWhiteSpace(AzureOpenAIApiKey))
+            {
+                throw new InvalidOperationException(
+                    "AzureOpenAIApiKey, KeyVaultEndpoint, or managed identity must be configured");
+            }
+        }
+        else if (LLMProvider == "Ollama")
+        {
+            if (string.IsNullOrWhiteSpace(OllamaEndpoint))
+            {
+                throw new InvalidOperationException(
+                    "OllamaEndpoint must be specified when using Ollama provider");
+            }
+
+            if (string.IsNullOrWhiteSpace(OllamaModel))
+            {
+                throw new InvalidOperationException(
+                    "OllamaModel must be specified when using Ollama provider");
+            }
         }
     }
 }

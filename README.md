@@ -207,6 +207,31 @@ curl -X POST https://localhost:5001/api/tasks \
 
 Request/response contracts live in `EvoAITest.ApiService/Models/TaskModels.cs`, ensuring consistent casing, validation, and telemetry-friendly payloads.
 
+## LLM Routing & Resilience
+
+The LLM layer now supports intelligent routing, automatic fallback, and circuit breakers so production workloads can mix GPT-5 with cost-effective models safely.
+
+- `EnableMultiModelRouting`: when `true`, `RoutingLLMProvider` sends planning tasks to GPT-5 while code/extraction prompts go to Qwen/Mistral.
+- `EnableProviderFallback`: keeps requests flowing by falling back to Ollama when Azure OpenAI is rate-limited or unhealthy (circuit breaker thresholds configurable).
+- `RoutingStrategy`: `"TaskBased"` (default) or `"CostOptimized"` to prioritize price/performance.
+- `CircuitBreakerFailureThreshold` / `CircuitBreakerOpenDurationSeconds`: guard against cascading failures.
+
+```json
+{
+  "EvoAITest": {
+    "Core": {
+      "EnableMultiModelRouting": true,
+      "RoutingStrategy": "TaskBased",
+      "EnableProviderFallback": true,
+      "CircuitBreakerFailureThreshold": 5,
+      "CircuitBreakerOpenDurationSeconds": 30,
+      "OllamaEndpoint": "http://localhost:11434",
+      "OllamaModel": "qwen2.5-7b"
+    }
+  }
+}
+```
+
 ## Configuration
 
 ### appsettings.Development.json (Local with Ollama)

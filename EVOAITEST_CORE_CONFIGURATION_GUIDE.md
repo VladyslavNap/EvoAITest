@@ -314,6 +314,17 @@ dotnet user-secrets list --project EvoAITest.ApiService
 | `LLMProvider` | string | "AzureOpenAI" | Provider type: "AzureOpenAI", "Ollama", "Local" |
 | `LLMModel` | string | "gpt-5" | Model name (Azure OpenAI only) |
 
+### Advanced Routing & Resilience
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `EnableMultiModelRouting` | bool | `false` | Routes prompts to the best-fit provider (handled by `RoutingLLMProvider`). |
+| `RoutingStrategy` | string | `"TaskBased"` | `"TaskBased"` (default) or `"CostOptimized"` to balance price/performance. |
+| `EnableProviderFallback` | bool | `true` | Falls back to the secondary provider when the primary fails or is rate-limited. |
+| `CircuitBreakerFailureThreshold` | int | `5` | Consecutive failures before avoiding a provider. |
+| `CircuitBreakerOpenDurationSeconds` | int | `30` | How long the circuit stays open before retrying a provider. |
+| `LLMRequestTimeoutSeconds` | int | `60` | Timeout applied to each LLM request. |
+
 ### Azure OpenAI Properties
 
 | Property | Type | Default | Required | Source |
