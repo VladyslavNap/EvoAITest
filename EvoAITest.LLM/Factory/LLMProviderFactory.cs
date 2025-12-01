@@ -252,14 +252,22 @@ public sealed class LLMProviderFactory
                 var secret = await _keyVaultClient.GetSecretAsync(_options.KeyVaultSecretName, cancellationToken: cancellationToken);
                 var apiKey = secret.Value.Value;
 
-                _logger.LogInformation(
-                    "Successfully retrieved API key from Key Vault. Creating Azure OpenAI provider.");
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    _logger.LogError(
+                        "Retrieved API key from Key Vault is null, empty, or whitespace. Skipping provider creation and falling back to next authentication method.");
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "Successfully retrieved API key from Key Vault. Creating Azure OpenAI provider.");
 
-                return new AzureOpenAIProvider(
-                    _options.AzureOpenAIEndpoint,
-                    apiKey,
-                    _options.AzureOpenAIDeployment,
-                    logger);
+                    return new AzureOpenAIProvider(
+                        _options.AzureOpenAIEndpoint,
+                        apiKey,
+                        _options.AzureOpenAIDeployment,
+                        logger);
+                }
             }
             catch (Exception ex)
             {
