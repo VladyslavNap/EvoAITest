@@ -105,10 +105,10 @@ public interface IRoutingStrategy
 /// <remarks>
 /// <para>
 /// This strategy routes requests to providers based on predefined rules:
-/// - Planning tasks ? GPT-5 (Azure OpenAI)
-/// - Code generation ? Qwen2.5 (Ollama)
-/// - Simple tasks ? Local models for cost savings
-/// - Complex reasoning ? Most capable model available
+/// - Planning tasks → GPT-4 (Azure OpenAI)
+/// - Code generation → Qwen2.5 (Ollama)
+/// - Simple tasks → Local models for cost savings
+/// - Complex reasoning → Most capable model available
 /// </para>
 /// <para>
 /// The strategy also considers provider capabilities (streaming, function calling)
@@ -186,8 +186,8 @@ public sealed class TaskBasedRoutingStrategy : IRoutingStrategy
 
         return taskType switch
         {
-            TaskType.Planning when providerName.Contains("azure") || modelName.Contains("gpt-5") => 1.0,
-            TaskType.Planning when providerName.Contains("azure") || modelName.Contains("gpt-4") => 0.9,
+            TaskType.Planning when providerName.Contains("azure") || modelName.Contains("gpt-4") => 1.0,
+            TaskType.Planning when modelName.Contains("gpt") => 0.9,
             
             TaskType.CodeGeneration when modelName.Contains("qwen") => 1.0,
             TaskType.CodeGeneration when modelName.Contains("codellama") => 0.9,
@@ -252,7 +252,7 @@ public sealed class TaskBasedRoutingStrategy : IRoutingStrategy
 /// <remarks>
 /// <para>
 /// This strategy prioritizes:
-/// 1. Free/local providers (Ollama) for simple tasks
+/// 1. Prefer free/local providers (Ollama) for simple tasks
 /// 2. Smaller models when complexity allows
 /// 3. Azure OpenAI only for complex or high-priority tasks
 /// </para>
@@ -339,13 +339,10 @@ public sealed class CostOptimizedRoutingStrategy : IRoutingStrategy
         }
 
         // Adjust for priority
-        if (context.Priority == RequestPriority.Critical)
+        if (context.Priority == RequestPriority.Critical && providerName.Contains("azure"))
         {
             // Reliability trumps cost
-            if (providerName.Contains("azure"))
-            {
-                score += 0.5;
-            }
+            score += 0.5;
         }
 
         return Math.Clamp(score, 0.0, 1.0);

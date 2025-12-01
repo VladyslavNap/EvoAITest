@@ -22,13 +22,11 @@ public sealed class RoutingStrategyTests
             Complexity = ComplexityLevel.High
         };
 
-        var gpt5Mock = CreateProviderMock("Azure OpenAI", "gpt-5", supportsStreaming: true, supportsFunctionCalling: true);
+        var gpt4Mock = CreateProviderMock("Azure OpenAI", "gpt-4-turbo", supportsStreaming: true, supportsFunctionCalling: true);
         var ollamaMock = CreateProviderMock("Ollama", "qwen2.5-7b", supportsStreaming: true, supportsFunctionCalling: true);
 
-        var providers = new List<ILLMProvider> { gpt5Mock.Object, ollamaMock.Object };
-
         // Act
-        var score = strategy.ScoreProvider(context, gpt5Mock.Object);
+        var score = strategy.ScoreProvider(context, gpt4Mock.Object);
 
         // Assert
         score.Should().BeGreaterThan(0.7); // High score for GPT-5 on planning tasks
@@ -115,7 +113,7 @@ public sealed class RoutingStrategyTests
 
         var providers = new List<ILLMProvider>
         {
-            CreateProviderMock("Azure OpenAI", "gpt-5", maxContextTokens: 32768).Object,
+            CreateProviderMock("Azure OpenAI", "gpt-4-turbo", maxContextTokens: 32768).Object,
             CreateProviderMock("Ollama", "qwen2.5-7b", maxContextTokens: 32768).Object,
             CreateProviderMock("Ollama", "llama3", maxContextTokens: 8192).Object
         };
@@ -161,12 +159,10 @@ public sealed class RoutingStrategyTests
             Complexity = ComplexityLevel.Expert
         };
 
-        var azureProvider = CreateProviderMock("Azure OpenAI", "gpt-5", maxContextTokens: 32768).Object;
-        var ollamaProvider = CreateProviderMock("Ollama", "qwen2.5-7b", maxContextTokens: 8192).Object;
+        var azureProvider = CreateProviderMock("Azure OpenAI", "gpt-4-turbo", maxContextTokens: 32768).Object;
 
         // Act
         var azureScore = strategy.ScoreProvider(context, azureProvider);
-        var ollamaScore = strategy.ScoreProvider(context, ollamaProvider);
 
         // Assert
         azureScore.Should().BeGreaterThan(0.5); // Quality over cost for complex tasks
