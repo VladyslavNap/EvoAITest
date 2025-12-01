@@ -186,8 +186,8 @@ public sealed class TaskBasedRoutingStrategy : IRoutingStrategy
 
         return taskType switch
         {
-            TaskType.Planning when providerName.Contains("azure") || modelName.Contains("gpt-5") => 1.0,
-            TaskType.Planning when providerName.Contains("azure") || modelName.Contains("gpt-4") => 0.9,
+            TaskType.Planning when providerName.Contains("azure") || modelName.Contains("gpt-4") => 1.0,
+            TaskType.Planning when modelName.Contains("gpt") => 0.9,
             
             TaskType.CodeGeneration when modelName.Contains("qwen") => 1.0,
             TaskType.CodeGeneration when modelName.Contains("codellama") => 0.9,

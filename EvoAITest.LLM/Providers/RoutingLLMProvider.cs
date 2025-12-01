@@ -297,7 +297,8 @@ public sealed class RoutingLLMProvider : ILLMProvider
     {
         var attemptedProviders = new HashSet<string>();
         Exception? lastException = null;
-        var maxAttempts = Math.Max(_providers.Count, _options.MaxRetries);
+        // Limit attempts to the lesser of available providers and configured MaxRetries
+        var maxAttempts = Math.Min(_providers.Count, _options.MaxRetries);
 
         while (attemptedProviders.Count < maxAttempts)
         {
