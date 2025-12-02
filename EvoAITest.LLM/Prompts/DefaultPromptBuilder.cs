@@ -518,7 +518,7 @@ Each tool call should specify the tool name and parameters.",
             {
                 try
                 {
-                    if (Regex.IsMatch(component.Template, pattern, RegexOptions.IgnoreCase))
+                    if (Regex.IsMatch(component.Template, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)))
                     {
                         issues.Add($"Potential injection detected in {name}: matched pattern '{pattern}'");
                         
