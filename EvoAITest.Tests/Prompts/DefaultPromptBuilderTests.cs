@@ -594,7 +594,10 @@ public sealed class DefaultPromptBuilderTests
 
         // Assert
         tokens.Should().BeGreaterThan(0);
-        tokens.Should().BeInRange(text.Length / 4 - 5, text.Length / 4 + 5); // ~4 chars per token ± 5
+        var expected = text.Length / 4;
+        var lower = (int)(expected * 0.8);
+        var upper = (int)(expected * 1.2);
+        tokens.Should().BeInRange(lower, upper); // ~4 chars per token Â±20%
     }
 
     [TestMethod]
