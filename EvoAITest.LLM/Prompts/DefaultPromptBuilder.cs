@@ -263,7 +263,8 @@ Each tool call should specify the tool name and parameters.",
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return BuildAsync(prompt, CancellationToken.None).GetAwaiter().GetResult();
+        // Avoid deadlocks by running BuildAsync on a thread pool thread.
+        return Task.Run(() => BuildAsync(prompt, CancellationToken.None)).GetAwaiter().GetResult();
     }
 
     public async Task<PromptBuildResult> BuildAsync(Prompt prompt, CancellationToken cancellationToken = default)
