@@ -83,7 +83,8 @@ var prompt = _promptBuilder.FromTemplate("login-automation", new Dictionary<stri
 {
     ["url"] = "https://example.com",
     ["username"] = "testuser",
-    ["password"] = "SecurePass123"
+    // Never pass plaintext secrets to the LLM. Use a placeholder and inject real secrets only at execution time.
+    ["password"] = "<PASSWORD>"
 });
 ```
 
