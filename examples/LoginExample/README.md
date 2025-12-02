@@ -329,7 +329,7 @@ Options:
 
 Available models:
 - `qwen2.5:32b` - Best quality (requires 32GB RAM)
-- `qwen2.5-7b` - Balanced (requires 8GB RAM)
+- `qwen2.5:7b` - Balanced (requires 8GB RAM)
 - `mistral` - Fast and capable
 - `llama3` - Good general-purpose model
 
@@ -633,7 +633,7 @@ jobs:
           curl -fsSL https://ollama.com/install.sh | sh
           ollama serve &
           sleep 5
-          ollama pull qwen2.5-7b
+          ollama pull qwen2.5:7b
       
       - name: Run Login Example
         run: |
@@ -659,7 +659,7 @@ steps:
     curl -fsSL https://ollama.com/install.sh | sh
     ollama serve &
     sleep 5
-    ollama pull qwen2.5-7b
+    ollama pull qwen2.5:7b
   displayName: 'Install Ollama'
 
 - script: |
