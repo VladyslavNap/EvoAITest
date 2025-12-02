@@ -34,6 +34,7 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 - `Program.cs` now maps both task CRUD and execution endpoints, enables authentication/authorization scaffolding, and exposes `Program` internals for WebApplicationFactory testing.
 - `EvoAITest.Tests/Integration/ApiIntegrationTests.cs` adds end-to-end coverage (task creation → execution → healing → history) using WebApplicationFactory + in-memory EF.
 - `examples/LoginExample` is a runnable CLI sample that demonstrates natural-language login automation, tying together planning, execution, and reporting.
+- `EvoAITest.LLM/Prompts` introduces the new prompt-builder toolkit (templates, injection protection, routing-aware system prompts) with 40+ dedicated unit tests and DI registration hooks.
 
 ## Project Structure
 
@@ -232,6 +233,30 @@ The LLM layer now supports intelligent routing, automatic fallback, and circuit 
 }
 ```
 
+### Prompt Builder Toolkit
+
+`EvoAITest.LLM/Prompts` ships a modular `IPromptBuilder` implementation with:
+- Template registry (`login-automation`, `planner`, `healer`, etc.) and variable substitution
+- Versioned system instructions + reusable prompt components (context, tools, examples)
+- Injection protection (detects "ignore previous instructions", special tokens, length limits)
+- Build-time validation + sanitization with warning metadata
+
+```csharp
+var prompt = promptBuilder
+    .CreatePrompt("browser-automation")
+    .WithContext("Current URL: https://example.com")
+    .WithUserInstruction("Click the login button")
+    .WithVariables(new() { ["button"] = "#login" });
+
+var buildResult = await promptBuilder.BuildAsync(prompt);
+if (buildResult.Warnings.Count > 0)
+{
+    logger.LogWarning("Prompt warnings: {Warnings}", string.Join(", ", buildResult.Warnings));
+}
+```
+
+See `EvoAITest.LLM/Prompts/README.md` for the full API reference, templates, and troubleshooting guidance.
+
 ## Configuration
 
 ### appsettings.Development.json (Local with Ollama)
@@ -354,6 +379,9 @@ dotnet test EvoAITest.Tests
 # Run specific test class
 dotnet test --filter "FullyQualifiedName~EvoAITestCoreOptionsTests"
 
+# Prompt builder tests
+dotnet test --filter "FullyQualifiedName~DefaultPromptBuilderTests"
+
 # Run Azure OpenAI tests
 dotnet test --filter "FullyQualifiedName~AzureOpenAI"
 
@@ -393,6 +421,7 @@ These tests exercise the Task + Execution endpoints end-to-end using WebApplicat
 - ? **EvoAIDbContext (12 EF Core data-layer tests)**
 - ? **AutomationTaskRepository (30 EF-backed repository tests)**
 - ? **API Integration (WebApplicationFactory)** - Task + execution flows
+- ? **PromptBuilder (40+ template/injection tests)**
 
 **All tests are fully automated in CI/CD - NO Azure credentials required for unit tests!**
 
@@ -543,6 +572,7 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - [Task API Endpoints](EvoAITest.ApiService/Endpoints/TaskEndpoints.cs) - Minimal API routes, response codes, and inline OpenAPI metadata.
 - [Execution API Guide](EvoAITest.ApiService/Endpoints/ExecutionEndpoints_README.md) - Planner/Executor/Healer orchestration routes, background status polling, and sample payloads.
 - [Login Automation Example](examples/LoginExample/README.md) - CLI sample showing natural-language planning → execution → reporting.
+- [Prompt Builder Guide](EvoAITest.LLM/Prompts/README.md) - Templates, versioning, injection protection, and DI usage.
 - **[Tool Executor Tests Summary](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md)** - 30+ unit tests for Tool Executor.
 - **[Tool Executor Integration Tests](TOOL_EXECUTOR_INTEGRATION_TESTS_SUMMARY.md)** - 9 real browser integration tests.
 - **[CI/CD Pipeline Documentation](CI_CD_PIPELINE_DOCUMENTATION.md)** - Automated testing and deployment pipelines.
