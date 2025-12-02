@@ -233,7 +233,7 @@ public sealed class InjectionProtectionOptions
     /// <summary>
     /// Gets or sets whether to block detected injections.
     /// </summary>
-    public bool BlockOnDetection { get; set; } = true;
+    public bool BlockOnDetection { get; set; } = false;
 
     /// <summary>
     /// Gets or sets whether to log suspected injections.
