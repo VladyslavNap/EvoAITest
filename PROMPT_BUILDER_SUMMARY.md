@@ -53,12 +53,12 @@ Successfully implemented a comprehensive prompt building toolkit for EvoAITest.L
 ### 1. **Modular Prompt Construction**
 
 ```csharp
-var prompt = _promptBuilder.CreatePrompt("browser-automation")
-    .WithContext("Current page: https://example.com")
-    .WithUserInstruction("Click the login button")
-    .WithTools(browserTools)
-    .WithOutputFormat("Return JSON with tool_calls")
-    .WithVariable("url", "https://example.com");
+var prompt = _promptBuilder.CreatePrompt("browser-automation");
+_promptBuilder.WithContext(prompt, "Current page: https://example.com");
+_promptBuilder.WithUserInstruction(prompt, "Click the login button");
+_promptBuilder.WithTools(prompt, browserTools);
+_promptBuilder.WithOutputFormat(prompt, "Return JSON with tool_calls");
+_promptBuilder.WithVariable(prompt, "url", "https://example.com");
 
 var result = await _promptBuilder.BuildAsync(prompt);
 ```
