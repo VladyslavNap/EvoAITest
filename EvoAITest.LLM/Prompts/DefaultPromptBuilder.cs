@@ -624,6 +624,16 @@ Each tool call should specify the tool name and parameters.",
             result = result.Replace(placeholder, value);
         }
 
+        // Warn if unreplaced placeholders remain
+        var unreplaced = Regex.Matches(result, @"\{[^\{\}]+\}")
+            .Cast<Match>()
+            .Select(m => m.Value)
+            .Distinct()
+            .ToList();
+        if (unreplaced.Count > 0)
+        {
+            _logger?.LogWarning("Unreplaced placeholders found in prompt: {Placeholders}", string.Join(", ", unreplaced));
+        }
         return result;
     }
 
