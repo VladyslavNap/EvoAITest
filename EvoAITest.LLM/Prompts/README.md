@@ -33,10 +33,10 @@ public class MyService
     public async Task<string> GeneratePlanAsync(string userGoal)
     {
         // Create a prompt with browser automation instructions
-        var prompt = _promptBuilder.CreatePrompt("browser-automation")
-            .WithContext("Current page: https://example.com")
-            .WithUserInstruction(userGoal)
-            .WithOutputFormat("Return JSON with tool_calls array");
+        var prompt = _promptBuilder.CreatePrompt("browser-automation");
+        prompt = _promptBuilder.WithContext(prompt, "Current page: https://example.com");
+        prompt = _promptBuilder.WithUserInstruction(prompt, userGoal);
+        prompt = _promptBuilder.WithOutputFormat(prompt, "Return JSON with tool_calls array");
         
         _promptBuilder.WithVariable(prompt, "url", "https://example.com");
         
