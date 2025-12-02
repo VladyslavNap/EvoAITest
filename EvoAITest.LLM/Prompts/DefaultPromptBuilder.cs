@@ -561,7 +561,7 @@ Each tool call should specify the tool name and parameters.",
         // Truncate if too long
         if (sanitized.Length > InjectionOptions.MaxPromptLength)
         {
-            sanitized = sanitized.Substring(0, InjectionOptions.MaxPromptLength);
+            sanitized = sanitized[..InjectionOptions.MaxPromptLength];
             _logger.LogWarning("Truncated input from {Original} to {Max} characters",
                 input.Length, InjectionOptions.MaxPromptLength);
         }
