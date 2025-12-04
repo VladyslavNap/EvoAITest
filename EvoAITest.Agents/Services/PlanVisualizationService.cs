@@ -152,6 +152,23 @@ public sealed class PlanVisualizationService
         sb.AppendLine("graph TD");
         sb.AppendLine($"    Start([\"Start: {EscapeMermaid(plan.TaskId)}\"])");
         
+        // Handle empty plan
+        if (plan.Steps.Count == 0)
+        {
+            sb.AppendLine($"    Start --> End([\"End\"])");
+            edges.Add(new GraphEdge { SourceId = "Start", TargetId = "End", RelationType = "direct" });
+            
+            var emptyGraph = new PlanGraph
+            {
+                PlanId = plan.Id,
+                Nodes = nodes,
+                Edges = edges,
+                Format = GraphFormat.Mermaid,
+                Content = sb.ToString()
+            };
+            return emptyGraph;
+        }
+        
         // Add nodes for each step
         foreach (var step in plan.Steps.OrderBy(s => s.StepNumber))
         {
@@ -431,17 +448,19 @@ public sealed class PlanVisualizationService
         // Add dependency links
         if (chainOfThought != null)
         {
-            foreach (var dep in chainOfThought.StepDependencies)
+            var dependencyEdges = chainOfThought.StepDependencies.Select(dep => new GraphEdge
             {
-                var edge = new GraphEdge
-                {
-                    SourceId = $"node{dep.RequiredStepNumber}",
-                    TargetId = $"node{dep.DependentStepNumber}",
-                    RelationType = dep.Type.ToString(),
-                    Label = "requires"
-                };
-                edges.Add(edge);
-
+                SourceId = $"node{dep.RequiredStepNumber}",
+                TargetId = $"node{dep.DependentStepNumber}",
+                RelationType = dep.Type.ToString(),
+                Label = "requires"
+            }).ToList();
+            
+            edges.AddRange(dependencyEdges);
+            
+            // Add corresponding D3 links
+            foreach (var edge in dependencyEdges)
+            {
                 d3Links.Add(new
                 {
                     source = edge.SourceId,
