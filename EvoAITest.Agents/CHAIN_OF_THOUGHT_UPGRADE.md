@@ -113,7 +113,7 @@ var chainOfThought = ParseChainOfThoughtFromResponse(response.Content);
 // Store in plan
 plan.Metadata["chain_of_thought"] = chainOfThought;
 plan.ThoughtProcess = chainOfThought.ReasoningSteps
-    .Select(r => $"{r.Thought} ? {r.Conclusion}")
+    .Select(r => $"{r.Thought} => {r.Conclusion}")
     .ToList();
 
 // Generate visualization with dependencies
