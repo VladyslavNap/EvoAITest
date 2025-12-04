@@ -160,7 +160,7 @@ public sealed class PlanVisualizationService
             
             var emptyGraph = new PlanGraph
             {
-                PlanId = plan.TaskId,
+                PlanId = plan.Id,
                 Nodes = nodes,
                 Edges = edges,
                 Format = GraphFormat.Mermaid,
@@ -448,16 +448,19 @@ public sealed class PlanVisualizationService
         // Add dependency links
         if (chainOfThought != null)
         {
-            var dependencyEdges = chainOfThought.StepDependencies.Select(dep =>
+            var dependencyEdges = chainOfThought.StepDependencies.Select(dep => new GraphEdge
             {
-                var edge = new GraphEdge
-                {
-                    SourceId = $"node{dep.RequiredStepNumber}",
-                    TargetId = $"node{dep.DependentStepNumber}",
-                    RelationType = dep.Type.ToString(),
-                    Label = "requires"
-                };
-                
+                SourceId = $"node{dep.RequiredStepNumber}",
+                TargetId = $"node{dep.DependentStepNumber}",
+                RelationType = dep.Type.ToString(),
+                Label = "requires"
+            }).ToList();
+            
+            edges.AddRange(dependencyEdges);
+            
+            // Add corresponding D3 links
+            foreach (var edge in dependencyEdges)
+            {
                 d3Links.Add(new
                 {
                     source = edge.SourceId,
@@ -465,11 +468,7 @@ public sealed class PlanVisualizationService
                     value = 1,
                     type = "dependency"
                 });
-                
-                return edge;
-            });
-            
-            edges.AddRange(dependencyEdges);
+            }
         }
 
         var d3Graph = new
