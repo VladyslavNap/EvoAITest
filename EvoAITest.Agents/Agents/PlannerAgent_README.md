@@ -120,7 +120,7 @@ Confidence: 92.0%
   4. Type
      Reasoning: Enter the password
      Expected: Password is masked in the field
- 5. Click
+  5. Click
     Reasoning: Submit the login form
      Expected: User is logged in and redirected to dashboard
 
