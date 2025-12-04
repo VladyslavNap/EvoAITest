@@ -521,7 +521,7 @@ public sealed class PlanVisualizationService
     private string EscapePlantUml(string input)
     {
         return input?
-            .Replace("\\n", "\n")
+            .Replace("\n", "\\n")
             .Replace("\r", "") ?? string.Empty;
     }
 }
