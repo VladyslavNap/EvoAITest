@@ -151,7 +151,14 @@ Every LLM response now includes a reasoning section plus the structured plan and
 }
 ```
 
-The PlannerAgent stores `thought_process` entries in `ExecutionPlan.ThoughtProcess` and visualization metadata in `ExecutionPlan.Visualization`. Downstream services (Executor, dashboards) can persist both for explainability or diagrams.
+> **Security Warning**: The PlannerAgent stores `thought_process` entries in `ExecutionPlan.ThoughtProcess` and visualization metadata in `ExecutionPlan.Visualization`. Before persisting this data:
+> - **Never store actual credentials** (passwords, API keys, tokens) in reasoning data
+> - **Implement sanitization** to detect and redact sensitive patterns before persistence
+> - **Encrypt at rest** and use secure transport for reasoning data
+> - **Restrict access** to chain-of-thought data with role-based controls
+> - See `CHAIN_OF_THOUGHT_UPGRADE.md` for detailed security guidelines
+
+Downstream services (Executor, dashboards) should sanitize both `ThoughtProcess` and `Visualization` before persisting for explainability or diagrams.
 
 #### Rendering Visualizations
 

@@ -340,6 +340,78 @@ Four types of step dependencies:
 
 ---
 
+## Security Best Practices
+
+### Protecting Sensitive Data in Chain-of-Thought
+
+Chain-of-thought reasoning data should **never** contain sensitive information such as:
+- Passwords, API keys, or authentication tokens
+- Personally identifiable information (PII)
+- Session tokens or cookies
+- Database connection strings
+- Private encryption keys
+
+### Implementation Guidelines
+
+1. **Sanitization Before Persistence**
+   ```csharp
+   // Example: Sanitize reasoning before storing
+   public ExecutionPlan SanitizePlan(ExecutionPlan plan)
+   {
+       foreach (var thought in plan.ThoughtProcess)
+       {
+           thought = RedactSecrets(thought);
+       }
+       return plan;
+   }
+   ```
+
+2. **Secret Detection Patterns**
+   - Detect patterns like "password:", "api_key:", "token:"
+   - Use regular expressions to identify potential credentials
+   - Implement allowlists for safe reasoning patterns
+
+3. **Access Controls**
+   - Restrict who can view raw chain-of-thought data
+   - Implement role-based access for reasoning dashboards
+   - Audit access to reasoning logs
+
+4. **Encryption**
+   - Encrypt chain-of-thought data at rest
+   - Use secure transport (TLS) for reasoning data in transit
+   - Consider field-level encryption for sensitive reasoning fields
+
+5. **Prompt Engineering**
+   - Instruct LLM to avoid including actual credential values
+   - Use placeholders like "[USERNAME]" or "[PASSWORD]" in reasoning
+   - Configure prompts to reference credentials symbolically
+
+### Recommended Implementation
+
+```csharp
+public class ReasoningSanitizer
+{
+    private static readonly Regex[] SecretPatterns = new[]
+    {
+        new Regex(@"password[:\s]+[^\s]+", RegexOptions.IgnoreCase),
+        new Regex(@"api[_-]?key[:\s]+[^\s]+", RegexOptions.IgnoreCase),
+        new Regex(@"token[:\s]+[^\s]+", RegexOptions.IgnoreCase),
+        new Regex(@"\b[\w\.-]+@[\w\.-]+\.\w+\b") // Email addresses
+    };
+
+    public static string Redact(string text)
+    {
+        foreach (var pattern in SecretPatterns)
+        {
+            text = pattern.Replace(text, "[REDACTED]");
+        }
+        return text;
+    }
+}
+```
+
+---
+
 ## Future Enhancements
 
 ### Phase 1 (Completed)
@@ -350,9 +422,11 @@ Four types of step dependencies:
 
 ### Phase 2 (Next)
 - [ ] Parse reasoning from LLM response
-- [ ] Persist chain-of-thought to database
+- [ ] Implement secret detection and redaction before persisting chain-of-thought
+- [ ] Add comprehensive tests for reasoning sanitization
+- [ ] Persist sanitized chain-of-thought to database with encryption at rest
 - [ ] Add comprehensive tests
-- [ ] Create visualization UI component
+- [ ] Create visualization UI component with access controls
 
 ### Phase 3 (Future)
 - [ ] Machine learning on reasoning quality
@@ -380,13 +454,16 @@ Four types of step dependencies:
 
 ## Example Reasoning Output
 
+> **Security Note**: Chain-of-thought data should never contain sensitive information like passwords, API keys, or tokens. Always sanitize or redact secrets before persisting reasoning data. The example below uses placeholder values for illustration purposes only.
+
 ```json
 {
   "reasoning": {
     "identified_goal": "Authenticate user on example.com and access dashboard",
     "key_requirements": [
-      "Provide username: test@example.com",
-      "Provide password: SecurePass123",
+      "Navigate to login page",
+      "Enter username in the appropriate field",
+      "Enter password in the appropriate field",
       "Verify successful authentication",
       "Capture final dashboard state"
     ],
