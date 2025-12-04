@@ -353,15 +353,31 @@ public sealed class PlannerAgent : IPlanner
     private string BuildSystemPrompt()
     {
         return """
-            You are an expert browser automation planner. Your role is to convert natural language task descriptions
-            into structured, executable browser automation plans.
+            You are an expert browser automation planner with advanced reasoning capabilities.
+            Your role is to think step-by-step about how to automate browser tasks,
+            then convert that reasoning into structured, executable automation plans.
+            
+            IMPORTANT: Use chain-of-thought reasoning by documenting your thought process BEFORE creating the plan.
+            
+            Your response must have TWO sections:
+            
+            1. REASONING SECTION - Document your step-by-step thinking:
+               - identified_goal: What is the overall objective?
+               - key_requirements: List specific requirements from the task
+               - reasoning_steps: Array of {thought, conclusion} pairs showing your thinking process
+               - identified_risks: Potential problems or challenges
+               - mitigation_strategies: How to handle the risks
+               - step_dependencies: Relationships between steps (if any)
+            
+            2. EXECUTION PLAN SECTION - The concrete automation steps based on your reasoning
             
             Key responsibilities:
-            - Analyze the user's task description and break it down into sequential steps
+            - Analyze the user's task description thoroughly
+            - Break it down into sequential steps with clear reasoning
             - Select appropriate browser automation tools for each step
-            - Provide clear reasoning for each step's purpose
-            - Ensure steps are ordered logically and efficiently
-            - Include proper waits and validation where needed
+            - Document WHY each step is necessary
+            - Identify dependencies and ordering requirements
+            - Consider error cases and edge scenarios
             
             Available tool categories:
             - Navigation: navigate, wait_for_url_change
@@ -380,16 +396,29 @@ public sealed class PlannerAgent : IPlanner
             - Consider error cases (e.g., popups, slow loading)
             
             Response format:
-            Return a JSON object with a "steps" array. Each step must have:
-            - order: Sequential step number (1, 2, 3...)
-            - action: Tool name (e.g., "navigate", "click", "type")
-            - selector: CSS selector (empty string if not applicable)
-            - value: Input value (empty string if not applicable)
-            - reasoning: Why this step is necessary
-            - expected_result: What should happen after this step
-            
-            Example response:
             {
+              "reasoning": {
+                "identified_goal": "High-level goal description",
+                "key_requirements": ["requirement 1", "requirement 2"],
+                "reasoning_steps": [
+                  {
+                    "step_number": 1,
+                    "thought": "What I'm considering at this point",
+                    "conclusion": "What I decided and why",
+                    "category": "RequirementAnalysis"
+                  }
+                ],
+                "identified_risks": ["risk 1", "risk 2"],
+                "mitigation_strategies": ["strategy 1", "strategy 2"],
+                "step_dependencies": [
+                  {
+                    "dependent_step": 3,
+                    "required_step": 2,
+                    "reason": "Step 3 needs data from step 2",
+                    "type": "DataFlow"
+                  }
+                ]
+              },
               "steps": [
                 {
                   "order": 1,
@@ -398,22 +427,104 @@ public sealed class PlannerAgent : IPlanner
                   "value": "https://example.com",
                   "reasoning": "Navigate to the target website to begin the automation workflow",
                   "expected_result": "Page loads successfully and displays the homepage"
+                }
+              ]
+            }
+            
+            Example with reasoning:
+            {
+              "reasoning": {
+                "identified_goal": "Authenticate user on example.com and navigate to dashboard",
+                "key_requirements": [
+                  "Must provide username and password",
+                  "Must verify successful login",
+                  "Should capture final state"
+                ],
+                "reasoning_steps": [
+                  {
+                    "step_number": 1,
+                    "thought": "We need to access the login page first before we can interact with any authentication forms.",
+                    "conclusion": "Start with navigation to the login URL as the foundation step.",
+                    "category": "RequirementAnalysis"
+                  },
+                  {
+                    "step_number": 2,
+                    "thought": "Username and password fields may not be immediately available if the page loads slowly.",
+                    "conclusion": "Add explicit waits for form elements to ensure they're ready for interaction.",
+                    "category": "ErrorHandling"
+                  },
+                  {
+                    "step_number": 3,
+                    "thought": "After form submission, we should verify the login succeeded before marking the task complete.",
+                    "conclusion": "Include post-login verification by checking for dashboard elements or URL change.",
+                    "category": "Validation"
+                  }
+                ],
+                "identified_risks": [
+                  "Element selectors may change",
+                  "Login might trigger 2FA",
+                  "Network delays could cause timeouts"
+                ],
+                "mitigation_strategies": [
+                  "Use multiple selector strategies (ID, class, xpath)",
+                  "Add conditional checks for 2FA prompts",
+                  "Implement appropriate wait times for network operations"
+                ],
+                "step_dependencies": [
+                  {
+                    "dependent_step": 3,
+                    "required_step": 2,
+                    "reason": "Username field must be filled before password field",
+                    "type": "Sequential"
+                  },
+                  {
+                    "dependent_step": 5,
+                    "required_step": 4,
+                    "reason": "Submit button click requires completed form",
+                    "type": "StateChange"
+                  }
+                ]
+              },
+              "steps": [
+                {
+                  "order": 1,
+                  "action": "navigate",
+                  "selector": "",
+                  "value": "https://example.com/login",
+                  "reasoning": "Navigate to login page as the foundation for authentication flow",
+                  "expected_result": "Login page loads with authentication form visible"
                 },
                 {
                   "order": 2,
                   "action": "wait_for_element",
-                  "selector": "#login-button",
+                  "selector": "#username",
                   "value": "",
-                  "reasoning": "Ensure the login button is visible before attempting to click it",
-                  "expected_result": "Login button is visible and ready for interaction"
+                  "reasoning": "Ensure username field is ready before interaction",
+                  "expected_result": "Username input field is visible and interactable"
                 },
                 {
                   "order": 3,
+                  "action": "type",
+                  "selector": "#username",
+                  "value": "test@example.com",
+                  "reasoning": "Enter username credential",
+                  "expected_result": "Username is populated in the field"
+                },
+                {
+                  "order": 4,
+                  "action": "type",
+                  "selector": "#password",
+                  "value": "SecurePass123",
+                  "reasoning": "Enter password credential",
+                  "expected_result": "Password is masked in the field"
+                },
+                {
+                  "order": 5,
                   "action": "click",
                   "selector": "#login-button",
                   "value": "",
-                  "reasoning": "Click the login button to proceed to the authentication form",
-                  "expected_result": "Login form appears with username and password fields"
+                  "reasoning": "Submit authentication form",
+                  "expected_result": "User is authenticated and redirected to dashboard"
                 }
               ]
             }

@@ -8,6 +8,8 @@ The `PlannerAgent` is an AI-powered planning agent that converts natural languag
 
 ? **Natural Language to Execution Plan**: Converts user-friendly task descriptions into concrete browser automation steps  
 ? **LLM Integration**: Supports Azure OpenAI GPT-5 and Ollama with function calling  
+? **Chain-of-Thought Reasoning**: Captures the planner's step-by-step rationale (`ExecutionPlan.ThoughtProcess`) for auditing and explainability  
+? **Visualization Output**: Optional Graphviz DOT / JSON graphs (`ExecutionPlan.Visualization`) describing step dependencies for dashboards  
 ? **Intelligent Tool Selection**: Automatically selects appropriate browser tools from the registry  
 ? **Plan Validation**: Comprehensive validation of generated plans  
 ? **Plan Refinement**: Adapts plans based on execution feedback  
@@ -119,8 +121,53 @@ Confidence: 92.0%
      Reasoning: Enter the password
      Expected: Password is masked in the field
   5. Click
-     Reasoning: Submit the login form
+    Reasoning: Submit the login form
      Expected: User is logged in and redirected to dashboard
+
+### Chain-of-Thought Response Format
+
+Every LLM response now includes a reasoning section plus the structured plan and optional visualization:
+
+```json
+{
+  "thought_process": [
+    "Goal: authenticate user and verify dashboard KPIs.",
+    "Need to navigate, wait for form, submit credentials, confirm widgets."
+  ],
+  "plan": [
+    {
+      "order": 1,
+      "action": "navigate",
+      "value": "https://example.com/login",
+      "reasoning": "Start on the login page",
+      "expected_result": "Login form visible",
+      "depends_on": []
+    }
+  ],
+  "visualization": {
+    "format": "dot",
+    "content": "digraph Plan { step1 -> step2; }"
+  }
+}
+```
+
+> **Security Warning**: The PlannerAgent stores `thought_process` entries in `ExecutionPlan.ThoughtProcess` and visualization metadata in `ExecutionPlan.Visualization`. Before persisting this data:
+> - **Never store actual credentials** (passwords, API keys, tokens) in reasoning data
+> - **Implement sanitization** to detect and redact sensitive patterns before persistence
+> - **Encrypt at rest** and use secure transport for reasoning data
+> - **Restrict access** to chain-of-thought data with role-based controls
+> - See `CHAIN_OF_THOUGHT_UPGRADE.md` for detailed security guidelines
+
+Downstream services (Executor, dashboards) should sanitize both `ThoughtProcess` and `Visualization` before persisting for explainability or diagrams.
+
+#### Rendering Visualizations
+
+`EvoAITest.Agents/Services/PlanVisualizationService.cs` can transform plans + chain-of-thought metadata into Graphviz, Mermaid, PlantUML, JSON, or D3-friendly graphs:
+
+```csharp
+var vizService = new PlanVisualizationService();
+var graph = vizService.GenerateGraph(plan, GraphFormat.Mermaid);
+Console.WriteLine(graph.Content);
 ```
 
 ### 2. Complex Task with Expectations

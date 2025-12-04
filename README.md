@@ -572,6 +572,8 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - [Task API Endpoints](EvoAITest.ApiService/Endpoints/TaskEndpoints.cs) - Minimal API routes, response codes, and inline OpenAPI metadata.
 - [Execution API Guide](EvoAITest.ApiService/Endpoints/ExecutionEndpoints_README.md) - Planner/Executor/Healer orchestration routes, background status polling, and sample payloads.
 - [Login Automation Example](examples/LoginExample/README.md) - CLI sample showing natural-language planning → execution → reporting.
+- [Planner Chain-of-Thought Upgrade](EvoAITest.Agents/CHAIN_OF_THOUGHT_UPGRADE.md) - reasoning metadata, visualization formats, and storage guidance.
+- [Prompt Builder Summary](PROMPT_BUILDER_SUMMARY.md) - template system, injection protection, and testing notes.
 - [Prompt Builder Guide](EvoAITest.LLM/Prompts/README.md) - Templates, versioning, injection protection, and DI usage.
 - **[Tool Executor Tests Summary](DEFAULT_TOOL_EXECUTOR_TESTS_SUMMARY.md)** - 30+ unit tests for Tool Executor.
 - **[Tool Executor Integration Tests](TOOL_EXECUTOR_INTEGRATION_TESTS_SUMMARY.md)** - 9 real browser integration tests.

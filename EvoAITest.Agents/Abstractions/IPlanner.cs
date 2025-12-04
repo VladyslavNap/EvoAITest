@@ -78,6 +78,16 @@ public sealed class ExecutionPlan
     /// Gets or sets the timestamp when the plan was created.
     /// </summary>
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// Gets or sets the LLM's thought process (chain-of-thought) used to craft the plan.
+    /// </summary>
+    public List<string> ThoughtProcess { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets an optional visualization (JSON graph or Graphviz DOT) describing step relationships.
+    /// </summary>
+    public PlanVisualization? Visualization { get; set; }
 }
 
 /// <summary>
@@ -135,4 +145,25 @@ public sealed class ExecutionContext
     /// Gets or sets the session ID for this execution.
     /// </summary>
     public string SessionId { get; set; } = Guid.NewGuid().ToString();
+}
+
+/// <summary>
+/// Represents a visualization artifact for an execution plan (Graphviz DOT or JSON graph).
+/// </summary>
+public sealed class PlanVisualization
+{
+    /// <summary>
+    /// Gets or sets the visualization format (e.g., "dot", "json").
+    /// </summary>
+    public string Format { get; set; } = "dot";
+
+    /// <summary>
+    /// Gets or sets the visualization content (DOT string, JSON payload, etc.).
+    /// </summary>
+    public string Content { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets optional metadata describing nodes, edges, or layout preferences.
+    /// </summary>
+    public Dictionary<string, object> Metadata { get; set; } = new();
 }

@@ -118,6 +118,19 @@ Task<IReadOnlyList<HealingStrategy>> SuggestAlternativesAsync(IReadOnlyList<Agen
 ### 10. **HealerAgent_README.md**
 New doc that covers the HealerAgent architecture, dependency graph, LLM prompts, healing strategy catalog, telemetry, troubleshooting, and usage examples.
 
+### 11. **Chain-of-Thought Upgrade (Day 16)**
+**Locations**:
+- `EvoAITest.Agents/Models/ChainOfThought.cs` – reasoning, dependency, and risk models
+- `EvoAITest.Agents/Agents/PlannerAgent.cs` – reasoning metadata + visualization parsing
+- `EvoAITest.Agents/Services/PlanVisualizationService.cs` – DOT/Mermaid/JSON renderers
+- `EvoAITest.Agents/CHAIN_OF_THOUGHT_UPGRADE.md` – end-to-end guide
+
+**Highlights**:
+- PlannerAgent prompts LLMs to emit `thought_process`, structured `plan`, and optional `visualization`.
+- `ExecutionPlan` persists the reasoning (`ThoughtProcess`) and visualization artifacts so dashboards/executors can surface them.
+- Visualization service produces Graphviz, Mermaid, PlantUML, and JSON formats for dependency graphs.
+- Planner unit tests now cover thought parsing, dependency metadata, visualization payloads, and regression cases.
+
 ---
 
 ## Architecture
@@ -370,18 +383,18 @@ Handles:
 
 ## Testing Strategy
 
-### Unit Tests (Would be added in separate PR)
-- Mock ILLMProvider responses
-- Test plan creation with various tasks
-- Test validation rules
-- Test error handling
-- Test cancellation
+### PlannerAgent Unit Tests (`EvoAITest.Tests/Agents/PlannerAgentTests.cs`)
+- Mock LLM responses to verify plan generation + reasoning parsing.
+- Assert `ExecutionPlan.ThoughtProcess` and `Visualization` metadata are persisted.
+- Validate chain-of-thought safeguards (missing sections, malformed JSON, dependency parsing).
+- Regression coverage for validation rules, cancellation, and LLM failures.
 
-### Integration Tests (Would be added in separate PR)
-- Real LLM provider
-- Real browser tool registry
-- End-to-end plan generation
-- Plan execution validation
+### Prompt Builder Tests (`EvoAITest.Tests/Prompts/DefaultPromptBuilderTests.cs`)
+- 40+ specs covering template expansion, injection detection, sanitization, versioning, and metadata handling.
+
+### Integration Tests (`EvoAITest.Tests/Integration/ApiIntegrationTests.cs`)
+- WebApplicationFactory-based end-to-end tests (task CRUD, execution, healing, history).
+- Runs against in-memory EF + mocked planner/executor/healer to keep CI deterministic.
 
 ---
 

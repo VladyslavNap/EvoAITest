@@ -142,6 +142,31 @@ builder.Services.AddHealer<HealerAgent>();     // optional override
 
 `AddAgentServices()` wires up the PlannerAgent + ExecutorAgent + HealerAgent trio out of the box, so applications immediately benefit from planning, execution, and self-healing orchestration.
 
+### Chain-of-Thought & Visualization
+
+- Planner emits `ExecutionPlan.ThoughtProcess` (list of reasoning strings) plus optional `PlanVisualization` metadata (`dot`, `json`, etc.).
+- `PlanVisualizationService` (in `EvoAITest.Agents/Services`) can render Graphviz/Mermaid/JSON graphs for dashboards or docs.
+- Chain-of-thought includes goals, requirements, ordered reasoning steps, risks, and dependencies so operators understand why each action exists.
+
+```json
+{
+  "thought_process": [
+    "Identify goal: authenticate user and confirm dashboard.",
+    "Need to navigate, wait for login form, submit credentials, verify KPI widgets."
+  ],
+  "plan": [
+    { "order": 1, "action": "navigate", "value": "https://example.com/login" },
+    { "order": 2, "action": "wait_for_element", "selector": "#username" }
+  ],
+  "visualization": {
+    "format": "dot",
+    "content": "digraph Plan { 1 -> 2; }"
+  }
+}
+```
+
+Plan consumers (Executor, UI, docs) can persist both the structured steps and the reasoning to give engineers full traceability.
+
 ## Usage Examples
 
 ### Execute a Task
