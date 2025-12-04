@@ -152,6 +152,23 @@ public sealed class PlanVisualizationService
         sb.AppendLine("graph TD");
         sb.AppendLine($"    Start([\"Start: {EscapeMermaid(plan.TaskId)}\"])");
         
+        // Handle empty plan
+        if (plan.Steps.Count == 0)
+        {
+            sb.AppendLine($"    Start --> End([\"End\"])");
+            edges.Add(new GraphEdge { SourceId = "Start", TargetId = "End", RelationType = "direct" });
+            
+            var emptyGraph = new PlanGraph
+            {
+                PlanId = plan.TaskId,
+                Nodes = nodes,
+                Edges = edges,
+                Format = GraphFormat.Mermaid,
+                Content = sb.ToString()
+            };
+            return emptyGraph;
+        }
+        
         // Add nodes for each step
         foreach (var step in plan.Steps.OrderBy(s => s.StepNumber))
         {
@@ -431,7 +448,7 @@ public sealed class PlanVisualizationService
         // Add dependency links
         if (chainOfThought != null)
         {
-            foreach (var dep in chainOfThought.StepDependencies)
+            var dependencyEdges = chainOfThought.StepDependencies.Select(dep =>
             {
                 var edge = new GraphEdge
                 {
@@ -440,8 +457,7 @@ public sealed class PlanVisualizationService
                     RelationType = dep.Type.ToString(),
                     Label = "requires"
                 };
-                edges.Add(edge);
-
+                
                 d3Links.Add(new
                 {
                     source = edge.SourceId,
@@ -449,7 +465,11 @@ public sealed class PlanVisualizationService
                     value = 1,
                     type = "dependency"
                 });
-            }
+                
+                return edge;
+            });
+            
+            edges.AddRange(dependencyEdges);
         }
 
         var d3Graph = new

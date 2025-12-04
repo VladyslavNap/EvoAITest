@@ -162,7 +162,6 @@ var vizService = new PlanVisualizationService();
 var graph = vizService.GenerateGraph(plan, GraphFormat.Mermaid);
 Console.WriteLine(graph.Content);
 ```
-```
 
 ### 2. Complex Task with Expectations
 
