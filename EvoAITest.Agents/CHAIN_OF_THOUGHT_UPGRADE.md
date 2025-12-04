@@ -4,7 +4,7 @@
 
 The PlannerAgent has been upgraded with advanced chain-of-thought reasoning capabilities that enable it to document its planning rationale step-by-step before generating the formal execution plan.
 
-## ? Implemented Features
+## ✓ Implemented Features
 
 ### 1. **Chain-of-Thought Models** (`ChainOfThought.cs`)
 
