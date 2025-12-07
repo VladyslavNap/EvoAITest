@@ -334,4 +334,58 @@ public interface IBrowserAgent : IAsyncDisposable
     /// Thrown if the browser agent is not initialized.
     /// </exception>
     Task<string> GetPageHtmlAsync(CancellationToken cancellationToken = default);
+
+    // ========== Visual Regression Screenshot Methods ==========
+
+    /// <summary>
+    /// Captures a screenshot of the full page and returns it as a byte array.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains PNG image bytes.</returns>
+    /// <remarks>
+    /// This method captures the entire scrollable page, not just the current viewport.
+    /// Useful for visual regression testing where you need the raw image bytes.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">Thrown if the browser agent is not initialized.</exception>
+    Task<byte[]> TakeFullPageScreenshotBytesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Captures a screenshot of a specific element and returns it as a byte array.
+    /// </summary>
+    /// <param name="selector">A CSS selector string that identifies the element to capture.</param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains PNG image bytes.</returns>
+    /// <remarks>
+    /// This method waits for the element to be visible before capturing.
+    /// Useful for visual regression testing of specific components.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="selector"/> is null or empty.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the browser agent is not initialized.</exception>
+    /// <exception cref="TimeoutException">Thrown if the element cannot be found within the timeout period.</exception>
+    Task<byte[]> TakeElementScreenshotAsync(string selector, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Captures a screenshot of a specific rectangular region and returns it as a byte array.
+    /// </summary>
+    /// <param name="region">The rectangular region to capture (x, y, width, height in pixels).</param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains PNG image bytes.</returns>
+    /// <remarks>
+    /// Useful for visual regression testing of specific areas that don't correspond to single elements.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="region"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the browser agent is not initialized.</exception>
+    Task<byte[]> TakeRegionScreenshotAsync(ScreenshotRegion region, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Captures a screenshot of the current viewport only and returns it as a byte array.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains PNG image bytes.</returns>
+    /// <remarks>
+    /// This method captures only the currently visible area, not the full scrollable page.
+    /// Faster than full page screenshots and useful for above-the-fold content testing.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">Thrown if the browser agent is not initialized.</exception>
+    Task<byte[]> TakeViewportScreenshotAsync(CancellationToken cancellationToken = default);
 }

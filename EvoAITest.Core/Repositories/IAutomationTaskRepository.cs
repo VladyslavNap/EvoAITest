@@ -106,4 +106,94 @@ public interface IAutomationTaskRepository
     /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
     /// <returns>The total number of tasks for the user.</returns>
     Task<int> GetTaskCountByUserAsync(string userId, CancellationToken cancellationToken = default);
+
+    // ========== Visual Regression Methods ==========
+
+    /// <summary>
+    /// Retrieves a visual baseline for a specific checkpoint configuration.
+    /// </summary>
+    /// <param name="taskId">The task ID.</param>
+    /// <param name="checkpointName">The checkpoint name.</param>
+    /// <param name="environment">The environment (dev, staging, prod).</param>
+    /// <param name="browser">The browser (chromium, firefox, webkit).</param>
+    /// <param name="viewport">The viewport size (e.g., "1920x1080").</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The most recent baseline for the specified configuration, or null if not found.</returns>
+    Task<VisualBaseline?> GetBaselineAsync(
+        Guid taskId,
+        string checkpointName,
+        string environment,
+        string browser,
+        string viewport,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Saves a visual baseline to the database.
+    /// </summary>
+    /// <param name="baseline">The baseline to save.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The saved baseline with database-generated values.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when baseline is null.</exception>
+    Task<VisualBaseline> SaveBaselineAsync(VisualBaseline baseline, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves comparison history for a specific checkpoint.
+    /// </summary>
+    /// <param name="taskId">The task ID.</param>
+    /// <param name="checkpointName">The checkpoint name.</param>
+    /// <param name="limit">Maximum number of results to return (default 50).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of comparison results ordered by date descending.</returns>
+    Task<List<VisualComparisonResult>> GetComparisonHistoryAsync(
+        Guid taskId,
+        string checkpointName,
+        int limit = 50,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Saves a visual comparison result to the database.
+    /// </summary>
+    /// <param name="result">The comparison result to save.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The saved comparison result with database-generated values.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when result is null.</exception>
+    Task<VisualComparisonResult> SaveComparisonResultAsync(
+        VisualComparisonResult result,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all baselines for a specific task.
+    /// </summary>
+    /// <param name="taskId">The task ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of all baselines for the task.</returns>
+    Task<List<VisualBaseline>> GetBaselinesByTaskAsync(Guid taskId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all baselines for a specific Git branch.
+    /// </summary>
+    /// <param name="gitBranch">The Git branch name.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of baselines for the specified branch.</returns>
+    Task<List<VisualBaseline>> GetBaselinesByBranchAsync(string gitBranch, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets failed visual comparison results for a task.
+    /// </summary>
+    /// <param name="taskId">The task ID.</param>
+    /// <param name="limit">Maximum number of results to return (default 50).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of failed comparison results.</returns>
+    Task<List<VisualComparisonResult>> GetFailedComparisonsAsync(
+        Guid taskId,
+        int limit = 50,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes old baselines older than the specified date.
+    /// </summary>
+    /// <param name="olderThan">Delete baselines created before this date.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Number of baselines deleted.</returns>
+    Task<int> DeleteOldBaselinesAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default);
 }

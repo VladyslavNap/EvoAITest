@@ -607,6 +607,31 @@ public sealed class ApiIntegrationTests
 
         public Task<string> GetPageHtmlAsync(CancellationToken cancellationToken = default) => Task.FromResult("<html><body><h1>Example Domain</h1></body></html>");
 
+        public Task<byte[]> TakeFullPageScreenshotBytesAsync(CancellationToken cancellationToken = default)
+        {
+            // Return a minimal PNG header for testing
+            var pngHeader = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+            return Task.FromResult(pngHeader);
+        }
+
+        public Task<byte[]> TakeElementScreenshotAsync(string selector, CancellationToken cancellationToken = default)
+        {
+            var pngHeader = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+            return Task.FromResult(pngHeader);
+        }
+
+        public Task<byte[]> TakeRegionScreenshotAsync(ScreenshotRegion region, CancellationToken cancellationToken = default)
+        {
+            var pngHeader = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+            return Task.FromResult(pngHeader);
+        }
+
+        public Task<byte[]> TakeViewportScreenshotAsync(CancellationToken cancellationToken = default)
+        {
+            var pngHeader = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+            return Task.FromResult(pngHeader);
+        }
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

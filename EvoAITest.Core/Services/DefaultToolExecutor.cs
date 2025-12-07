@@ -39,6 +39,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
     private readonly IBrowserToolRegistry _toolRegistry;
     private readonly ToolExecutorOptions _options;
     private readonly ILogger<DefaultToolExecutor> _logger;
+    private readonly IVisualComparisonService? _visualComparisonService;
     
     // OpenTelemetry tracing
     private static readonly ActivitySource ActivitySource = new("EvoAITest.ToolExecutor", "1.0.0");
@@ -67,16 +68,19 @@ public sealed class DefaultToolExecutor : IToolExecutor
     /// <param name="toolRegistry">The tool registry for validation and metadata.</param>
     /// <param name="options">Configuration options for retry behavior and timeouts.</param>
     /// <param name="logger">Logger for structured telemetry.</param>
+    /// <param name="visualComparisonService">Optional service for visual regression testing.</param>
     public DefaultToolExecutor(
         IBrowserAgent browserAgent,
         IBrowserToolRegistry toolRegistry,
         IOptions<ToolExecutorOptions> options,
-        ILogger<DefaultToolExecutor> logger)
+        ILogger<DefaultToolExecutor> logger,
+        IVisualComparisonService? visualComparisonService = null)
     {
         _browserAgent = browserAgent ?? throw new ArgumentNullException(nameof(browserAgent));
         _toolRegistry = toolRegistry ?? throw new ArgumentNullException(nameof(toolRegistry));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _visualComparisonService = visualComparisonService; // Optional for backwards compatibility
         
         // Validate options on construction
         _options.Validate();
@@ -602,6 +606,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
                 "get_page_state" => await ExecuteGetPageStateAsync(toolCall, cancellationToken).ConfigureAwait(false),
                 "get_page_html" => await ExecuteGetPageHtmlAsync(toolCall, cancellationToken).ConfigureAwait(false),
                 "clear_input" => await ExecuteClearInputAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "visual_check" => await ExecuteVisualCheckAsync(toolCall, cancellationToken).ConfigureAwait(false),
                 "extract_table" => throw new NotImplementedException($"Tool '{toolCall.ToolName}' is not yet implemented"),
                 "wait_for_url_change" => throw new NotImplementedException($"Tool '{toolCall.ToolName}' is not yet implemented"),
                 "select_option" => throw new NotImplementedException($"Tool '{toolCall.ToolName}' is not yet implemented"),
@@ -693,6 +698,194 @@ public sealed class DefaultToolExecutor : IToolExecutor
         var selector = GetRequiredParameter<string>(toolCall, "selector");
         await _browserAgent.TypeAsync(selector, string.Empty, cancellationToken).ConfigureAwait(false);
         return null;
+    }
+
+    private async Task<object?> ExecuteVisualCheckAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        if (_visualComparisonService == null)
+        {
+            throw new InvalidOperationException(
+                "Visual regression testing is not configured. " +
+                "Ensure IVisualComparisonService is registered in the DI container.");
+        }
+
+        // Parse required parameters
+        var checkpointName = GetRequiredParameter<string>(toolCall, "checkpoint_name");
+        var checkpointTypeStr = GetRequiredParameter<string>(toolCall, "checkpoint_type");
+        
+        // Parse checkpoint type
+        if (!Enum.TryParse<CheckpointType>(checkpointTypeStr, true, out var checkpointType))
+        {
+            throw new ArgumentException(
+                $"Invalid checkpoint_type '{checkpointTypeStr}'. " +
+                $"Valid values are: {string.Join(", ", Enum.GetNames(typeof(CheckpointType)))}");
+        }
+
+        // Parse optional parameters
+        var tolerance = GetOptionalParameter(toolCall, "tolerance", 0.01);
+        var selector = GetOptionalParameter<string?>(toolCall, "selector", null);
+        var ignoreSelectorsParam = GetOptionalParameter<object?>(toolCall, "ignore_selectors", null);
+        
+        // Parse ignore selectors
+        var ignoreSelectors = new List<string>();
+        if (ignoreSelectorsParam != null)
+        {
+            if (ignoreSelectorsParam is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Array)
+            {
+                ignoreSelectors = jsonElement.EnumerateArray()
+                    .Where(e => e.ValueKind == JsonValueKind.String)
+                    .Select(e => e.GetString()!)
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList();
+            }
+            else if (ignoreSelectorsParam is string[] stringArray)
+            {
+                ignoreSelectors = stringArray.Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+            }
+        }
+
+        // Parse region for region type
+        ScreenshotRegion? region = null;
+        if (checkpointType == CheckpointType.Region)
+        {
+            var regionParam = GetOptionalParameter<object?>(toolCall, "region", null);
+            if (regionParam == null)
+            {
+                throw new ArgumentException("Parameter 'region' is required for checkpoint_type 'region'");
+            }
+
+            // Try to parse region from JSON
+            try
+            {
+                var regionJson = JsonSerializer.Serialize(regionParam);
+                region = JsonSerializer.Deserialize<ScreenshotRegion>(regionJson);
+                
+                if (region == null)
+                {
+                    throw new ArgumentException("Failed to parse 'region' parameter");
+                }
+            }
+            catch (JsonException ex)
+            {
+                throw new ArgumentException($"Invalid 'region' parameter: {ex.Message}", ex);
+            }
+        }
+
+        // Validate selector for element type
+        if (checkpointType == CheckpointType.Element && string.IsNullOrWhiteSpace(selector))
+        {
+            throw new ArgumentException("Parameter 'selector' is required for checkpoint_type 'element'");
+        }
+
+        // Get context from tool call metadata (if available)
+        var taskId = toolCall.Parameters.TryGetValue("task_id", out var taskIdObj) && taskIdObj is Guid guid 
+            ? guid 
+            : Guid.Empty;
+        var environment = GetOptionalParameter(toolCall, "environment", "dev");
+        var browser = GetOptionalParameter(toolCall, "browser", "chromium");
+        var viewport = GetOptionalParameter(toolCall, "viewport", "1920x1080");
+
+        // Create visual checkpoint
+        var checkpoint = new VisualCheckpoint
+        {
+            Name = checkpointName,
+            Type = checkpointType,
+            Tolerance = tolerance,
+            Selector = selector,
+            Region = region,
+            IgnoreSelectors = ignoreSelectors
+        };
+
+        if (_options.EnableDetailedLogging)
+        {
+            _logger.LogInformation(
+                "Executing visual check '{CheckpointName}' (type: {CheckpointType}, tolerance: {Tolerance:P2})",
+                checkpointName, checkpointType, tolerance);
+        }
+
+        // Capture screenshot based on checkpoint type
+        byte[] screenshot;
+        try
+        {
+            screenshot = checkpointType switch
+            {
+                CheckpointType.FullPage => await _browserAgent.TakeFullPageScreenshotBytesAsync(cancellationToken),
+                CheckpointType.Element => await _browserAgent.TakeElementScreenshotAsync(selector!, cancellationToken),
+                CheckpointType.Region => await _browserAgent.TakeRegionScreenshotAsync(region!, cancellationToken),
+                CheckpointType.Viewport => await _browserAgent.TakeViewportScreenshotAsync(cancellationToken),
+                _ => throw new NotSupportedException($"Checkpoint type '{checkpointType}' is not supported")
+            };
+
+            if (_options.EnableDetailedLogging)
+            {
+                _logger.LogDebug(
+                    "Captured screenshot for visual check '{CheckpointName}' ({Size} bytes)",
+                    checkpointName, screenshot.Length);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to capture screenshot for visual check '{CheckpointName}'", checkpointName);
+            throw new InvalidOperationException(
+                $"Failed to capture screenshot for visual check '{checkpointName}': {ex.Message}", ex);
+        }
+
+        // Compare against baseline
+        VisualComparisonResult comparisonResult;
+        try
+        {
+            comparisonResult = await _visualComparisonService.CompareAsync(
+                checkpoint,
+                screenshot,
+                taskId,
+                environment,
+                browser,
+                viewport,
+                cancellationToken).ConfigureAwait(false);
+
+            if (_options.EnableDetailedLogging)
+            {
+                _logger.LogInformation(
+                    "Visual check '{CheckpointName}' completed: {Status} (Difference: {Difference:P2}, Tolerance: {Tolerance:P2})",
+                    checkpointName,
+                    comparisonResult.Passed ? "PASSED" : "FAILED",
+                    comparisonResult.DifferencePercentage,
+                    tolerance);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Visual comparison failed for checkpoint '{CheckpointName}'", checkpointName);
+            throw new InvalidOperationException(
+                $"Visual comparison failed for checkpoint '{checkpointName}': {ex.Message}", ex);
+        }
+
+        // Return result as dictionary for tool execution result
+        var resultData = new Dictionary<string, object>
+        {
+            ["checkpoint_name"] = checkpointName,
+            ["passed"] = comparisonResult.Passed,
+            ["difference_percentage"] = comparisonResult.DifferencePercentage,
+            ["tolerance"] = tolerance,
+            ["pixels_different"] = comparisonResult.PixelsDifferent,
+            ["total_pixels"] = comparisonResult.TotalPixels,
+            ["comparison_id"] = comparisonResult.Id,
+            ["baseline_path"] = comparisonResult.BaselinePath ?? string.Empty,
+            ["actual_path"] = comparisonResult.ActualPath ?? string.Empty,
+            ["diff_path"] = comparisonResult.DiffPath ?? string.Empty
+        };
+
+        if (comparisonResult.SsimScore.HasValue)
+        {
+            resultData["ssim_score"] = comparisonResult.SsimScore.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(comparisonResult.DifferenceType))
+        {
+            resultData["difference_type"] = comparisonResult.DifferenceType;
+        }
+
+        return resultData;
     }
 
     #endregion

@@ -436,6 +436,94 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
         return await page.ContentAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // ========== Visual Regression Screenshot Methods ==========
+
+    /// <inheritdoc />
+    public async Task<byte[]> TakeFullPageScreenshotBytesAsync(CancellationToken cancellationToken = default)
+    {
+        var page = EnsurePage();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var screenshot = await page.ScreenshotAsync(new Microsoft.Playwright.PageScreenshotOptions
+        {
+            Type = Microsoft.Playwright.ScreenshotType.Png,
+            FullPage = true
+        }).WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        return screenshot;
+    }
+
+    /// <inheritdoc />
+    public async Task<byte[]> TakeElementScreenshotAsync(string selector, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(selector))
+        {
+            throw new ArgumentNullException(nameof(selector));
+        }
+
+        var page = EnsurePage();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Wait for element to be visible
+        await page.WaitForSelectorAsync(selector, new Microsoft.Playwright.PageWaitForSelectorOptions
+        {
+            State = Microsoft.Playwright.WaitForSelectorState.Visible,
+            Timeout = DefaultTimeoutMs
+        }).WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        // Get the element and take screenshot
+        var element = await page.QuerySelectorAsync(selector).ConfigureAwait(false);
+        if (element == null)
+        {
+            throw new InvalidOperationException($"Element with selector '{selector}' not found after waiting.");
+        }
+
+        var screenshot = await element.ScreenshotAsync(new Microsoft.Playwright.ElementHandleScreenshotOptions
+        {
+            Type = Microsoft.Playwright.ScreenshotType.Png
+        }).WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        return screenshot;
+    }
+
+    /// <inheritdoc />
+    public async Task<byte[]> TakeRegionScreenshotAsync(ScreenshotRegion region, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(region);
+
+        var page = EnsurePage();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var screenshot = await page.ScreenshotAsync(new Microsoft.Playwright.PageScreenshotOptions
+        {
+            Type = Microsoft.Playwright.ScreenshotType.Png,
+            Clip = new Microsoft.Playwright.Clip
+            {
+                X = region.X,
+                Y = region.Y,
+                Width = region.Width,
+                Height = region.Height
+            }
+        }).WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        return screenshot;
+    }
+
+    /// <inheritdoc />
+    public async Task<byte[]> TakeViewportScreenshotAsync(CancellationToken cancellationToken = default)
+    {
+        var page = EnsurePage();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var screenshot = await page.ScreenshotAsync(new Microsoft.Playwright.PageScreenshotOptions
+        {
+            Type = Microsoft.Playwright.ScreenshotType.Png,
+            FullPage = false // Only current viewport
+        }).WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        return screenshot;
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
