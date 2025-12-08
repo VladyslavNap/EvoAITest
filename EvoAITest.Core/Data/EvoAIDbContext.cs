@@ -38,13 +38,21 @@ public sealed class EvoAIDbContext : DbContext
     public DbSet<ExecutionHistory> ExecutionHistory => Set<ExecutionHistory>();
 
     /// <summary>
-    /// Configures the model and relationships using Fluent API.
+    /// Gets or sets the VisualBaselines DbSet.
     /// </summary>
-    /// <param name="modelBuilder">The builder being used to construct the model for this context.</param>
+    public DbSet<VisualBaseline> VisualBaselines => Set<VisualBaseline>();
+
+    /// <summary>
+    /// Gets or sets the VisualComparisonResults DbSet.
+    /// </summary>
+    public DbSet<VisualComparisonResult> VisualComparisonResults => Set<VisualComparisonResult>();
+
+    /// <summary>
+    /// Configures the database model using the specified model builder.
+    /// </summary>
+    /// <param name="modelBuilder">The model builder to use.</param>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        base.OnModelCreating(modelBuilder);
-
         // Configure AutomationTask entity
         modelBuilder.Entity<AutomationTask>(entity =>
         {
@@ -69,6 +77,16 @@ public sealed class EvoAIDbContext : DbContext
                     v => JsonSerializer.Serialize(v, JsonOptions),
                     v => JsonSerializer.Deserialize<List<ExecutionStep>>(v, JsonOptions) ?? new List<ExecutionStep>()
                 );
+
+            // JSON column for VisualCheckpoints
+            entity.Property(e => e.VisualCheckpoints)
+                .HasColumnType("nvarchar(max)")
+                .IsRequired();
+
+            // JSON column for Metadata
+            entity.Property(e => e.Metadata)
+                .HasColumnType("nvarchar(max)")
+                .IsRequired();
 
             // Configure Status enum as string
             entity.Property(e => e.Status)
@@ -117,6 +135,18 @@ public sealed class EvoAIDbContext : DbContext
                 .HasColumnType("nvarchar(max)")
                 .IsRequired();
 
+            // Visual regression fields
+            entity.Property(e => e.VisualComparisonResults)
+                .HasColumnType("nvarchar(max)")
+                .IsRequired();
+
+            entity.Property(e => e.VisualCheckpointsPassed).IsRequired();
+            entity.Property(e => e.VisualCheckpointsFailed).IsRequired();
+
+            entity.Property(e => e.VisualStatus)
+                .HasColumnType("nvarchar(50)")
+                .HasConversion<string>();
+
             // Configure ExecutionStatus enum as string
             entity.Property(e => e.ExecutionStatus)
                 .HasColumnType("nvarchar(50)")
@@ -132,6 +162,105 @@ public sealed class EvoAIDbContext : DbContext
                 .WithMany(t => t.Executions)
                 .HasForeignKey(e => e.TaskId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure VisualBaseline entity
+        modelBuilder.Entity<VisualBaseline>(entity =>
+        {
+            // Primary key
+            entity.HasKey(e => e.Id);
+
+            // Table name
+            entity.ToTable("VisualBaselines");
+
+            // Required fields
+            entity.Property(e => e.TaskId).IsRequired();
+            entity.Property(e => e.CheckpointName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Environment).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Browser).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Viewport).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.BaselinePath).IsRequired().HasColumnType("nvarchar(max)");
+            entity.Property(e => e.ImageHash).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.ApprovedBy).IsRequired().HasMaxLength(100);
+
+            // Optional fields
+            entity.Property(e => e.GitCommit).HasMaxLength(40);
+            entity.Property(e => e.GitBranch).HasMaxLength(200);
+            entity.Property(e => e.BuildVersion).HasMaxLength(50);
+            entity.Property(e => e.UpdateReason).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.Metadata).HasColumnType("nvarchar(max)").IsRequired();
+
+            // Unique constraint for baseline per task/checkpoint/environment/browser/viewport
+            entity.HasIndex(e => new { e.TaskId, e.CheckpointName, e.Environment, e.Browser, e.Viewport })
+                .IsUnique();
+
+            // Additional indexes
+            entity.HasIndex(e => e.GitBranch);
+            entity.HasIndex(e => e.CreatedAt);
+
+            // Relationships
+            entity.HasOne(e => e.Task)
+                .WithMany()
+                .HasForeignKey(e => e.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Self-referencing relationship for history
+            entity.HasOne<VisualBaseline>()
+                .WithMany()
+                .HasForeignKey(e => e.PreviousBaselineId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Configure VisualComparisonResult entity
+        modelBuilder.Entity<VisualComparisonResult>(entity =>
+        {
+            // Primary key
+            entity.HasKey(e => e.Id);
+
+            // Table name
+            entity.ToTable("VisualComparisonResults");
+
+            // Required fields
+            entity.Property(e => e.TaskId).IsRequired();
+            entity.Property(e => e.ExecutionHistoryId).IsRequired();
+            entity.Property(e => e.CheckpointName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.BaselinePath).IsRequired().HasColumnType("nvarchar(max)");
+            entity.Property(e => e.ActualPath).IsRequired().HasColumnType("nvarchar(max)");
+            entity.Property(e => e.DiffPath).IsRequired().HasColumnType("nvarchar(max)");
+            entity.Property(e => e.DifferencePercentage).IsRequired();
+            entity.Property(e => e.Tolerance).IsRequired();
+            entity.Property(e => e.Passed).IsRequired();
+            entity.Property(e => e.PixelsDifferent).IsRequired();
+            entity.Property(e => e.TotalPixels).IsRequired();
+            entity.Property(e => e.ComparedAt).IsRequired();
+
+            // Optional fields
+            entity.Property(e => e.DifferenceType).HasMaxLength(50);
+            entity.Property(e => e.Regions).HasColumnType("nvarchar(max)").IsRequired();
+            entity.Property(e => e.Metadata).HasColumnType("nvarchar(max)").IsRequired();
+
+            // Indexes
+            entity.HasIndex(e => e.TaskId);
+            entity.HasIndex(e => e.ExecutionHistoryId);
+            entity.HasIndex(e => e.Passed);
+            entity.HasIndex(e => e.ComparedAt);
+
+            // Relationships
+            entity.HasOne(e => e.Task)
+                .WithMany()
+                .HasForeignKey(e => e.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.ExecutionHistory)
+                .WithMany()
+                .HasForeignKey(e => e.ExecutionHistoryId)
+                .OnDelete(DeleteBehavior.NoAction); // Prevent cascade cycles
+
+            entity.HasOne(e => e.Baseline)
+                .WithMany()
+                .HasForeignKey(e => e.BaselineId)
+                .OnDelete(DeleteBehavior.NoAction); // Prevent cascade cycles
         });
     }
 

@@ -182,6 +182,21 @@ public static class BrowserToolRegistry
                     ["should_be_visible"] = new ParameterDef("boolean", false, "Element must be visible (true) or just exist in DOM (false)", true),
                     ["timeout_ms"] = new ParameterDef("int", false, "Maximum time to wait for element in milliseconds", 5000)
                 }
+            ),
+
+            ["visual_check"] = new BrowserToolDefinition(
+                Name: "visual_check",
+                Description: "Capture a screenshot and compare it against a baseline image for visual regression testing. Use at key points to verify UI consistency.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["checkpoint_name"] = new ParameterDef("string", true, "Unique name for this visual checkpoint (e.g., 'HomePage_AfterLoad', 'LoginForm_BeforeSubmit')", null),
+                    ["checkpoint_type"] = new ParameterDef("string", false, "Type of screenshot: 'fullpage', 'viewport', 'element', or 'region'", "fullpage"),
+                    ["selector"] = new ParameterDef("string", false, "CSS selector for element-based screenshots (required if checkpoint_type is 'element')", null),
+                    ["region"] = new ParameterDef("string", false, "Region coordinates as JSON '{\"x\":0,\"y\":0,\"width\":100,\"height\":100}' for partial screenshots", null),
+                    ["tolerance"] = new ParameterDef("string", false, "Comparison tolerance (0.0-1.0, default 0.01 = 1% difference allowed)", "0.01"),
+                    ["ignore_selectors"] = new ParameterDef("array", false, "Array of CSS selectors for elements to ignore during comparison (e.g., timestamps, ads)", null),
+                    ["create_baseline_if_missing"] = new ParameterDef("boolean", false, "Auto-create baseline if it doesn't exist (useful for first run)", false)
+                }
             )
         };
     }

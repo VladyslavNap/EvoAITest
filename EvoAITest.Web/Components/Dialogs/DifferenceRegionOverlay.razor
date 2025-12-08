@@ -1,0 +1,358 @@
+@using EvoAITest.Core.Models
+@using System.Text.Json
+@inject ILogger<DifferenceRegionOverlay> Logger
+
+<div class="region-overlay-container" style="position: relative; display: inline-block;">
+    <!-- Base Image -->
+    <img src="@ImageUrl" 
+         alt="@ImageAlt" 
+         class="overlay-image"
+         @ref="_imageElement"
+         @onload="OnImageLoaded"
+         style="display: block; max-width: 100%; height: auto;" />
+
+    <!-- SVG Overlay -->
+    @if (_imageLoaded && Regions.Count > 0 && ShowOverlay)
+    {
+        <svg class="region-overlay-svg" 
+             width="@_imageWidth" 
+             height="@_imageHeight"
+             style="position: absolute; top: 0; left: 0; pointer-events: none;">
+            
+            @foreach (var (region, index) in Regions.Select((r, i) => (r, i + 1)))
+            {
+                var isHighlighted = _highlightedIndex == index;
+                var opacity = isHighlighted ? 0.4 : 0.2;
+                var strokeWidth = isHighlighted ? 3 : 2;
+                var color = GetRegionColor(index);
+
+                <!-- Region Rectangle -->
+                <rect x="@region.X" 
+                      y="@region.Y" 
+                      width="@region.Width" 
+                      height="@region.Height"
+                      fill="@color"
+                      fill-opacity="@opacity"
+                      stroke="@color"
+                      stroke-width="@strokeWidth"
+                      style="pointer-events: all; cursor: pointer;"
+                      @onclick="@(() => OnRegionClick(index))"
+                      @onmouseenter="@(() => OnRegionHover(index))"
+                      @onmouseleave="@(() => OnRegionLeave())">
+                    <title>Region @index - @region.Width×@region.Height px (@region.PixelCount pixels different)</title>
+                </rect>
+
+                <!-- Region Label -->
+                @if (ShowLabels)
+                {
+                    var labelX = region.X + 5;
+                    var labelY = region.Y + 20;
+                    
+                    <g>
+                        <text x="@labelX" 
+                              y="@labelY" 
+                              font-family="Arial, sans-serif" 
+                              font-size="14" 
+                              font-weight="bold"
+                              fill="white"
+                              stroke="black"
+                              stroke-width="0.5"
+                              style="pointer-events: none;">
+                            @index
+                        </text>
+                    </g>
+                }
+            }
+        </svg>
+    }
+
+    <!-- Hover Tooltip -->
+    @if (_hoveredRegion != null)
+    {
+        <div class="region-tooltip" 
+             style="position: absolute; top: @(_tooltipY)px; left: @(_tooltipX)px; z-index: 1000;">
+            <div class="tooltip-content">
+                <strong>Region @_hoveredIndex</strong>
+                <div>Position: (@_hoveredRegion.X, @_hoveredRegion.Y)</div>
+                <div>Size: @_hoveredRegion.Width × @_hoveredRegion.Height px</div>
+                <div>Pixels: @_hoveredRegion.PixelCount.ToString("N0")</div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Region Details Panel -->
+@if (ShowDetailsPanel && _selectedRegion != null)
+{
+    <div class="region-details-panel card mt-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">
+                <i class="bi bi-geo-alt"></i> Region @_selectedIndex Details
+            </h6>
+            <button type="button" class="btn-close btn-sm" @onclick="ClearSelection"></button>
+        </div>
+        <div class="card-body">
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Position:</span>
+                    <span class="detail-value">(@_selectedRegion.X, @_selectedRegion.Y)</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Dimensions:</span>
+                    <span class="detail-value">@_selectedRegion.Width × @_selectedRegion.Height px</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Area:</span>
+                    <span class="detail-value">@((_selectedRegion.Width * _selectedRegion.Height).ToString("N0")) pixels</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Different Pixels:</span>
+                    <span class="detail-value text-danger">@_selectedRegion.PixelCount.ToString("N0")</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Change Density:</span>
+                    <span class="detail-value">
+                        @{
+                            var density = (_selectedRegion.Width * _selectedRegion.Height) > 0 
+                                ? (double)_selectedRegion.PixelCount / (_selectedRegion.Width * _selectedRegion.Height) 
+                                : 0;
+                        }
+                        @density.ToString("P1")
+                    </span>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <button class="btn btn-sm btn-primary me-2" @onclick="ZoomToRegion">
+                    <i class="bi bi-zoom-in"></i> Zoom to Region
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CopyCoordinates">
+                    <i class="bi bi-clipboard"></i> Copy Coordinates
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .region-overlay-container {
+        position: relative;
+        display: inline-block;
+        user-select: none;
+    }
+
+    .overlay-image {
+        display: block;
+    }
+
+    .region-overlay-svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+
+    .region-tooltip {
+        position: absolute;
+        background-color: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 1000;
+    }
+
+    .tooltip-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .region-details-panel {
+        border: 2px solid #0d6efd;
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .detail-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .detail-label {
+        font-weight: 500;
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+
+    .detail-value {
+        font-weight: 600;
+        font-size: 1rem;
+        color: #212529;
+    }
+
+    svg rect {
+        transition: all 0.2s ease;
+    }
+
+    svg rect:hover {
+        stroke-width: 4 !important;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string ImageUrl { get; set; } = string.Empty;
+
+    [Parameter]
+    public string ImageAlt { get; set; } = "Comparison Image";
+
+    [Parameter]
+    public List<DifferenceRegion> Regions { get; set; } = new();
+
+    [Parameter]
+    public bool ShowOverlay { get; set; } = true;
+
+    [Parameter]
+    public bool ShowLabels { get; set; } = true;
+
+    [Parameter]
+    public bool ShowDetailsPanel { get; set; } = true;
+
+    [Parameter]
+    public int? HighlightedRegionIndex { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnRegionSelected { get; set; }
+
+    private ElementReference _imageElement;
+    private bool _imageLoaded;
+    private int _imageWidth;
+    private int _imageHeight;
+    private int? _highlightedIndex;
+    private int? _selectedIndex;
+    private DifferenceRegion? _selectedRegion;
+    private int? _hoveredIndex;
+    private DifferenceRegion? _hoveredRegion;
+    private int _tooltipX;
+    private int _tooltipY;
+
+    protected override void OnParametersSet()
+    {
+        if (HighlightedRegionIndex.HasValue && HighlightedRegionIndex.Value != _highlightedIndex)
+        {
+            _highlightedIndex = HighlightedRegionIndex.Value;
+        }
+    }
+
+    private void OnImageLoaded()
+    {
+        _imageLoaded = true;
+        
+        // In a real implementation, we would use JS interop to get actual image dimensions
+        // For now, using placeholder dimensions
+        _imageWidth = 1920;
+        _imageHeight = 1080;
+        
+        Logger.LogDebug("Image loaded: {Width}x{Height}", _imageWidth, _imageHeight);
+        StateHasChanged();
+    }
+
+    private void OnRegionClick(int regionIndex)
+    {
+        _selectedIndex = regionIndex;
+        _selectedRegion = Regions.ElementAtOrDefault(regionIndex - 1);
+        _highlightedIndex = regionIndex;
+
+        Logger.LogDebug("Region {Index} selected", regionIndex);
+        OnRegionSelected.InvokeAsync(regionIndex);
+        StateHasChanged();
+    }
+
+    private void OnRegionHover(int regionIndex)
+    {
+        _hoveredIndex = regionIndex;
+        _hoveredRegion = Regions.ElementAtOrDefault(regionIndex - 1);
+
+        if (_hoveredRegion != null)
+        {
+            // Position tooltip near the region
+            _tooltipX = _hoveredRegion.X + _hoveredRegion.Width + 10;
+            _tooltipY = _hoveredRegion.Y;
+        }
+
+        StateHasChanged();
+    }
+
+    private void OnRegionLeave()
+    {
+        _hoveredIndex = null;
+        _hoveredRegion = null;
+        StateHasChanged();
+    }
+
+    private void ClearSelection()
+    {
+        _selectedIndex = null;
+        _selectedRegion = null;
+        _highlightedIndex = null;
+        StateHasChanged();
+    }
+
+    private void ZoomToRegion()
+    {
+        if (_selectedRegion == null) return;
+
+        Logger.LogInformation(
+            "Zoom to region: ({X}, {Y}) {Width}x{Height}",
+            _selectedRegion.X,
+            _selectedRegion.Y,
+            _selectedRegion.Width,
+            _selectedRegion.Height);
+
+        // TODO: Implement zoom functionality with JS interop
+    }
+
+    private void CopyCoordinates()
+    {
+        if (_selectedRegion == null) return;
+
+        var coordinates = $"{{\"x\": {_selectedRegion.X}, \"y\": {_selectedRegion.Y}, \"width\": {_selectedRegion.Width}, \"height\": {_selectedRegion.Height}}}";
+        
+        Logger.LogInformation("Copied coordinates: {Coordinates}", coordinates);
+        
+        // TODO: Implement clipboard copy with JS interop
+    }
+
+    private string GetRegionColor(int index)
+    {
+        // Cycle through a set of distinct colors
+        var colors = new[]
+        {
+            "#dc3545", // Red
+            "#fd7e14", // Orange
+            "#ffc107", // Yellow
+            "#198754", // Green
+            "#0dcaf0", // Cyan
+            "#0d6efd", // Blue
+            "#6610f2", // Indigo
+            "#d63384"  // Pink
+        };
+
+        return colors[(index - 1) % colors.Length];
+    }
+
+    public sealed class DifferenceRegion
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public int PixelCount { get; set; }
+    }
+}

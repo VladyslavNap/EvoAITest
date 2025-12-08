@@ -891,4 +891,342 @@ public sealed class HealerAgent : IHealer
 
         return strategies;
     }
+
+    // ============================================================
+    // Visual Regression Healing Methods
+    // ============================================================
+
+    /// <summary>
+    /// Attempts to heal visual regression failures by analyzing diff images and suggesting tolerance adjustments or ignore regions.
+    /// </summary>
+    /// <param name="failedComparisons">List of failed visual comparison results.</param>
+    /// <param name="context">Execution context.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of healing strategies for visual regression failures.</returns>
+    public async Task<List<HealingStrategy>> HealVisualRegressionAsync(
+        IReadOnlyList<VisualComparisonResult> failedComparisons,
+        AgentExecutionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(failedComparisons);
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (failedComparisons.Count == 0)
+        {
+            return new List<HealingStrategy>();
+        }
+
+        _logger.LogInformation(
+            "Analyzing {Count} visual regression failures for healing opportunities",
+            failedComparisons.Count);
+
+        var healingStrategies = new List<HealingStrategy>();
+
+        foreach (var comparison in failedComparisons)
+        {
+            try
+            {
+                var strategies = await AnalyzeVisualFailureAsync(comparison, context, cancellationToken);
+                healingStrategies.AddRange(strategies);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to analyze visual regression failure for checkpoint '{CheckpointName}'",
+                    comparison.CheckpointName);
+            }
+        }
+
+        // Sort by priority and confidence
+        var sortedStrategies = healingStrategies
+            .OrderByDescending(s => s.Priority)
+            .ThenByDescending(s => s.Confidence)
+            .ToList();
+
+        _logger.LogInformation(
+            "Generated {Count} healing strategies for visual regression failures",
+            sortedStrategies.Count);
+
+        return sortedStrategies;
+    }
+
+    /// <summary>
+    /// Analyzes a single visual comparison failure and suggests healing strategies.
+    /// </summary>
+    private async Task<List<HealingStrategy>> AnalyzeVisualFailureAsync(
+        VisualComparisonResult comparison,
+        AgentExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        var strategies = new List<HealingStrategy>();
+
+        // Build analysis prompt for LLM
+        var analysisPrompt = BuildVisualFailureAnalysisPrompt(comparison);
+
+        _logger.LogDebug(
+            "Requesting LLM analysis for visual checkpoint '{CheckpointName}' (Diff: {Difference:P2})",
+            comparison.CheckpointName,
+            comparison.DifferencePercentage);
+
+        var llmRequest = new LLMRequest
+        {
+            Model = _llmProvider.GetModelName(),
+            Messages = new List<Message>
+            {
+                new() { Role = MessageRole.System, Content = BuildVisualHealingSystemPrompt() },
+                new() { Role = MessageRole.User, Content = analysisPrompt }
+            },
+            Temperature = 0.7,
+            MaxTokens = 1500,
+            ResponseFormat = new ResponseFormat { Type = "json_object" }
+        };
+
+        var llmResponse = await _llmProvider.CompleteAsync(llmRequest, cancellationToken);
+
+        if (llmResponse.Choices.Count == 0)
+        {
+            _logger.LogWarning("LLM returned no choices for visual regression analysis");
+            return strategies;
+        }
+
+        // Parse LLM response
+        var parsedStrategies = ParseVisualHealingResponse(llmResponse.Content, comparison);
+        strategies.AddRange(parsedStrategies);
+
+        return strategies;
+    }
+
+    /// <summary>
+    /// Builds the system prompt for visual regression healing.
+    /// </summary>
+    private string BuildVisualHealingSystemPrompt()
+    {
+        return """
+            You are an expert visual regression testing diagnostic agent. Your role is to analyze
+            screenshot comparison failures and suggest healing strategies.
+            
+            Available visual healing strategies:
+            
+            1. AdjustVisualTolerance: Increase tolerance for acceptable differences
+               - Use when: Minor rendering differences (fonts, anti-aliasing, shadows)
+               - Suggest new tolerance value (0.01 to 0.10)
+               - Be conservative (prefer lower tolerances)
+            
+            2. AddIgnoreRegions: Exclude dynamic content from comparison
+               - Use when: Specific areas contain timestamps, ads, or dynamic content
+               - Suggest CSS selectors or regions to ignore
+               - Be specific (target exact elements)
+            
+            3. WaitForStability: Add delays for animations or loading
+               - Use when: Differences suggest animations or async loading
+               - Suggest wait duration (milliseconds)
+            
+            4. ManualBaselineApproval: Flag for manual review
+               - Use when: Legitimate design changes detected
+               - Explain what changed and why manual review is needed
+            
+            Response format (JSON):
+            {
+              "strategies": [
+                {
+                  "type": "AdjustVisualTolerance" | "AddIgnoreRegions" | "WaitForStability" | "ManualBaselineApproval",
+                  "name": "descriptive name",
+                  "description": "clear explanation",
+                  "confidence": 0.0-1.0,
+                  "priority": 1-10,
+                  "parameters": {
+                    // For AdjustVisualTolerance:
+                    "new_tolerance": 0.02,
+                    "reason": "minor font rendering differences"
+                    
+                    // For AddIgnoreRegions:
+                    "ignore_selectors": ["#timestamp", ".ad-banner"],
+                    "reason": "these elements contain dynamic content"
+                    
+                    // For WaitForStability:
+                    "wait_ms": 2000,
+                    "reason": "animation duration is approximately 2 seconds"
+                    
+                    // For ManualBaselineApproval:
+                    "changes_detected": "header layout redesign",
+                    "recommendation": "requires product owner approval"
+                  }
+                }
+              ],
+              "analysis": "brief summary of the failure pattern"
+            }
+            """;
+    }
+
+    /// <summary>
+    /// Builds the analysis prompt for a visual failure.
+    /// </summary>
+    private string BuildVisualFailureAnalysisPrompt(VisualComparisonResult comparison)
+    {
+        var promptBuilder = new System.Text.StringBuilder();
+
+        promptBuilder.AppendLine("## Visual Regression Failure Analysis");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine($"**Checkpoint Name**: {comparison.CheckpointName}");
+        promptBuilder.AppendLine($"**Difference**: {comparison.DifferencePercentage:P2}");
+        promptBuilder.AppendLine($"**Tolerance**: {comparison.Tolerance:P2}");
+        promptBuilder.AppendLine($"**Pixels Different**: {comparison.PixelsDifferent:N0} / {comparison.TotalPixels:N0}");
+        
+        if (comparison.SsimScore.HasValue)
+        {
+            promptBuilder.AppendLine($"**SSIM Score**: {comparison.SsimScore.Value:F4} (1.0 = identical)");
+        }
+
+        if (!string.IsNullOrEmpty(comparison.DifferenceType))
+        {
+            promptBuilder.AppendLine($"**Difference Type**: {comparison.DifferenceType}");
+        }
+
+        promptBuilder.AppendLine();
+
+        // Parse and add region information
+        if (!string.IsNullOrEmpty(comparison.Regions))
+        {
+            try
+            {
+                var regions = JsonSerializer.Deserialize<List<DifferenceRegion>>(comparison.Regions);
+                if (regions != null && regions.Count > 0)
+                {
+                    promptBuilder.AppendLine("**Difference Regions**:");
+                    foreach (var region in regions.Take(5)) // Limit to first 5 regions
+                    {
+                        promptBuilder.AppendLine($"  - Region at ({region.X}, {region.Y}) size {region.Width}x{region.Height}");
+                        promptBuilder.AppendLine($"    Pixels different: {region.PixelCount}");
+                    }
+                    
+                    if (regions.Count > 5)
+                    {
+                        promptBuilder.AppendLine($"  ... and {regions.Count - 5} more regions");
+                    }
+                    promptBuilder.AppendLine();
+                }
+            }
+            catch (JsonException)
+            {
+                // Ignore parsing errors
+            }
+        }
+
+        promptBuilder.AppendLine("## Task");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Analyze this visual regression failure and suggest specific healing strategies.");
+        promptBuilder.AppendLine("Consider:");
+        promptBuilder.AppendLine("- Is the difference within reasonable rendering variation?");
+        promptBuilder.AppendLine("- Are there specific regions that should be ignored (timestamps, ads, etc.)?");
+        promptBuilder.AppendLine("- Does the page need time to stabilize (animations, loading)?");
+        promptBuilder.AppendLine("- Is this a legitimate design change requiring manual approval?");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Return your response as a JSON object with the structure defined in the system prompt.");
+
+        return promptBuilder.ToString();
+    }
+
+    /// <summary>
+    /// Parses visual healing response from LLM.
+    /// </summary>
+    private List<HealingStrategy> ParseVisualHealingResponse(string responseContent, VisualComparisonResult comparison)
+    {
+        var strategies = new List<HealingStrategy>();
+
+        try
+        {
+            using var document = JsonDocument.Parse(responseContent);
+            var root = document.RootElement;
+
+            if (!root.TryGetProperty("strategies", out var strategiesArray))
+            {
+                _logger.LogWarning("LLM response missing 'strategies' array");
+                return strategies;
+            }
+
+            foreach (var strategyElement in strategiesArray.EnumerateArray())
+            {
+                var strategy = ParseVisualHealingStrategy(strategyElement, comparison);
+                if (strategy != null)
+                {
+                    strategies.Add(strategy);
+                }
+            }
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse visual healing response from LLM");
+        }
+
+        return strategies;
+    }
+
+    /// <summary>
+    /// Parses a single visual healing strategy from JSON.
+    /// </summary>
+    private HealingStrategy? ParseVisualHealingStrategy(JsonElement strategyElement, VisualComparisonResult comparison)
+    {
+        try
+        {
+            var typeStr = strategyElement.TryGetProperty("type", out var typeProp)
+                ? typeProp.GetString() ?? "ManualBaselineApproval"
+                : "ManualBaselineApproval";
+
+            if (!Enum.TryParse<HealingStrategyType>(typeStr, ignoreCase: true, out var strategyType))
+            {
+                strategyType = HealingStrategyType.ManualBaselineApproval;
+            }
+
+            var strategy = new HealingStrategy
+            {
+                Type = strategyType,
+                Name = strategyElement.TryGetProperty("name", out var nameProp)
+                    ? nameProp.GetString() ?? "Visual Healing"
+                    : "Visual Healing",
+                Description = strategyElement.TryGetProperty("description", out var descProp)
+                    ? descProp.GetString() ?? ""
+                    : "",
+                Confidence = strategyElement.TryGetProperty("confidence", out var confProp)
+                    ? confProp.GetDouble()
+                    : 0.6,
+                Priority = strategyElement.TryGetProperty("priority", out var prioProp)
+                    ? prioProp.GetInt32()
+                    : 5,
+                ApplicableErrorTypes = new List<string> { "VisualRegression" }
+            };
+
+            // Parse parameters
+            if (strategyElement.TryGetProperty("parameters", out var paramsProp))
+            {
+                var paramsJson = paramsProp.GetRawText();
+                strategy.Parameters = JsonSerializer.Deserialize<Dictionary<string, object>>(paramsJson)
+                    ?? new Dictionary<string, object>();
+            }
+
+            // Add comparison metadata
+            strategy.Parameters["checkpoint_name"] = comparison.CheckpointName;
+            strategy.Parameters["comparison_id"] = comparison.Id.ToString();
+            strategy.Parameters["current_tolerance"] = comparison.Tolerance;
+            strategy.Parameters["difference_percentage"] = comparison.DifferencePercentage;
+
+            return strategy;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse individual visual healing strategy");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Difference region model for parsing.
+    /// </summary>
+    private sealed class DifferenceRegion
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public int PixelCount { get; set; }
+    }
 }

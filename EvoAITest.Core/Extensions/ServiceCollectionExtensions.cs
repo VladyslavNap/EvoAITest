@@ -69,6 +69,11 @@ public static class ServiceCollectionExtensions
         // Register tool executor
         services.TryAddScoped<IToolExecutor, DefaultToolExecutor>();
 
+        // Register visual regression services
+        services.TryAddSingleton<VisualComparisonEngine>();
+        services.TryAddSingleton<IFileStorageService, LocalFileStorageService>();
+        services.TryAddScoped<IVisualComparisonService, VisualComparisonService>();
+
         // Register DbContext with SQL Server (only if connection string is configured)
         // Note: If the connection string is not configured, DbContext will NOT be registered.
         // This allows running without database persistence but will cause runtime errors

@@ -14,6 +14,9 @@ builder.Services.AddEvoAITestCore(builder.Configuration);
 // Add services to the container.
 builder.Services.AddProblemDetails();
 
+// Add controllers for Visual Regression API
+builder.Services.AddControllers();
+
 // Add authentication and authorization for API endpoints.
 // In production, configure a proper authentication scheme (e.g., JWT Bearer).
 // For development, the API endpoints fall back to "anonymous-user" if no authenticated user is present.
@@ -47,6 +50,9 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+// Map controllers (includes VisualRegressionController)
+app.MapControllers();
 
 // Map API endpoints
 app.MapTaskEndpoints();

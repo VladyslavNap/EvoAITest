@@ -371,4 +371,319 @@ public sealed class AutomationTaskRepository : IAutomationTaskRepository
             throw;
         }
     }
+
+    // ========== Visual Regression Methods ==========
+
+    /// <inheritdoc/>
+    public async Task<VisualBaseline?> GetBaselineAsync(
+        Guid taskId,
+        string checkpointName,
+        string environment,
+        string browser,
+        string viewport,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(checkpointName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(environment);
+        ArgumentException.ThrowIfNullOrWhiteSpace(browser);
+        ArgumentException.ThrowIfNullOrWhiteSpace(viewport);
+
+        _logger.LogInformation(
+            "Retrieving baseline for task {TaskId}, checkpoint '{CheckpointName}', {Environment}/{Browser}/{Viewport}",
+            taskId, checkpointName, environment, browser, viewport);
+
+        try
+        {
+            var baseline = await _context.VisualBaselines
+                .Where(b => b.TaskId == taskId
+                         && b.CheckpointName == checkpointName
+                         && b.Environment == environment
+                         && b.Browser == browser
+                         && b.Viewport == viewport)
+                .AsNoTracking()
+                .OrderByDescending(b => b.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (baseline == null)
+            {
+                _logger.LogDebug("No baseline found for checkpoint '{CheckpointName}'", checkpointName);
+            }
+            else
+            {
+                _logger.LogDebug("Baseline {BaselineId} retrieved for checkpoint '{CheckpointName}'",
+                    baseline.Id, checkpointName);
+            }
+
+            return baseline;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving baseline for checkpoint '{CheckpointName}'", checkpointName);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<VisualBaseline> SaveBaselineAsync(
+        VisualBaseline baseline,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+
+        _logger.LogInformation("Saving baseline for checkpoint '{CheckpointName}'", baseline.CheckpointName);
+
+        try
+        {
+            // Check if task exists
+            var taskExists = await _context.AutomationTasks.AnyAsync(
+                t => t.Id == baseline.TaskId,
+                cancellationToken);
+
+            if (!taskExists)
+            {
+                _logger.LogWarning("Task {TaskId} not found for baseline", baseline.TaskId);
+                throw new InvalidOperationException($"Task {baseline.TaskId} not found.");
+            }
+
+            _context.VisualBaselines.Add(baseline);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Baseline {BaselineId} saved successfully", baseline.Id);
+
+            return baseline;
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Database error saving baseline for checkpoint '{CheckpointName}'",
+                baseline.CheckpointName);
+            throw new InvalidOperationException("Failed to save baseline. See inner exception for details.", ex);
+        }
+        catch (Exception ex) when (ex is not InvalidOperationException)
+        {
+            _logger.LogError(ex, "Error saving baseline for checkpoint '{CheckpointName}'",
+                baseline.CheckpointName);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<VisualComparisonResult>> GetComparisonHistoryAsync(
+        Guid taskId,
+        string checkpointName,
+        int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(checkpointName);
+
+        _logger.LogInformation(
+            "Retrieving comparison history for task {TaskId}, checkpoint '{CheckpointName}', limit {Limit}",
+            taskId, checkpointName, limit);
+
+        try
+        {
+            var history = await _context.VisualComparisonResults
+                .Where(c => c.TaskId == taskId && c.CheckpointName == checkpointName)
+                .AsNoTracking()
+                .OrderByDescending(c => c.ComparedAt)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+
+            _logger.LogDebug("Retrieved {Count} comparison results for checkpoint '{CheckpointName}'",
+                history.Count, checkpointName);
+
+            return history;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving comparison history for checkpoint '{CheckpointName}'",
+                checkpointName);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<VisualComparisonResult> SaveComparisonResultAsync(
+        VisualComparisonResult result,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        _logger.LogInformation("Saving comparison result for checkpoint '{CheckpointName}'", result.CheckpointName);
+
+        try
+        {
+            // Check if task exists
+            var taskExists = await _context.AutomationTasks.AnyAsync(
+                t => t.Id == result.TaskId,
+                cancellationToken);
+
+            if (!taskExists)
+            {
+                _logger.LogWarning("Task {TaskId} not found for comparison result", result.TaskId);
+                throw new InvalidOperationException($"Task {result.TaskId} not found.");
+            }
+
+            _context.VisualComparisonResults.Add(result);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Comparison result {ResultId} saved (Passed: {Passed}, Diff: {Difference:P2})",
+                result.Id, result.Passed, result.DifferencePercentage);
+
+            return result;
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Database error saving comparison result for checkpoint '{CheckpointName}'",
+                result.CheckpointName);
+            throw new InvalidOperationException("Failed to save comparison result. See inner exception for details.", ex);
+        }
+        catch (Exception ex) when (ex is not InvalidOperationException)
+        {
+            _logger.LogError(ex, "Error saving comparison result for checkpoint '{CheckpointName}'",
+                result.CheckpointName);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<VisualBaseline>> GetBaselinesByTaskAsync(
+        Guid taskId,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Retrieving all baselines for task {TaskId}", taskId);
+
+        try
+        {
+            var baselines = await _context.VisualBaselines
+                .Where(b => b.TaskId == taskId)
+                .AsNoTracking()
+                .OrderByDescending(b => b.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+            _logger.LogDebug("Retrieved {Count} baselines for task {TaskId}", baselines.Count, taskId);
+
+            return baselines;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving baselines for task {TaskId}", taskId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<VisualBaseline>> GetBaselinesByBranchAsync(
+        string gitBranch,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(gitBranch);
+
+        _logger.LogInformation("Retrieving baselines for Git branch '{GitBranch}'", gitBranch);
+
+        try
+        {
+            var baselines = await _context.VisualBaselines
+                .Where(b => b.GitBranch == gitBranch)
+                .AsNoTracking()
+                .OrderByDescending(b => b.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+            _logger.LogDebug("Retrieved {Count} baselines for branch '{GitBranch}'", baselines.Count, gitBranch);
+
+            return baselines;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving baselines for branch '{GitBranch}'", gitBranch);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Gets failed visual comparison results for a task.
+    /// </summary>
+    public async Task<List<VisualComparisonResult>> GetFailedComparisonsAsync(
+        Guid taskId,
+        int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit, nameof(limit));
+
+        return await _context.VisualComparisonResults
+            .Where(r => r.TaskId == taskId && !r.Passed)
+            .OrderByDescending(r => r.ComparedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes old baselines older than the specified date.
+    /// </summary>
+    public async Task<int> DeleteOldBaselinesAsync(
+        DateTimeOffset olderThan,
+        CancellationToken cancellationToken = default)
+    {
+        var oldBaselines = await _context.VisualBaselines
+            .Where(b => b.CreatedAt < olderThan)
+            .ToListAsync(cancellationToken);
+
+        if (oldBaselines.Count == 0)
+        {
+            _logger.LogDebug("No old baselines found older than {CutoffDate}", olderThan);
+            return 0;
+        }
+
+        _context.VisualBaselines.RemoveRange(oldBaselines);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Deleted {Count} old baselines (older than {CutoffDate})",
+            oldBaselines.Count, olderThan);
+
+        return oldBaselines.Count;
+    }
+
+    /// <summary>
+    /// Deletes old baselines based on retention policy.
+    /// </summary>
+    public async Task<int> DeleteOldBaselinesAsync(
+        Guid taskId,
+        int retentionDays,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(retentionDays, nameof(retentionDays));
+
+        var cutoffDate = DateTimeOffset.UtcNow.AddDays(-retentionDays);
+
+        var oldBaselines = await _context.VisualBaselines
+            .Where(b => b.TaskId == taskId && b.CreatedAt < cutoffDate)
+            .ToListAsync(cancellationToken);
+
+        if (oldBaselines.Count == 0)
+        {
+            _logger.LogDebug("No old baselines found for task {TaskId} older than {CutoffDate}", taskId, cutoffDate);
+            return 0;
+        }
+
+        _context.VisualBaselines.RemoveRange(oldBaselines);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Deleted {Count} old baselines for task {TaskId} (older than {CutoffDate})",
+            oldBaselines.Count, taskId, cutoffDate);
+
+        return oldBaselines.Count;
+    }
+
+    /// <summary>
+    /// Gets a specific comparison result by ID.
+    /// </summary>
+    public async Task<VisualComparisonResult?> GetComparisonResultAsync(
+        Guid comparisonId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.VisualComparisonResults
+            .Include(r => r.Baseline)
+            .FirstOrDefaultAsync(r => r.Id == comparisonId, cancellationToken);
+    }
 }

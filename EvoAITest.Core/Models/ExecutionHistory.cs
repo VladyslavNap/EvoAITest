@@ -96,6 +96,28 @@ public sealed class ExecutionHistory
     public string Metadata { get; set; } = "{}";
 
     /// <summary>
+    /// Gets or sets the JSON-serialized visual comparison results.
+    /// </summary>
+    [Column(TypeName = "nvarchar(max)")]
+    public string VisualComparisonResults { get; set; } = "[]";
+
+    /// <summary>
+    /// Gets or sets the count of visual checkpoints that passed.
+    /// </summary>
+    public int VisualCheckpointsPassed { get; set; }
+
+    /// <summary>
+    /// Gets or sets the count of visual checkpoints that failed.
+    /// </summary>
+    public int VisualCheckpointsFailed { get; set; }
+
+    /// <summary>
+    /// Gets or sets the overall visual regression status.
+    /// </summary>
+    [Column(TypeName = "nvarchar(50)")]
+    public VisualRegressionStatus VisualStatus { get; set; } = VisualRegressionStatus.NotApplicable;
+
+    /// <summary>
     /// Gets or sets the timestamp when this record was created.
     /// </summary>
     [Required]

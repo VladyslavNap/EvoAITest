@@ -1,0 +1,393 @@
+@using EvoAITest.Core.Models
+@inject ILogger<ToleranceAdjustmentDialog> Logger
+
+<div class="modal @(_isVisible ? "show d-block" : "")" tabindex="-1" role="dialog" aria-labelledby="toleranceDialogTitle" aria-hidden="@(!_isVisible)">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="toleranceDialogTitle">
+                    <i class="bi bi-sliders"></i> Adjust Tolerance
+                </h5>
+                <button type="button" class="btn-close" @onclick="Cancel" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body">
+                @if (ComparisonResult != null)
+                {
+                    <!-- Current Status -->
+                    <div class="alert @(ComparisonResult.Passed ? "alert-success" : "alert-danger")" role="alert">
+                        <strong>Current Status:</strong> @(ComparisonResult.Passed ? "PASSED" : "FAILED")
+                        <br />
+                        <strong>Difference:</strong> @ComparisonResult.DifferencePercentage.ToString("P2")
+                        <br />
+                        <strong>Current Tolerance:</strong> @ComparisonResult.Tolerance.ToString("P2")
+                    </div>
+
+                    <!-- Tolerance Slider -->
+                    <div class="tolerance-adjustment mb-4">
+                        <label for="toleranceSlider" class="form-label">
+                            New Tolerance: <strong class="text-primary">@_newTolerance.ToString("P2")</strong>
+                        </label>
+                        <input type="range" 
+                               class="form-range" 
+                               id="toleranceSlider"
+                               min="0.0001" 
+                               max="0.10" 
+                               step="0.0001"
+                               value="@_newTolerance"
+                               @oninput="OnToleranceChanged" />
+                        
+                        <div class="d-flex justify-content-between text-muted small">
+                            <span>0.01% (Strict)</span>
+                            <span>1.0% (Moderate)</span>
+                            <span>10.0% (Lenient)</span>
+                        </div>
+                    </div>
+
+                    <!-- Quick Presets -->
+                    <div class="tolerance-presets mb-4">
+                        <label class="form-label">Quick Presets:</label>
+                        <div class="btn-group w-100" role="group">
+                            <button type="button" 
+                                    class="btn btn-outline-secondary @(_newTolerance == 0.005 ? "active" : "")"
+                                    @onclick="@(() => SetTolerance(0.005))">
+                                Very Strict<br/><small>0.5%</small>
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-outline-secondary @(_newTolerance == 0.01 ? "active" : "")"
+                                    @onclick="@(() => SetTolerance(0.01))">
+                                Strict<br/><small>1.0%</small>
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-outline-secondary @(_newTolerance == 0.02 ? "active" : "")"
+                                    @onclick="@(() => SetTolerance(0.02))">
+                                Moderate<br/><small>2.0%</small>
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-outline-secondary @(_newTolerance == 0.05 ? "active" : "")"
+                                    @onclick="@(() => SetTolerance(0.05))">
+                                Lenient<br/><small>5.0%</small>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Live Preview -->
+                    <div class="preview-section mb-4">
+                        <h6>Preview with New Tolerance</h6>
+                        <div class="preview-card p-3 @(WouldPass ? "border-success bg-success-subtle" : "border-danger bg-danger-subtle")">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <div class="preview-details">
+                                        <div class="preview-item">
+                                            <span class="preview-label">Difference:</span>
+                                            <span class="preview-value">@ComparisonResult.DifferencePercentage.ToString("P2")</span>
+                                        </div>
+                                        <div class="preview-item">
+                                            <span class="preview-label">New Tolerance:</span>
+                                            <span class="preview-value">@_newTolerance.ToString("P2")</span>
+                                        </div>
+                                        <div class="preview-item">
+                                            <span class="preview-label">Result:</span>
+                                            <span class="preview-value">
+                                                <strong class="@(WouldPass ? "text-success" : "text-danger")">
+                                                    @(WouldPass ? "WOULD PASS ?" : "WOULD FAIL ?")
+                                                </strong>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="preview-icon">
+                                        @if (WouldPass)
+                                        {
+                                            <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-x-circle-fill text-danger" style="font-size: 4rem;"></i>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Apply Options -->
+                    <div class="apply-options mb-3">
+                        <label class="form-label">Apply To:</label>
+                        <div class="form-check">
+                            <input type="radio" 
+                                   class="form-check-input" 
+                                   id="applyToCheckpoint"
+                                   name="applyOption"
+                                   value="checkpoint"
+                                   @onchange="@(() => _applyToAll = false)"
+                                   checked="@(!_applyToAll)" />
+                            <label class="form-check-label" for="applyToCheckpoint">
+                                This checkpoint only (<strong>@ComparisonResult.CheckpointName</strong>)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input type="radio" 
+                                   class="form-check-input" 
+                                   id="applyToAll"
+                                   name="applyOption"
+                                   value="all"
+                                   @onchange="@(() => _applyToAll = true)"
+                                   checked="@_applyToAll" />
+                            <label class="form-check-label" for="applyToAll">
+                                All checkpoints in this task
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Recommendation -->
+                    @if (_recommendation != null)
+                    {
+                        <div class="alert alert-info" role="alert">
+                            <i class="bi bi-lightbulb"></i>
+                            <strong>Recommendation:</strong> @_recommendation
+                        </div>
+                    }
+
+                    <!-- Error Message -->
+                    @if (!string.IsNullOrEmpty(_errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            <i class="bi bi-exclamation-circle"></i> @_errorMessage
+                        </div>
+                    }
+                }
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Cancel" disabled="@_isProcessing">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-primary" @onclick="ResetToDefault" disabled="@_isProcessing">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset to Default
+                </button>
+                <button type="button" 
+                        class="btn btn-success" 
+                        @onclick="ApplyAsync" 
+                        disabled="@_isProcessing">
+                    @if (_isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Applying...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-check-circle"></i>
+                        <span>Apply Changes</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_isVisible)
+{
+    <div class="modal-backdrop fade show"></div>
+}
+
+<style>
+    .modal.show {
+        background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .tolerance-adjustment {
+        padding: 1.5rem;
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+        border: 1px solid #dee2e6;
+    }
+
+    .tolerance-presets .btn {
+        padding: 0.75rem;
+    }
+
+    .preview-card {
+        border: 2px solid;
+        border-radius: 0.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .preview-details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .preview-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .preview-label {
+        font-weight: 500;
+        color: #6c757d;
+    }
+
+    .preview-value {
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+
+    .form-range::-webkit-slider-thumb {
+        background-color: #0d6efd;
+    }
+
+    .form-range::-moz-range-thumb {
+        background-color: #0d6efd;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public VisualComparisonResult? ComparisonResult { get; set; }
+
+    [Parameter]
+    public EventCallback<ToleranceAdjustment> OnApply { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private bool _isVisible;
+    private bool _isProcessing;
+    private bool _applyToAll;
+    private double _newTolerance = 0.01;
+    private string? _errorMessage;
+    private string? _recommendation;
+
+    private bool WouldPass => ComparisonResult != null && ComparisonResult.DifferencePercentage <= _newTolerance;
+
+    public void Show()
+    {
+        if (ComparisonResult == null) return;
+
+        _isVisible = true;
+        _isProcessing = false;
+        _applyToAll = false;
+        _newTolerance = ComparisonResult.Tolerance;
+        _errorMessage = null;
+        UpdateRecommendation();
+        StateHasChanged();
+    }
+
+    public void Hide()
+    {
+        _isVisible = false;
+        StateHasChanged();
+    }
+
+    private void Cancel()
+    {
+        if (_isProcessing) return;
+        
+        Hide();
+        OnCancel.InvokeAsync();
+    }
+
+    private void SetTolerance(double tolerance)
+    {
+        _newTolerance = tolerance;
+        UpdateRecommendation();
+    }
+
+    private void OnToleranceChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var value))
+        {
+            _newTolerance = value;
+            UpdateRecommendation();
+        }
+    }
+
+    private void ResetToDefault()
+    {
+        _newTolerance = 0.01; // Default 1%
+        UpdateRecommendation();
+    }
+
+    private void UpdateRecommendation()
+    {
+        if (ComparisonResult == null) return;
+
+        var difference = ComparisonResult.DifferencePercentage;
+        
+        if (_newTolerance < 0.005)
+        {
+            _recommendation = "Very strict tolerance may cause frequent false failures due to minor rendering differences.";
+        }
+        else if (_newTolerance > 0.05)
+        {
+            _recommendation = "High tolerance may miss significant visual regressions. Use with caution.";
+        }
+        else if (WouldPass && !ComparisonResult.Passed)
+        {
+            _recommendation = "This adjustment will make the current comparison pass. Ensure the differences are acceptable.";
+        }
+        else if (!WouldPass && ComparisonResult.Passed)
+        {
+            _recommendation = "This adjustment will make the current comparison fail. Consider if this is intended.";
+        }
+        else
+        {
+            _recommendation = null;
+        }
+    }
+
+    private async Task ApplyAsync()
+    {
+        if (ComparisonResult == null || _isProcessing) return;
+
+        _isProcessing = true;
+        _errorMessage = null;
+
+        try
+        {
+            Logger.LogInformation(
+                "Adjusting tolerance for checkpoint {CheckpointName} from {OldTolerance:P2} to {NewTolerance:P2} (Apply to all: {ApplyToAll})",
+                ComparisonResult.CheckpointName,
+                ComparisonResult.Tolerance,
+                _newTolerance,
+                _applyToAll);
+
+            var adjustment = new ToleranceAdjustment
+            {
+                CheckpointName = ComparisonResult.CheckpointName,
+                OldTolerance = ComparisonResult.Tolerance,
+                NewTolerance = _newTolerance,
+                ApplyToAll = _applyToAll,
+                AdjustedAt = DateTimeOffset.UtcNow,
+                AdjustedBy = "Current User" // TODO: Get from auth context
+            };
+
+            await OnApply.InvokeAsync(adjustment);
+            
+            Hide();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to adjust tolerance");
+            _errorMessage = $"Failed to adjust tolerance: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    public sealed class ToleranceAdjustment
+    {
+        public string CheckpointName { get; set; } = string.Empty;
+        public double OldTolerance { get; set; }
+        public double NewTolerance { get; set; }
+        public bool ApplyToAll { get; set; }
+        public DateTimeOffset AdjustedAt { get; set; }
+        public string AdjustedBy { get; set; } = string.Empty;
+    }
+}

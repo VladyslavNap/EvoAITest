@@ -170,6 +170,22 @@ public sealed class AutomationTask
     public DateTimeOffset? CompletedAt { get; set; }
 
     /// <summary>
+    /// Gets or sets the visual checkpoints defined for this task.
+    /// </summary>
+    /// <remarks>
+    /// JSON-serialized array of VisualCheckpoint objects defining points
+    /// where screenshots should be captured and compared against baselines.
+    /// </remarks>
+    [Column(TypeName = "nvarchar(max)")]
+    public string VisualCheckpoints { get; set; } = "[]";
+
+    /// <summary>
+    /// Gets or sets additional metadata as JSON.
+    /// </summary>
+    [Column(TypeName = "nvarchar(max)")]
+    public string Metadata { get; set; } = "{}";
+
+    /// <summary>
     /// Navigation property to execution history records for this task.
     /// </summary>
     public ICollection<ExecutionHistory> Executions { get; set; } = new List<ExecutionHistory>();
