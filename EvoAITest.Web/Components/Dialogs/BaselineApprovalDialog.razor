@@ -1,0 +1,347 @@
+@using EvoAITest.Core.Models
+@inject ILogger<BaselineApprovalDialog> Logger
+
+<div class="modal @(_isVisible ? "show d-block" : "")" tabindex="-1" role="dialog" aria-labelledby="approvalDialogTitle" aria-hidden="@(!_isVisible)">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="approvalDialogTitle">
+                    <i class="bi bi-check-circle"></i> Approve Baseline
+                </h5>
+                <button type="button" class="btn-close" @onclick="Cancel" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body">
+                @if (ComparisonResult != null)
+                {
+                    <!-- Warning Message -->
+                    <div class="alert alert-warning" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Warning:</strong> This will replace the current baseline with the actual screenshot.
+                        Future comparisons will use this new baseline.
+                    </div>
+
+                    <!-- Comparison Preview -->
+                    <div class="comparison-preview mb-4">
+                        <h6>Comparison Details</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="metric-item">
+                                    <span class="metric-label">Checkpoint:</span>
+                                    <span class="metric-value">@ComparisonResult.CheckpointName</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Difference:</span>
+                                    <span class="metric-value text-danger">@ComparisonResult.DifferencePercentage.ToString("P2")</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="metric-item">
+                                    <span class="metric-label">Compared:</span>
+                                    <span class="metric-value">@ComparisonResult.ComparedAt.ToString("g")</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">SSIM Score:</span>
+                                    <span class="metric-value">@(ComparisonResult.SsimScore?.ToString("F4") ?? "N/A")</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Image Preview -->
+                    <div class="image-preview mb-4">
+                        <h6>Image Preview</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="preview-card">
+                                    <label class="preview-label">Current Baseline</label>
+                                    <div class="preview-image-container">
+                                        <img src="@GetImageUrl(ComparisonResult.BaselinePath)" 
+                                             alt="Current Baseline" 
+                                             class="preview-image img-fluid" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="preview-card">
+                                    <label class="preview-label">New Baseline (Actual)</label>
+                                    <div class="preview-image-container">
+                                        <img src="@GetImageUrl(ComparisonResult.ActualPath)" 
+                                             alt="New Baseline" 
+                                             class="preview-image img-fluid" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reason Input -->
+                    <div class="form-group mb-3">
+                        <label for="approvalReason" class="form-label">
+                            Reason for Approval <span class="text-danger">*</span>
+                        </label>
+                        <textarea id="approvalReason" 
+                                  class="form-control @(_reasonError ? "is-invalid" : "")" 
+                                  rows="3"
+                                  placeholder="e.g., Updated design approved by product owner, Legitimate UI changes..."
+                                  @bind="_approvalReason"
+                                  @bind:event="oninput"></textarea>
+                        @if (_reasonError)
+                        {
+                            <div class="invalid-feedback">
+                                Please provide a reason for this approval.
+                            </div>
+                        }
+                        <small class="form-text text-muted">
+                            This reason will be logged for audit purposes. Minimum 10 characters required.
+                        </small>
+                    </div>
+
+                    <!-- Confirmation Checkbox -->
+                    <div class="form-check mb-3">
+                        <input type="checkbox" 
+                               class="form-check-input" 
+                               id="confirmCheckbox"
+                               @bind="_isConfirmed" />
+                        <label class="form-check-label" for="confirmCheckbox">
+                            I understand this will update the baseline and affect future test runs
+                        </label>
+                    </div>
+
+                    <!-- Error Message -->
+                    @if (!string.IsNullOrEmpty(_errorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            <i class="bi bi-exclamation-circle"></i> @_errorMessage
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No comparison data available.
+                    </div>
+                }
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Cancel" disabled="@_isProcessing">
+                    Cancel
+                </button>
+                <button type="button" 
+                        class="btn btn-success" 
+                        @onclick="ApproveAsync" 
+                        disabled="@(!CanApprove || _isProcessing)">
+                    @if (_isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Approving...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-check-circle"></i>
+                        <span>Approve Baseline</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_isVisible)
+{
+    <div class="modal-backdrop fade show"></div>
+}
+
+<style>
+    .modal.show {
+        background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .comparison-preview {
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+        border: 1px solid #dee2e6;
+    }
+
+    .metric-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .metric-item:last-child {
+        border-bottom: none;
+    }
+
+    .metric-label {
+        font-weight: 500;
+        color: #6c757d;
+    }
+
+    .metric-value {
+        font-weight: 600;
+    }
+
+    .preview-card {
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        padding: 0.5rem;
+        background-color: #fff;
+    }
+
+    .preview-label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #495057;
+    }
+
+    .preview-image-container {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 200px;
+    }
+
+    .preview-image {
+        max-height: 300px;
+        width: auto;
+        border-radius: 0.25rem;
+    }
+
+    .modal-backdrop {
+        z-index: 1040;
+    }
+
+    .modal {
+        z-index: 1050;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public VisualComparisonResult? ComparisonResult { get; set; }
+
+    [Parameter]
+    public EventCallback<ApprovalResult> OnApprove { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private bool _isVisible;
+    private bool _isProcessing;
+    private bool _isConfirmed;
+    private bool _reasonError;
+    private string _approvalReason = string.Empty;
+    private string? _errorMessage;
+
+    private bool CanApprove => 
+        ComparisonResult != null && 
+        _isConfirmed && 
+        !string.IsNullOrWhiteSpace(_approvalReason) && 
+        _approvalReason.Length >= 10;
+
+    public void Show()
+    {
+        _isVisible = true;
+        _isProcessing = false;
+        _isConfirmed = false;
+        _approvalReason = string.Empty;
+        _errorMessage = null;
+        _reasonError = false;
+        StateHasChanged();
+    }
+
+    public void Hide()
+    {
+        _isVisible = false;
+        StateHasChanged();
+    }
+
+    private void Cancel()
+    {
+        if (_isProcessing) return;
+        
+        Hide();
+        OnCancel.InvokeAsync();
+    }
+
+    private async Task ApproveAsync()
+    {
+        if (ComparisonResult == null || _isProcessing) return;
+
+        // Validate reason
+        if (string.IsNullOrWhiteSpace(_approvalReason) || _approvalReason.Length < 10)
+        {
+            _reasonError = true;
+            _errorMessage = "Please provide a detailed reason (minimum 10 characters).";
+            return;
+        }
+
+        if (!_isConfirmed)
+        {
+            _errorMessage = "Please confirm you understand the implications of this action.";
+            return;
+        }
+
+        _isProcessing = true;
+        _errorMessage = null;
+
+        try
+        {
+            Logger.LogInformation(
+                "Approving baseline for comparison {ComparisonId} with reason: {Reason}",
+                ComparisonResult.Id,
+                _approvalReason);
+
+            var approvalResult = new ApprovalResult
+            {
+                ComparisonId = ComparisonResult.Id,
+                CheckpointName = ComparisonResult.CheckpointName,
+                Reason = _approvalReason,
+                ApprovedAt = DateTimeOffset.UtcNow,
+                ApprovedBy = "Current User" // TODO: Get from auth context
+            };
+
+            await OnApprove.InvokeAsync(approvalResult);
+            
+            Hide();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to approve baseline");
+            _errorMessage = $"Failed to approve baseline: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private string GetImageUrl(string? imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath))
+        {
+            return "/images/placeholder.png";
+        }
+
+        // TODO: In Phase 5, convert to URL via API endpoint
+        return $"/visual-regression/{imagePath.Replace("\\", "/")}";
+    }
+
+    public sealed class ApprovalResult
+    {
+        public Guid ComparisonId { get; set; }
+        public string CheckpointName { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+        public DateTimeOffset ApprovedAt { get; set; }
+        public string ApprovedBy { get; set; } = string.Empty;
+    }
+}

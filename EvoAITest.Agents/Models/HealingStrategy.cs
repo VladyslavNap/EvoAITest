@@ -86,6 +86,20 @@ public enum HealingStrategyType
     /// <summary>Fall back to a simpler approach.</summary>
     SimpleFallback,
     
+    // ===== Visual Regression Healing Strategies =====
+    
+    /// <summary>Adjust visual comparison tolerance.</summary>
+    AdjustVisualTolerance,
+    
+    /// <summary>Add ignore regions for dynamic content.</summary>
+    AddIgnoreRegions,
+    
+    /// <summary>Wait for page to stabilize before screenshot.</summary>
+    WaitForStability,
+    
+    /// <summary>Flag for manual baseline approval.</summary>
+    ManualBaselineApproval,
+    
     /// <summary>Custom healing logic.</summary>
     Custom
 }

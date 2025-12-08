@@ -196,4 +196,19 @@ public interface IAutomationTaskRepository
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Number of baselines deleted.</returns>
     Task<int> DeleteOldBaselinesAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes old baselines based on retention policy.
+    /// </summary>
+    Task<int> DeleteOldBaselinesAsync(
+        Guid taskId,
+        int retentionDays,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a specific comparison result by ID.
+    /// </summary>
+    Task<VisualComparisonResult?> GetComparisonResultAsync(
+        Guid comparisonId,
+        CancellationToken cancellationToken = default);
 }

@@ -10,9 +10,11 @@
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/VladyslavNap/EvoAITest/actions)
 [![Code Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/VladyslavNap/EvoAITest/actions)
 
+> 📚 **[Complete Documentation Index](DOCUMENTATION_INDEX.md)** | ⚡ **[Quick Start](docs/VisualRegressionQuickStart.md)** | 🗺️ **[Roadmap](VISUAL_REGRESSION_ROADMAP.md)** | 📖 **[User Guide](docs/VisualRegressionUserGuide.md)**
+
 ## Overview
 
-EvoAITest is a modern, cloud-native browser automation framework that uses Azure OpenAI (GPT-5) to enable intelligent, natural language-driven web testing and automation. Built on .NET 10 with Aspire orchestration, it combines enterprise-grade Azure AI with local development flexibility using Ollama.
+EvoAITest is a modern, cloud-native browser automation framework that uses Azure OpenAI (GPT-5) to enable intelligent, natural language-driven web testing and automation with comprehensive **Visual Regression Testing** capabilities. Built on .NET 10 with Aspire orchestration, it combines enterprise-grade Azure AI with local development flexibility using Ollama.
 
 ### Key Features
 
@@ -415,7 +417,7 @@ These tests exercise the Task + Execution endpoints end-to-end using WebApplicat
 - ? Environment variable binding
 - ? Key Vault security
 - ? **DefaultToolExecutor (30+ unit tests)**
-- ? **Tool Executor Integration (9 real browser tests)**
+- ? **Tool Executor Integration (9 real browser integration tests)**
 - ? **ExecutorAgent (19 orchestration-focused unit tests)**
 - ? **HealerAgent (25 LLM-driven healing tests)**
 - ? **EvoAIDbContext (12 EF Core data-layer tests)**

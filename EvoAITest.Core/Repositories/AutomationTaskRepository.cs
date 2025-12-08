@@ -599,70 +599,91 @@ public sealed class AutomationTaskRepository : IAutomationTaskRepository
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets failed visual comparison results for a task.
+    /// </summary>
     public async Task<List<VisualComparisonResult>> GetFailedComparisonsAsync(
         Guid taskId,
         int limit = 50,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Retrieving failed comparisons for task {TaskId}, limit {Limit}", taskId, limit);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit, nameof(limit));
 
-        try
-        {
-            var failed = await _context.VisualComparisonResults
-                .Where(c => c.TaskId == taskId && !c.Passed)
-                .AsNoTracking()
-                .OrderByDescending(c => c.ComparedAt)
-                .Take(limit)
-                .ToListAsync(cancellationToken);
-
-            _logger.LogDebug("Retrieved {Count} failed comparisons for task {TaskId}", failed.Count, taskId);
-
-            return failed;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving failed comparisons for task {TaskId}", taskId);
-            throw;
-        }
+        return await _context.VisualComparisonResults
+            .Where(r => r.TaskId == taskId && !r.Passed)
+            .OrderByDescending(r => r.ComparedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Deletes old baselines older than the specified date.
+    /// </summary>
     public async Task<int> DeleteOldBaselinesAsync(
         DateTimeOffset olderThan,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Deleting baselines older than {OlderThan}", olderThan);
+        var oldBaselines = await _context.VisualBaselines
+            .Where(b => b.CreatedAt < olderThan)
+            .ToListAsync(cancellationToken);
 
-        try
+        if (oldBaselines.Count == 0)
         {
-            var oldBaselines = await _context.VisualBaselines
-                .Where(b => b.CreatedAt < olderThan)
-                .ToListAsync(cancellationToken);
-
-            if (oldBaselines.Count == 0)
-            {
-                _logger.LogInformation("No baselines found older than {OlderThan}", olderThan);
-                return 0;
-            }
-
-            _context.VisualBaselines.RemoveRange(oldBaselines);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            _logger.LogInformation("Deleted {Count} baselines older than {OlderThan}",
-                oldBaselines.Count, olderThan);
-
-            return oldBaselines.Count;
+            _logger.LogDebug("No old baselines found older than {CutoffDate}", olderThan);
+            return 0;
         }
-        catch (DbUpdateException ex)
+
+        _context.VisualBaselines.RemoveRange(oldBaselines);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Deleted {Count} old baselines (older than {CutoffDate})",
+            oldBaselines.Count, olderThan);
+
+        return oldBaselines.Count;
+    }
+
+    /// <summary>
+    /// Deletes old baselines based on retention policy.
+    /// </summary>
+    public async Task<int> DeleteOldBaselinesAsync(
+        Guid taskId,
+        int retentionDays,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(retentionDays, nameof(retentionDays));
+
+        var cutoffDate = DateTimeOffset.UtcNow.AddDays(-retentionDays);
+
+        var oldBaselines = await _context.VisualBaselines
+            .Where(b => b.TaskId == taskId && b.CreatedAt < cutoffDate)
+            .ToListAsync(cancellationToken);
+
+        if (oldBaselines.Count == 0)
         {
-            _logger.LogError(ex, "Database error deleting old baselines");
-            throw new InvalidOperationException("Failed to delete old baselines. See inner exception for details.", ex);
+            _logger.LogDebug("No old baselines found for task {TaskId} older than {CutoffDate}", taskId, cutoffDate);
+            return 0;
         }
-        catch (Exception ex) when (ex is not InvalidOperationException)
-        {
-            _logger.LogError(ex, "Error deleting old baselines");
-            throw;
-        }
+
+        _context.VisualBaselines.RemoveRange(oldBaselines);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Deleted {Count} old baselines for task {TaskId} (older than {CutoffDate})",
+            oldBaselines.Count, taskId, cutoffDate);
+
+        return oldBaselines.Count;
+    }
+
+    /// <summary>
+    /// Gets a specific comparison result by ID.
+    /// </summary>
+    public async Task<VisualComparisonResult?> GetComparisonResultAsync(
+        Guid comparisonId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.VisualComparisonResults
+            .Include(r => r.Baseline)
+            .FirstOrDefaultAsync(r => r.Id == comparisonId, cancellationToken);
     }
 }

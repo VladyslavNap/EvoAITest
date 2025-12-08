@@ -43,4 +43,14 @@ public interface IFileStorageService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if the image exists; otherwise, false.</returns>
     Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if a file exists in storage.
+    /// </summary>
+    Task<bool> FileExistsAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads a file from storage.
+    /// </summary>
+    Task<byte[]> ReadFileAsync(string path, CancellationToken cancellationToken = default);
 }

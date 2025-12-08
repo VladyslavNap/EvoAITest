@@ -1,0 +1,605 @@
+@page "/visual-regression/{TaskId:guid}/{CheckpointName}"
+@using EvoAITest.Core.Models
+@using EvoAITest.Core.Abstractions
+@using EvoAITest.Core.Repositories
+@using System.Text.Json
+@using EvoAITest.Web.Components.Dialogs
+@using DifferenceRegion = EvoAITest.Web.Components.Dialogs.DifferenceRegionOverlay.DifferenceRegion
+@inject IVisualComparisonService VisualService
+@inject IAutomationTaskRepository TaskRepository
+@inject NavigationManager NavigationManager
+@inject ILogger<VisualRegressionViewer> Logger
+
+<PageTitle>Visual Regression: @CheckpointName</PageTitle>
+
+<div class="visual-regression-viewer">
+    @if (_isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Loading comparison data...</p>
+        </div>
+    }
+    else if (_errorMessage != null)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error</h4>
+            <p>@_errorMessage</p>
+            <button class="btn btn-primary mt-2" @onclick="LoadDataAsync">Retry</button>
+        </div>
+    }
+    else if (_currentComparison == null)
+    {
+        <div class="alert alert-warning" role="alert">
+            <h4 class="alert-heading">No Data</h4>
+            <p>No comparison data found for checkpoint "@CheckpointName"</p>
+            <button class="btn btn-primary mt-2" @onclick="@(() => NavigationManager.NavigateTo($"/tasks/{TaskId}"))">
+                Back to Task
+            </button>
+        </div>
+    }
+    else
+    {
+        <!-- Header -->
+        <div class="viewer-header mb-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2>@CheckpointName</h2>
+                    <span class="badge @GetStatusBadgeClass()">
+                        @(_currentComparison.Passed ? "PASSED" : "FAILED")
+                    </span>
+                </div>
+                <div>
+                    <button class="btn btn-outline-secondary" @onclick="@(() => NavigationManager.NavigateTo($"/tasks/{TaskId}"))">
+                        <i class="bi bi-arrow-left"></i> Back to Task
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Comparison Tabs -->
+        <div class="comparison-tabs card mb-4">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs">
+                    <li class="nav-item">
+                        <button class="nav-link @(_selectedTab == "baseline" ? "active" : "")" 
+                                @onclick="@(() => _selectedTab = "baseline")">
+                            Baseline
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_selectedTab == "actual" ? "active" : "")" 
+                                @onclick="@(() => _selectedTab = "actual")">
+                            Actual
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_selectedTab == "diff" ? "active" : "")" 
+                                @onclick="@(() => _selectedTab = "diff")">
+                            Diff
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @(_selectedTab == "sidebyside" ? "active" : "")" 
+                                @onclick="@(() => _selectedTab = "sidebyside")">
+                            Side-by-Side
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="image-container">
+                    @if (_selectedTab == "baseline")
+                    {
+                        <DifferenceRegionOverlay ImageUrl="@GetImageUrl(_currentComparison.BaselinePath)"
+                                                ImageAlt="Baseline"
+                                                Regions="@_differenceRegions"
+                                                ShowOverlay="@_showDifferenceRegions"
+                                                HighlightedRegionIndex="@_highlightedRegionIndex"
+                                                OnRegionSelected="OnRegionSelected" />
+                    }
+                    else if (_selectedTab == "actual")
+                    {
+                        <DifferenceRegionOverlay ImageUrl="@GetImageUrl(_currentComparison.ActualPath)"
+                                                ImageAlt="Actual"
+                                                Regions="@_differenceRegions"
+                                                ShowOverlay="@_showDifferenceRegions"
+                                                HighlightedRegionIndex="@_highlightedRegionIndex"
+                                                OnRegionSelected="OnRegionSelected" />
+                    }
+                    else if (_selectedTab == "diff")
+                    {
+                        <DifferenceRegionOverlay ImageUrl="@GetImageUrl(_currentComparison.DiffPath)"
+                                                ImageAlt="Difference"
+                                                Regions="@_differenceRegions"
+                                                ShowOverlay="@_showDifferenceRegions"
+                                                HighlightedRegionIndex="@_highlightedRegionIndex"
+                                                OnRegionSelected="OnRegionSelected" />
+                    }
+                    else if (_selectedTab == "sidebyside")
+                    {
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Baseline</h5>
+                                <img src="@GetImageUrl(_currentComparison.BaselinePath)" 
+                                     alt="Baseline" 
+                                     class="comparison-image img-fluid"
+                                     @onerror="HandleImageError" />
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Actual</h5>
+                                <img src="@GetImageUrl(_currentComparison.ActualPath)" 
+                                     alt="Actual" 
+                                     class="comparison-image img-fluid"
+                                     @onerror="HandleImageError" />
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Dashboard -->
+        <div class="metrics-dashboard mb-4">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="metric-card card">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle mb-2 text-muted">Difference</h6>
+                            <h3 class="card-title @(_currentComparison.DifferencePercentage > _currentComparison.Tolerance ? "text-danger" : "text-success")">
+                                @(_currentComparison.DifferencePercentage.ToString("P2"))
+                            </h3>
+                            <p class="card-text small">Tolerance: @(_currentComparison.Tolerance.ToString("P2"))</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card card">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle mb-2 text-muted">SSIM Score</h6>
+                            <h3 class="card-title">
+                                @(_currentComparison.SsimScore?.ToString("F4") ?? "N/A")
+                            </h3>
+                            <p class="card-text small">1.0 = Identical</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card card">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle mb-2 text-muted">Pixels Different</h6>
+                            <h3 class="card-title">
+                                @(_currentComparison.PixelsDifferent.ToString("N0"))
+                            </h3>
+                            <p class="card-text small">of @(_currentComparison.TotalPixels.ToString("N0"))</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card card">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle mb-2 text-muted">Status</h6>
+                            <h3 class="card-title">
+                                <span class="badge @GetStatusBadgeClass()" style="font-size: 1.2rem;">
+                                    @(_currentComparison.Passed ? "PASSED" : "FAILED")
+                                </span>
+                            </h3>
+                            <p class="card-text small">@_currentComparison.ComparedAt.ToString("g")</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons mb-4">
+            <div class="btn-group" role="group">
+                <button class="btn btn-success" @onclick="ShowApprovalDialog" disabled="@_isProcessing">
+                    <i class="bi bi-check-circle"></i> Approve Baseline
+                </button>
+                <button class="btn btn-primary" @onclick="ShowToleranceDialog">
+                    <i class="bi bi-sliders"></i> Adjust Tolerance
+                </button>
+                <button class="btn btn-info" @onclick="ToggleDifferenceRegions">
+                    <i class="bi bi-geo-alt"></i> @(_showDifferenceRegions ? "Hide" : "View") Regions
+                </button>
+                <button class="btn btn-secondary" @onclick="DownloadImages">
+                    <i class="bi bi-download"></i> Download Images
+                </button>
+            </div>
+        </div>
+
+        <!-- Difference Regions List (when not using overlay) -->
+        @if (!_showDifferenceRegions && _differenceRegions.Count > 0)
+        {
+            <div class="difference-regions-list card mb-4">
+                <div class="card-header">
+                    <h5>Difference Regions (@_differenceRegions.Count found)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        @foreach (var (region, index) in _differenceRegions.Select((r, i) => (r, i + 1)))
+                        {
+                            <div class="list-group-item @(_highlightedRegionIndex == index ? "region-item--highlighted" : "")"
+                                 @onclick="@(() => HighlightRegion(index))">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">Region @index</h6>
+                                        <p class="mb-1 small">
+                                            Position: (@region.X, @region.Y) | Size: @region.Width × @region.Height px
+                                        </p>
+                                        <p class="mb-0 small text-muted">
+                                            Pixels different: @region.PixelCount.ToString("N0")
+                                        </p>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-zoom-in"></i> Zoom
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Comparison History -->
+        @if (_comparisonHistory.Count > 0)
+        {
+            <div class="comparison-history card">
+                <div class="card-header">
+                    <h5>Comparison History</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        @foreach (var comparison in _comparisonHistory.Take(10))
+                        {
+                            <div class="list-group-item @(comparison.Id == _currentComparison.Id ? "active" : "")"
+                                 @onclick="@(() => LoadComparisonAsync(comparison.Id))">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">
+                                            @comparison.ComparedAt.ToString("g")
+                                            <span class="badge @(comparison.Passed ? "bg-success" : "bg-danger") ms-2">
+                                                @(comparison.Passed ? "PASSED" : "FAILED")
+                                            </span>
+                                        </h6>
+                                        <p class="mb-0 small">
+                                            Difference: @comparison.DifferencePercentage.ToString("P2")
+                                            @if (comparison.SsimScore.HasValue)
+                                            {
+                                                <span class="text-muted ms-2">| SSIM: @comparison.SsimScore.Value.ToString("F4")</span>
+                                            }
+                                        </p>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-eye"></i> View
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    @if (_comparisonHistory.Count > 10)
+                    {
+                        <div class="text-center mt-3">
+                            <button class="btn btn-outline-primary">
+                                View All (@_comparisonHistory.Count total)
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<!-- Dialog Components -->
+<BaselineApprovalDialog @ref="_approvalDialog"
+                       ComparisonResult="@_currentComparison"
+                       OnApprove="HandleBaselineApproved"
+                       OnCancel="@(() => {})" />
+
+<ToleranceAdjustmentDialog @ref="_toleranceDialog"
+                          ComparisonResult="@_currentComparison"
+                          OnApply="HandleToleranceAdjusted"
+                          OnCancel="@(() => {})" />
+
+<style>
+    .visual-regression-viewer {
+        padding: 2rem;
+    }
+
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+    }
+
+    .viewer-header h2 {
+        margin-bottom: 0.5rem;
+    }
+
+    .comparison-tabs .nav-link {
+        cursor: pointer;
+        color: #495057;
+    }
+
+    .comparison-tabs .nav-link.active {
+        font-weight: 600;
+    }
+
+    .image-container {
+        min-height: 400px;
+        background: #f8f9fa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.25rem;
+        overflow: auto;
+    }
+
+    .comparison-image {
+        max-width: 100%;
+        height: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .metrics-dashboard .metric-card {
+        border: 1px solid #dee2e6;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }
+
+    .metrics-dashboard .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+    }
+
+    .metric-card .card-title {
+        font-size: 2rem;
+        font-weight: bold;
+        margin: 0.5rem 0;
+    }
+
+    .action-buttons {
+        display: flex;
+        justify-content: center;
+    }
+
+    .region-item--highlighted {
+        background-color: #e7f3ff;
+        border-left: 4px solid #0d6efd;
+    }
+
+    .list-group-item {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .list-group-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    .comparison-history .list-group-item.active {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    .comparison-history .list-group-item.active * {
+        color: white !important;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public Guid TaskId { get; set; }
+
+    [Parameter]
+    public string CheckpointName { get; set; } = string.Empty;
+
+    [Parameter]
+    public Guid? ComparisonId { get; set; }
+
+    private VisualComparisonResult? _currentComparison;
+    private List<VisualComparisonResult> _comparisonHistory = new();
+    private VisualBaseline? _currentBaseline;
+    private string _selectedTab = "baseline";
+    private bool _showDifferenceRegions = false;
+    private bool _isLoading = true;
+    private bool _isProcessing = false;
+    private string? _errorMessage;
+    private List<DifferenceRegion> _differenceRegions = new();
+    private int? _highlightedRegionIndex;
+
+    private BaselineApprovalDialog? _approvalDialog;
+    private ToleranceAdjustmentDialog? _toleranceDialog;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            // Load comparison history
+            _comparisonHistory = await TaskRepository.GetComparisonHistoryAsync(
+                TaskId,
+                CheckpointName,
+                limit: 50);
+
+            if (_comparisonHistory.Count == 0)
+            {
+                _errorMessage = $"No comparison history found for checkpoint '{CheckpointName}'";
+                return;
+            }
+
+            // Load specific comparison or use most recent
+            if (ComparisonId.HasValue)
+            {
+                _currentComparison = _comparisonHistory.FirstOrDefault(c => c.Id == ComparisonId.Value);
+                if (_currentComparison == null)
+                {
+                    _currentComparison = _comparisonHistory[0]; // Fallback to latest
+                }
+            }
+            else
+            {
+                _currentComparison = _comparisonHistory[0]; // Latest
+            }
+
+            // Parse difference regions
+            if (!string.IsNullOrEmpty(_currentComparison?.Regions))
+            {
+                try
+                {
+                    _differenceRegions = JsonSerializer.Deserialize<List<DifferenceRegion>>(_currentComparison.Regions) ?? new();
+                }
+                catch (JsonException ex)
+                {
+                    Logger.LogWarning(ex, "Failed to parse difference regions");
+                    _differenceRegions = new();
+                }
+            }
+
+            Logger.LogInformation(
+                "Loaded comparison {ComparisonId} for checkpoint '{CheckpointName}' (Passed: {Passed})",
+                _currentComparison?.Id,
+                CheckpointName,
+                _currentComparison?.Passed);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load comparison data");
+            _errorMessage = $"Failed to load comparison data: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadComparisonAsync(Guid comparisonId)
+    {
+        _currentComparison = _comparisonHistory.FirstOrDefault(c => c.Id == comparisonId);
+        
+        if (_currentComparison != null)
+        {
+            // Parse difference regions for this comparison
+            if (!string.IsNullOrEmpty(_currentComparison.Regions))
+            {
+                try
+                {
+                    _differenceRegions = JsonSerializer.Deserialize<List<DifferenceRegion>>(_currentComparison.Regions) ?? new();
+                }
+                catch
+                {
+                    _differenceRegions = new();
+                }
+            }
+            else
+            {
+                _differenceRegions = new();
+            }
+
+            _highlightedRegionIndex = null;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowApprovalDialog()
+    {
+        _approvalDialog?.Show();
+    }
+
+    private void ShowToleranceDialog()
+    {
+        _toleranceDialog?.Show();
+    }
+
+    private async Task HandleBaselineApproved(BaselineApprovalDialog.ApprovalResult result)
+    {
+        Logger.LogInformation(
+            "Baseline approved for comparison {ComparisonId}: {Reason}",
+            result.ComparisonId,
+            result.Reason);
+
+        // TODO: Call API endpoint to approve baseline (Phase 5)
+        // await VisualService.ApproveBaselineAsync(result.ComparisonId, result.Reason);
+
+        // Reload data to reflect changes
+        await LoadDataAsync();
+    }
+
+    private async Task HandleToleranceAdjusted(ToleranceAdjustmentDialog.ToleranceAdjustment adjustment)
+    {
+        Logger.LogInformation(
+            "Tolerance adjusted for checkpoint {CheckpointName} from {OldTolerance:P2} to {NewTolerance:P2} (ApplyToAll: {ApplyToAll})",
+            adjustment.CheckpointName,
+            adjustment.OldTolerance,
+            adjustment.NewTolerance,
+            adjustment.ApplyToAll);
+
+        // TODO: Call API endpoint to update tolerance (Phase 5)
+        // await VisualService.UpdateToleranceAsync(TaskId, adjustment.CheckpointName, adjustment.NewTolerance, adjustment.ApplyToAll);
+
+        // Reload data to reflect changes
+        await LoadDataAsync();
+    }
+
+    private void ToggleDifferenceRegions()
+    {
+        _showDifferenceRegions = !_showDifferenceRegions;
+    }
+
+    private void DownloadImages()
+    {
+        // TODO: Implement image download functionality
+        Logger.LogInformation("Image download requested");
+    }
+
+    private void HighlightRegion(int regionIndex)
+    {
+        _highlightedRegionIndex = regionIndex;
+    }
+
+    private Task OnRegionSelected(int regionIndex)
+    {
+        _highlightedRegionIndex = regionIndex;
+        Logger.LogDebug("Region {Index} selected", regionIndex);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void HandleImageError(ErrorEventArgs args)
+    {
+        Logger.LogWarning("Failed to load image");
+    }
+
+    private string GetImageUrl(string? imagePath)
+    {
+        if (string.IsNullOrEmpty(imagePath))
+        {
+            return "/images/placeholder.png";
+        }
+
+        // TODO: In Phase 5, convert to URL via API endpoint
+        // For now, assume images are served from wwwroot/visual-regression
+        return $"/visual-regression/{imagePath.Replace("\\", "/")}";
+    }
+
+    private string GetStatusBadgeClass()
+    {
+        return _currentComparison?.Passed == true ? "bg-success" : "bg-danger";
+    }
+}

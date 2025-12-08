@@ -142,7 +142,9 @@ public sealed class LocalFileStorageService : IFileStorageService
         return $"{_baseUrl}/{sanitizedPath.Replace('\\', '/')}";
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Checks if an image exists in storage.
+    /// </summary>
     public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -150,6 +152,30 @@ public sealed class LocalFileStorageService : IFileStorageService
         var sanitizedPath = SanitizePath(path);
         var fullPath = Path.Combine(_basePath, sanitizedPath);
         return Task.FromResult(File.Exists(fullPath));
+    }
+
+    /// <summary>
+    /// Checks if a file exists in storage.
+    /// </summary>
+    public Task<bool> FileExistsAsync(string path, CancellationToken cancellationToken = default)
+    {
+        return ExistsAsync(path, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads a file from storage.
+    /// </summary>
+    public async Task<byte[]> ReadFileAsync(string path, CancellationToken cancellationToken = default)
+    {
+        var sanitizedPath = SanitizePath(path);
+        var fullPath = Path.Combine(_basePath, sanitizedPath);
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException($"File not found: {path}");
+        }
+
+        return await File.ReadAllBytesAsync(fullPath, cancellationToken);
     }
 
     /// <summary>
