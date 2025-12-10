@@ -394,7 +394,7 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
                     
                     return getAccessibilityTree(document.body);
                 }
-            ").WaitAsync(cancellationToken).ConfigureAwait(false);
+            ).WaitAsync(cancellationToken).ConfigureAwait(false);
 
             return accessibilityInfo is null
                 ? string.Empty
@@ -524,6 +524,117 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
         return screenshot;
     }
 
+    // ========== Mobile Device Emulation Methods ==========
+
+    /// <inheritdoc />
+    public DeviceProfile? CurrentDevice { get; private set; }
+
+    /// <inheritdoc />
+    public async Task SetDeviceEmulationAsync(DeviceProfile device, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(device);
+
+        var context = EnsureContext();
+        var page = EnsurePage();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _logger.LogInformation("Setting device emulation: {DeviceName}", device.Name);
+
+        try
+        {
+            device.Validate();
+
+            await page.SetViewportSizeAsync(device.Viewport.Width, device.Viewport.Height)
+                .WaitAsync(cancellationToken).ConfigureAwait(false);
+
+            if (device.Geolocation != null)
+            {
+                await SetGeolocationAsync(device.Geolocation.Latitude, device.Geolocation.Longitude,
+                    device.Geolocation.Accuracy, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (device.Permissions != null && device.Permissions.Count > 0)
+            {
+                await GrantPermissionsAsync(device.Permissions.ToArray(), cancellationToken).ConfigureAwait(false);
+            }
+
+            CurrentDevice = device;
+            _logger.LogInformation("Device emulation set: {DeviceName}", device.Name);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to set device emulation: {DeviceName}", device.Name);
+            throw new InvalidOperationException($"Failed to set device emulation for '{device.Name}'.", ex);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task SetGeolocationAsync(double latitude, double longitude, double? accuracy = null, 
+        CancellationToken cancellationToken = default)
+    {
+        if (latitude < -90 || latitude > 90)
+            throw new ArgumentOutOfRangeException(nameof(latitude), latitude, "Latitude must be between -90 and 90.");
+        if (longitude < -180 || longitude > 180)
+            throw new ArgumentOutOfRangeException(nameof(longitude), longitude, "Longitude must be between -180 and 180.");
+        if (accuracy.HasValue && accuracy.Value < 0)
+            throw new ArgumentOutOfRangeException(nameof(accuracy), accuracy.Value, "Accuracy must be non-negative.");
+
+        var context = EnsureContext();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await context.SetGeolocationAsync(new Microsoft.Playwright.Geolocation
+        {
+            Latitude = (float)latitude,
+            Longitude = (float)longitude,
+            Accuracy = accuracy.HasValue ? (float)accuracy.Value : 0
+        }).WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public Task SetTimezoneAsync(string timezoneId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(timezoneId);
+        _logger.LogWarning("Timezone changes after context creation are not supported by Playwright. " +
+                          "Set timezone during initialization instead.");
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public async Task SetLocaleAsync(string locale, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(locale);
+        var context = EnsureContext();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await context.SetExtraHTTPHeadersAsync(new Dictionary<string, string>
+        {
+            ["Accept-Language"] = locale
+        }).WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task GrantPermissionsAsync(string[] permissions, CancellationToken cancellationToken = default)
+    {
+        if (permissions == null || permissions.Length == 0)
+            throw new ArgumentNullException(nameof(permissions), "Permissions cannot be null or empty.");
+
+        var context = EnsureContext();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await context.GrantPermissionsAsync(permissions)
+            .WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task ClearPermissionsAsync(CancellationToken cancellationToken = default)
+    {
+        var context = EnsureContext();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await context.ClearPermissionsAsync()
+            .WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
@@ -572,6 +683,16 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
         }
 
         return _page;
+    }
+
+    private Microsoft.Playwright.IBrowserContext EnsureContext()
+    {
+        if (_context is null)
+        {
+            throw new InvalidOperationException("The Playwright browser agent has not been initialized.");
+        }
+
+        return _context;
     }
 
     private async Task<Models.LoadState> GetCurrentLoadStateAsync(Microsoft.Playwright.IPage page, CancellationToken cancellationToken)

@@ -388,4 +388,196 @@ public interface IBrowserAgent : IAsyncDisposable
     /// </remarks>
     /// <exception cref="InvalidOperationException">Thrown if the browser agent is not initialized.</exception>
     Task<byte[]> TakeViewportScreenshotAsync(CancellationToken cancellationToken = default);
+
+    // ========== Mobile Device Emulation Methods ==========
+
+    /// <summary>
+    /// Configures the browser to emulate a specific mobile device.
+    /// </summary>
+    /// <param name="device">
+    /// The device profile to emulate, including viewport, user agent, device metrics, and capabilities.
+    /// Use <see cref="DevicePresets"/> for predefined device profiles.
+    /// </param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method applies comprehensive device emulation including:
+    /// - Viewport dimensions and device pixel ratio
+    /// - User agent string
+    /// - Touch event support
+    /// - Mobile/desktop mode
+    /// - Geolocation (if specified in the device profile)
+    /// - Timezone (if specified in the device profile)
+    /// - Locale (if specified in the device profile)
+    /// - Permissions (if specified in the device profile)
+    /// </para>
+    /// <para>
+    /// This method should be called before navigating to a URL to ensure proper device emulation.
+    /// Some settings (like viewport) can be changed after navigation, but for best results,
+    /// set device emulation first.
+    /// </para>
+    /// <para>
+    /// Example usage:
+    /// <code>
+    /// var iPhone = DevicePresets.iPhone14Pro;
+    /// await browserAgent.SetDeviceEmulationAsync(iPhone);
+    /// await browserAgent.NavigateAsync("https://example.com");
+    /// </code>
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="device"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if the browser agent is not initialized or if device emulation cannot be applied.
+    /// </exception>
+    Task SetDeviceEmulationAsync(DeviceProfile device, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets the geolocation coordinates for the browser context.
+    /// </summary>
+    /// <param name="latitude">Latitude in decimal degrees (-90 to 90).</param>
+    /// <param name="longitude">Longitude in decimal degrees (-180 to 180).</param>
+    /// <param name="accuracy">Optional accuracy in meters. If null, uses high accuracy (default: 0).</param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method sets the geolocation that will be returned by the browser's Geolocation API.
+    /// After calling this method, JavaScript code using navigator.geolocation will receive these coordinates.
+    /// </para>
+    /// <para>
+    /// Geolocation must be granted via <see cref="GrantPermissionsAsync"/> before it can be used by web pages.
+    /// </para>
+    /// <para>
+    /// Common test locations are available as static properties in <see cref="GeolocationCoordinates"/>:
+    /// - GeolocationCoordinates.SanFrancisco
+    /// - GeolocationCoordinates.NewYork
+    /// - GeolocationCoordinates.London
+    /// - etc.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown if latitude is not between -90 and 90, or longitude is not between -180 and 180,
+    /// or accuracy is negative.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">Thrown if the browser agent is not initialized.</exception>
+    Task SetGeolocationAsync(double latitude, double longitude, double? accuracy = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets the timezone for the browser context.
+    /// </summary>
+    /// <param name="timezoneId">
+    /// The timezone ID (e.g., "America/New_York", "Europe/London", "Asia/Tokyo").
+    /// Must be a valid IANA timezone identifier.
+    /// </param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method changes the timezone that JavaScript Date functions will use.
+    /// Useful for testing time-sensitive features or multi-timezone applications.
+    /// </para>
+    /// <para>
+    /// The timezone affects:
+    /// - new Date().toString()
+    /// - Date.prototype.toLocaleString()
+    /// - Intl.DateTimeFormat
+    /// </para>
+    /// <para>
+    /// This setting persists for the entire browser context until changed.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="timezoneId"/> is null or empty.</exception>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="timezoneId"/> is not a valid timezone ID.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the browser agent is not initialized.</exception>
+    Task SetTimezoneAsync(string timezoneId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets the locale for the browser context.
+    /// </summary>
+    /// <param name="locale">
+    /// The locale string (e.g., "en-US", "fr-FR", "ja-JP").
+    /// Must be a valid BCP 47 language tag.
+    /// </param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method sets the language and regional preferences for the browser.
+    /// Affects the Accept-Language header and navigator.language values.
+    /// </para>
+    /// <para>
+    /// The locale affects:
+    /// - HTTP Accept-Language header
+    /// - navigator.language
+    /// - navigator.languages
+    /// - Intl API formatting
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="locale"/> is null or empty.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the browser agent is not initialized.</exception>
+    Task SetLocaleAsync(string locale, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Grants specified permissions to the browser context.
+    /// </summary>
+    /// <param name="permissions">
+    /// Array of permission names to grant (e.g., "geolocation", "notifications", "camera", "microphone").
+    /// See Playwright documentation for full list of supported permissions.
+    /// </param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method grants permissions that would normally require user interaction.
+    /// Useful for automated testing of features that require permissions.
+    /// </para>
+    /// <para>
+    /// Common permissions:
+    /// - "geolocation" - Required for Geolocation API
+    /// - "notifications" - Required for Web Notifications API
+    /// - "camera" - Required for getUserMedia() camera access
+    /// - "microphone" - Required for getUserMedia() microphone access
+    /// - "midi" - Required for Web MIDI API
+    /// - "midi-sysex" - Required for Web MIDI API with sysex
+    /// - "clipboard-read" - Required for reading clipboard
+    /// - "clipboard-write" - Required for writing clipboard
+    /// </para>
+    /// <para>
+    /// Permissions are granted for the entire browser context and persist until changed.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="permissions"/> is null or empty.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if the browser agent is not initialized.</exception>
+    Task GrantPermissionsAsync(string[] permissions, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears all granted permissions for the browser context.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method revokes all previously granted permissions.
+    /// After calling this method, permission prompts will appear again (in non-headless mode)
+    /// or permission-dependent features will fail gracefully.
+    /// </para>
+    /// <para>
+    /// Useful for testing permission denial scenarios or resetting state between tests.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">Thrown if the browser agent is not initialized.</exception>
+    Task ClearPermissionsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the current device profile being emulated, if any.
+    /// </summary>
+    /// <returns>
+    /// The currently active device profile, or null if no device emulation is active.
+    /// </returns>
+    /// <remarks>
+    /// This property allows checking what device configuration is currently active.
+    /// Returns null if the browser is running in desktop mode without emulation.
+    /// </remarks>
+    DeviceProfile? CurrentDevice { get; }
 }
