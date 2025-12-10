@@ -197,6 +197,68 @@ public static class BrowserToolRegistry
                     ["ignore_selectors"] = new ParameterDef("array", false, "Array of CSS selectors for elements to ignore during comparison (e.g., timestamps, ads)", null),
                     ["create_baseline_if_missing"] = new ParameterDef("boolean", false, "Auto-create baseline if it doesn't exist (useful for first run)", false)
                 }
+            ),
+
+            // ========== Mobile Device Emulation Tools ==========
+
+            ["set_device_emulation"] = new BrowserToolDefinition(
+                Name: "set_device_emulation",
+                Description: "Emulate a specific mobile device including viewport, user agent, touch support, and device metrics. Use this before navigating to test mobile responsive designs. Supports predefined devices (iPhone14Pro, GalaxyS23, iPadPro11, etc.) or custom configurations.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["device_name"] = new ParameterDef("string", false, "Name of predefined device to emulate (e.g., 'iPhone14Pro', 'GalaxyS23', 'iPadPro11', 'Pixel7'). See DevicePresets for full list.", null),
+                    ["viewport_width"] = new ParameterDef("int", false, "Custom viewport width in pixels (required if device_name not specified)", null),
+                    ["viewport_height"] = new ParameterDef("int", false, "Custom viewport height in pixels (required if device_name not specified)", null),
+                    ["user_agent"] = new ParameterDef("string", false, "Custom user agent string (uses device default if not specified)", null),
+                    ["device_scale_factor"] = new ParameterDef("string", false, "Device pixel ratio (e.g., '2.0' for Retina, '3.0' for high-DPI)", "1.0"),
+                    ["has_touch"] = new ParameterDef("boolean", false, "Enable touch event support", true),
+                    ["is_mobile"] = new ParameterDef("boolean", false, "Indicate mobile mode (affects meta viewport and touch)", true)
+                }
+            ),
+
+            ["set_geolocation"] = new BrowserToolDefinition(
+                Name: "set_geolocation",
+                Description: "Set the browser's geolocation to specific GPS coordinates. Useful for testing location-based features. Requires 'geolocation' permission to be granted. Supports preset locations (SanFrancisco, NewYork, London, Tokyo, Sydney, Paris) or custom coordinates.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["preset"] = new ParameterDef("string", false, "Use preset location: 'SanFrancisco', 'NewYork', 'London', 'Tokyo', 'Sydney', or 'Paris'", null),
+                    ["latitude"] = new ParameterDef("string", false, "Latitude in decimal degrees (-90 to 90). Required if preset not specified.", null),
+                    ["longitude"] = new ParameterDef("string", false, "Longitude in decimal degrees (-180 to 180). Required if preset not specified.", null),
+                    ["accuracy"] = new ParameterDef("string", false, "Optional accuracy in meters (e.g., '10.0' for 10 meter accuracy)", null)
+                }
+            ),
+
+            ["set_timezone"] = new BrowserToolDefinition(
+                Name: "set_timezone",
+                Description: "Set the browser's timezone for testing time-sensitive features. Note: Due to Playwright limitations, timezone should ideally be set before browser initialization. This tool logs a warning but can be useful for documentation purposes.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["timezone_id"] = new ParameterDef("string", true, "IANA timezone identifier (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo')", null)
+                }
+            ),
+
+            ["set_locale"] = new BrowserToolDefinition(
+                Name: "set_locale",
+                Description: "Set the browser's language and regional preferences. Affects the Accept-Language header and how web content is displayed. Useful for testing internationalization (i18n) and localization (l10n).",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["locale"] = new ParameterDef("string", true, "BCP 47 language tag (e.g., 'en-US', 'fr-FR', 'ja-JP', 'es-ES', 'de-DE')", null)
+                }
+            ),
+
+            ["grant_permissions"] = new BrowserToolDefinition(
+                Name: "grant_permissions",
+                Description: "Grant browser permissions that would normally require user interaction. Essential for testing features like geolocation, notifications, camera, microphone access, etc. Permissions persist for the browser session.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["permissions"] = new ParameterDef("array", true, "Array of permission names to grant. Common values: 'geolocation', 'notifications', 'camera', 'microphone', 'clipboard-read', 'clipboard-write'", null)
+                }
+            ),
+
+            ["clear_permissions"] = new BrowserToolDefinition(
+                Name: "clear_permissions",
+                Description: "Revoke all previously granted browser permissions. Use this to test permission denial scenarios or reset permission state between tests.",
+                Parameters: new Dictionary<string, ParameterDef>()
             )
         };
     }

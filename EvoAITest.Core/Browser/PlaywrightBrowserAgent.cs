@@ -394,7 +394,7 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
                     
                     return getAccessibilityTree(document.body);
                 }
-            ).WaitAsync(cancellationToken).ConfigureAwait(false);
+            ").WaitAsync(cancellationToken).ConfigureAwait(false);
 
             return accessibilityInfo is null
                 ? string.Empty
@@ -710,11 +710,11 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
         }
         catch (TimeoutException)
         {
-            // Ignored – fall back to document.readyState.
+            // Ignored ΓÇô fall back to document.readyState.
         }
         catch (Microsoft.Playwright.PlaywrightException)
         {
-            // Ignored – fall back to document.readyState.
+            // Ignored ΓÇô fall back to document.readyState.
         }
 
         var readyState = await page.EvaluateAsync<string>("document.readyState")

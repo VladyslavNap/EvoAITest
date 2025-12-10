@@ -632,6 +632,30 @@ public sealed class ApiIntegrationTests
             return Task.FromResult(pngHeader);
         }
 
+        // Mobile Device Emulation Methods
+        public DeviceProfile? CurrentDevice { get; private set; }
+
+        public Task SetDeviceEmulationAsync(DeviceProfile device, CancellationToken cancellationToken = default)
+        {
+            CurrentDevice = device;
+            return Task.CompletedTask;
+        }
+
+        public Task SetGeolocationAsync(double latitude, double longitude, double? accuracy = null, CancellationToken cancellationToken = default) 
+            => Task.CompletedTask;
+
+        public Task SetTimezoneAsync(string timezoneId, CancellationToken cancellationToken = default) 
+            => Task.CompletedTask;
+
+        public Task SetLocaleAsync(string locale, CancellationToken cancellationToken = default) 
+            => Task.CompletedTask;
+
+        public Task GrantPermissionsAsync(string[] permissions, CancellationToken cancellationToken = default) 
+            => Task.CompletedTask;
+
+        public Task ClearPermissionsAsync(CancellationToken cancellationToken = default) 
+            => Task.CompletedTask;
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
