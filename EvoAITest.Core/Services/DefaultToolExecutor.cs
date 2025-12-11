@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text.Json;
 using EvoAITest.Core.Abstractions;
+using EvoAITest.Core.Browser;
 using EvoAITest.Core.Models;
 using EvoAITest.Core.Options;
 using Microsoft.Extensions.Logging;
@@ -607,6 +608,15 @@ public sealed class DefaultToolExecutor : IToolExecutor
                 "get_page_html" => await ExecuteGetPageHtmlAsync(toolCall, cancellationToken).ConfigureAwait(false),
                 "clear_input" => await ExecuteClearInputAsync(toolCall, cancellationToken).ConfigureAwait(false),
                 "visual_check" => await ExecuteVisualCheckAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                
+                // Mobile Device Emulation Tools
+                "set_device_emulation" => await ExecuteSetDeviceEmulationAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "set_geolocation" => await ExecuteSetGeolocationAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "set_timezone" => await ExecuteSetTimezoneAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "set_locale" => await ExecuteSetLocaleAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "grant_permissions" => await ExecuteGrantPermissionsAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "clear_permissions" => await ExecuteClearPermissionsAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                
                 "extract_table" => throw new NotImplementedException($"Tool '{toolCall.ToolName}' is not yet implemented"),
                 "wait_for_url_change" => throw new NotImplementedException($"Tool '{toolCall.ToolName}' is not yet implemented"),
                 "select_option" => throw new NotImplementedException($"Tool '{toolCall.ToolName}' is not yet implemented"),
@@ -886,6 +896,202 @@ public sealed class DefaultToolExecutor : IToolExecutor
         }
 
         return resultData;
+    }
+
+    // Mobile Device Emulation Tool Implementations
+
+    private async Task<object?> ExecuteSetDeviceEmulationAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        var deviceName = GetOptionalParameter<string?>(toolCall, "device_name", null);
+
+        DeviceProfile device;
+        
+        if (!string.IsNullOrWhiteSpace(deviceName))
+        {
+            // Use predefined device from DevicePresets
+            device = DevicePresets.GetDevice(deviceName);
+            if (device == null)
+            {
+                var availableDevices = string.Join(", ", DevicePresets.GetAllDevices().Keys);
+                throw new ArgumentException(
+                    $"Unknown device '{deviceName}'. Available devices: {availableDevices}");
+            }
+        }
+        else
+        {
+            // Build custom device profile from parameters
+            var viewportWidth = GetOptionalParameter<int?>(toolCall, "viewport_width", null);
+            var viewportHeight = GetOptionalParameter<int?>(toolCall, "viewport_height", null);
+            
+            if (!viewportWidth.HasValue || !viewportHeight.HasValue)
+            {
+                throw new ArgumentException("Either 'device_name' or both 'viewport_width' and 'viewport_height' must be specified");
+            }
+
+            var userAgent = GetOptionalParameter<string?>(toolCall, "user_agent", null) 
+                ?? "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36";
+            var deviceScaleFactorStr = GetOptionalParameter<string?>(toolCall, "device_scale_factor", "1.0");
+            double deviceScaleFactor;
+            if (!double.TryParse(deviceScaleFactorStr, out deviceScaleFactor))
+            {
+                deviceScaleFactor = 1.0;
+            }
+            var hasTouch = GetOptionalParameter(toolCall, "has_touch", true);
+            var isMobile = GetOptionalParameter(toolCall, "is_mobile", true);
+
+            device = new DeviceProfile
+            {
+                Name = "Custom Device",
+                UserAgent = userAgent,
+                Viewport = new ViewportSize(viewportWidth.Value, viewportHeight.Value),
+                DeviceScaleFactor = deviceScaleFactor,
+                HasTouch = hasTouch,
+                IsMobile = isMobile
+            };
+        }
+
+        await _browserAgent.SetDeviceEmulationAsync(device, cancellationToken).ConfigureAwait(false);
+        
+        return new Dictionary<string, object>
+        {
+            ["device_name"] = device.Name,
+            ["viewport"] = $"{device.Viewport.Width}x{device.Viewport.Height}",
+            ["device_scale_factor"] = device.DeviceScaleFactor,
+            ["platform"] = device.Platform ?? "unknown"
+        };
+    }
+
+    private async Task<object?> ExecuteSetGeolocationAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        var preset = GetOptionalParameter<string?>(toolCall, "preset", null);
+
+        double latitude, longitude;
+        double? accuracy = null;
+
+        if (!string.IsNullOrWhiteSpace(preset))
+        {
+            // Use preset location
+            var coordinates = preset.ToLowerInvariant() switch
+            {
+                "sanfrancisco" or "san francisco" or "sf" => GeolocationCoordinates.SanFrancisco,
+                "newyork" or "new york" or "nyc" => GeolocationCoordinates.NewYork,
+                "london" => GeolocationCoordinates.London,
+                "tokyo" => GeolocationCoordinates.Tokyo,
+                "sydney" => GeolocationCoordinates.Sydney,
+                "paris" => GeolocationCoordinates.Paris,
+                _ => throw new ArgumentException(
+                    $"Unknown preset location '{preset}'. Available presets: SanFrancisco, NewYork, London, Tokyo, Sydney, Paris")
+            };
+
+            latitude = coordinates.Latitude;
+            longitude = coordinates.Longitude;
+            accuracy = coordinates.Accuracy;
+        }
+        else
+        {
+            // Use custom coordinates
+            var latitudeStr = GetOptionalParameter<string?>(toolCall, "latitude", null);
+            var longitudeStr = GetOptionalParameter<string?>(toolCall, "longitude", null);
+            
+            if (string.IsNullOrWhiteSpace(latitudeStr) || string.IsNullOrWhiteSpace(longitudeStr))
+            {
+                throw new ArgumentException("Either 'preset' or both 'latitude' and 'longitude' must be specified");
+            }
+
+            if (!double.TryParse(latitudeStr, out latitude))
+            {
+                throw new ArgumentException($"Invalid latitude value: '{latitudeStr}'");
+            }
+
+            if (!double.TryParse(longitudeStr, out longitude))
+            {
+                throw new ArgumentException($"Invalid longitude value: '{longitudeStr}'");
+            }
+
+            var accuracyStr = GetOptionalParameter<string?>(toolCall, "accuracy", null);
+            if (!string.IsNullOrWhiteSpace(accuracyStr) && double.TryParse(accuracyStr, out var parsedAccuracy))
+            {
+                accuracy = parsedAccuracy;
+            }
+        }
+
+        await _browserAgent.SetGeolocationAsync(latitude, longitude, accuracy, cancellationToken).ConfigureAwait(false);
+        
+        return new Dictionary<string, object>
+        {
+            ["latitude"] = latitude,
+            ["longitude"] = longitude,
+            ["accuracy"] = accuracy ?? 0
+        };
+    }
+
+    private async Task<object?> ExecuteSetTimezoneAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        var timezoneId = GetRequiredParameter<string>(toolCall, "timezone_id");
+        await _browserAgent.SetTimezoneAsync(timezoneId, cancellationToken).ConfigureAwait(false);
+        
+        return new Dictionary<string, object>
+        {
+            ["timezone_id"] = timezoneId,
+            ["warning"] = "Timezone changes after context creation have limited support in Playwright"
+        };
+    }
+
+    private async Task<object?> ExecuteSetLocaleAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        var locale = GetRequiredParameter<string>(toolCall, "locale");
+        await _browserAgent.SetLocaleAsync(locale, cancellationToken).ConfigureAwait(false);
+        
+        return new Dictionary<string, object>
+        {
+            ["locale"] = locale
+        };
+    }
+
+    private async Task<object?> ExecuteGrantPermissionsAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        var permissionsParam = GetRequiredParameter<object>(toolCall, "permissions");
+        
+        string[] permissions;
+        if (permissionsParam is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Array)
+        {
+            permissions = jsonElement.EnumerateArray()
+                .Where(e => e.ValueKind == JsonValueKind.String)
+                .Select(e => e.GetString()!)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .ToArray();
+        }
+        else if (permissionsParam is string[] stringArray)
+        {
+            permissions = stringArray;
+        }
+        else
+        {
+            throw new ArgumentException("Parameter 'permissions' must be an array of strings");
+        }
+
+        if (permissions.Length == 0)
+        {
+            throw new ArgumentException("At least one permission must be specified");
+        }
+
+        await _browserAgent.GrantPermissionsAsync(permissions, cancellationToken).ConfigureAwait(false);
+        
+        return new Dictionary<string, object>
+        {
+            ["granted_permissions"] = permissions,
+            ["count"] = permissions.Length
+        };
+    }
+
+    private async Task<object?> ExecuteClearPermissionsAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        await _browserAgent.ClearPermissionsAsync(cancellationToken).ConfigureAwait(false);
+        
+        return new Dictionary<string, object>
+        {
+            ["message"] = "All permissions cleared successfully"
+        };
     }
 
     #endregion
