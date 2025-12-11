@@ -190,7 +190,7 @@ var all = DevicePresets.GetAllDevices();
 |--------|-------|
 | **Files Created** | 5 |
 | **Total Lines of Code** | 920 |
-| **Device Presets** | 19 (7 iOS, 6 Android, 2 generic, 4 desktop) |
+| **Device Presets** | 18 (7 iOS, 6 Android, 2 generic, 3 desktop) |
 | **Helper Methods** | 20+ |
 | **Static Factories** | 15+ |
 | **Build Status** | ? Successful |
