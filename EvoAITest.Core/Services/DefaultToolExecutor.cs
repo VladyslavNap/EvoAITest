@@ -930,7 +930,12 @@ public sealed class DefaultToolExecutor : IToolExecutor
 
             var userAgent = GetOptionalParameter<string?>(toolCall, "user_agent", null) 
                 ?? "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36";
-            var deviceScaleFactor = GetOptionalParameter(toolCall, "device_scale_factor", 1.0);
+            var deviceScaleFactorStr = GetOptionalParameter<string?>(toolCall, "device_scale_factor", "1.0");
+            double deviceScaleFactor;
+            if (!double.TryParse(deviceScaleFactorStr, out deviceScaleFactor))
+            {
+                deviceScaleFactor = 1.0;
+            }
             var hasTouch = GetOptionalParameter(toolCall, "has_touch", true);
             var isMobile = GetOptionalParameter(toolCall, "is_mobile", true);
 
