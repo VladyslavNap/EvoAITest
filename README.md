@@ -302,7 +302,7 @@ See `EvoAITest.LLM/Prompts/README.md` for the full API reference, templates, and
 
 ## Browser Automation Tools
 
-EvoAITest provides 20 pre-defined browser automation tools (14 core + 6 mobile):
+EvoAITest provides 19 pre-defined browser automation tools (13 core + 6 mobile):
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
