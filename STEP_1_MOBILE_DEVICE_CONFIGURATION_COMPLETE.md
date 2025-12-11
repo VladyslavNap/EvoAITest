@@ -111,7 +111,7 @@ var withLocation = device.WithGeolocation(GeolocationCoordinates.Tokyo);
 **Location:** `EvoAITest.Core/Browser/DevicePresets.cs`
 
 **Features:**
-- **19 predefined device profiles:**
+- **18 predefined device profiles:**
   
 **iOS Devices (7):**
   - iPhone 14 Pro (393x852, 3x)
@@ -299,7 +299,7 @@ var customLocation = new GeolocationCoordinates
 };
 var pixelInLondon = pixel.WithGeolocation(customLocation);
 Console.WriteLine($"Location: {pixelInLondon.Geolocation}");
-// Output: Location: 51.500000, -0.100000 (±10m)
+// Output: Location: 51.500000, -0.100000 (Â±10m)
 ```
 
 ### Example 5: Finding Devices
