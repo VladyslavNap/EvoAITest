@@ -534,7 +534,6 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
     {
         ArgumentNullException.ThrowIfNull(device);
 
-        var context = EnsureContext();
         var page = EnsurePage();
         cancellationToken.ThrowIfCancellationRequested();
 
