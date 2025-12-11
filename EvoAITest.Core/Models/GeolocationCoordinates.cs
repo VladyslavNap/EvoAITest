@@ -49,39 +49,39 @@ public sealed record GeolocationCoordinates
     public override string ToString()
     {
         return Accuracy.HasValue
-            ? $"{Latitude:F6}, {Longitude:F6} (±{Accuracy:F0}m)"
+            ? $"{Latitude:F6}, {Longitude:F6} (\u00B1{Accuracy:F0}m)"
             : $"{Latitude:F6}, {Longitude:F6}";
     }
 
     // Common locations for testing
 
     /// <summary>
-    /// San Francisco, CA, USA (37.7749° N, 122.4194° W).
+    /// San Francisco, CA, USA (37.7749Â° N, 122.4194Â° W).
     /// </summary>
     public static GeolocationCoordinates SanFrancisco => new() { Latitude = 37.7749, Longitude = -122.4194 };
 
     /// <summary>
-    /// New York City, NY, USA (40.7128° N, 74.0060° W).
+    /// New York City, NY, USA (40.7128Â° N, 74.0060Â° W).
     /// </summary>
     public static GeolocationCoordinates NewYork => new() { Latitude = 40.7128, Longitude = -74.0060 };
 
     /// <summary>
-    /// London, UK (51.5074° N, 0.1278° W).
+    /// London, UK (51.5074Â° N, 0.1278Â° W).
     /// </summary>
     public static GeolocationCoordinates London => new() { Latitude = 51.5074, Longitude = -0.1278 };
 
     /// <summary>
-    /// Tokyo, Japan (35.6762° N, 139.6503° E).
+    /// Tokyo, Japan (35.6762Â° N, 139.6503Â° E).
     /// </summary>
     public static GeolocationCoordinates Tokyo => new() { Latitude = 35.6762, Longitude = 139.6503 };
 
     /// <summary>
-    /// Sydney, Australia (33.8688° S, 151.2093° E).
+    /// Sydney, Australia (33.8688Â° S, 151.2093Â° E).
     /// </summary>
     public static GeolocationCoordinates Sydney => new() { Latitude = -33.8688, Longitude = 151.2093 };
 
     /// <summary>
-    /// Paris, France (48.8566° N, 2.3522° E).
+    /// Paris, France (48.8566Â° N, 2.3522Â° E).
     /// </summary>
     public static GeolocationCoordinates Paris => new() { Latitude = 48.8566, Longitude = 2.3522 };
 }
