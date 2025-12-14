@@ -871,8 +871,8 @@ Visual Regression System Architecture:
             ↓               ↓               ↓
 ┌──────────────────┐ ┌─────────────┐ ┌────────────┐
 │ Comparison Engine│ │   Storage   │ │ Repository │
-│ Pixel + SSIM     │ │   Service   │ │   Layer    |
-│ Diff Generation  │ │  File I/O   │ │  Database  |
+│ Pixel + SSIM     │ │   Service   │ │   Layer    │
+│ Diff Generation  │ │  File I/O   │ │  Database  │
 └──────────────────┘ └─────────────┘ └────────────┘
             │
             ↓
