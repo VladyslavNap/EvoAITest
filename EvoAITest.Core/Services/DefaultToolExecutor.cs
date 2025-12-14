@@ -1129,15 +1129,15 @@ public sealed class DefaultToolExecutor : IToolExecutor
             headers = new Dictionary<string, string>();
             if (headersJson.ValueKind == JsonValueKind.Array)
             {
-                foreach (var item in headersJson.EnumerateArray())
-                {
-                    var headerStr = item.GetString();
-                    if (!string.IsNullOrEmpty(headerStr) && headerStr.Contains(':'))
-                    {
-                        var parts = headerStr.Split(':', 2);
-                        headers[parts[0].Trim()] = parts[1].Trim();
-                    }
-                }
+                headers = headersJson
+                    .EnumerateArray()
+                    .Select(item => item.GetString())
+                    .Where(headerStr => !string.IsNullOrEmpty(headerStr) && headerStr.Contains(':'))
+                    .Select(headerStr => headerStr.Split(':', 2))
+                    .ToDictionary(
+                        parts => parts[0].Trim(),
+                        parts => parts[1].Trim()
+                    );
             }
         }
 
