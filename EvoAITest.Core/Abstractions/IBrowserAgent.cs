@@ -580,4 +580,32 @@ public interface IBrowserAgent : IAsyncDisposable
     /// Returns null if the browser is running in desktop mode without emulation.
     /// </remarks>
     DeviceProfile? CurrentDevice { get; }
+
+    // ========== Network Interception Methods ==========
+
+    /// <summary>
+    /// Gets the network interceptor for managing request interception, blocking, and mocking.
+    /// </summary>
+    /// <returns>The network interceptor instance, or null if not initialized.</returns>
+    /// <remarks>
+    /// <para>
+    /// The network interceptor provides capabilities for:
+    /// - Intercepting and modifying HTTP requests
+    /// - Blocking specific requests (ads, trackers, images, etc.)
+    /// - Mocking API responses
+    /// - Logging network activity
+    /// </para>
+    /// <para>
+    /// Example usage:
+    /// <code>
+    /// var interceptor = browserAgent.GetNetworkInterceptor();
+    /// await interceptor.MockResponseAsync("**/api/config", new MockResponse
+    /// {
+    ///     Status = 200,
+    ///     Body = "{\"feature\": true}"
+    /// });
+    /// </code>
+    /// </para>
+    /// </remarks>
+    INetworkInterceptor? GetNetworkInterceptor();
 }

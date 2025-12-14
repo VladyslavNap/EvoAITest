@@ -111,16 +111,20 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
 }";
 
     private readonly ILogger<PlaywrightBrowserAgent> _logger;
+    private readonly ILoggerFactory _loggerFactory;
 
     private Microsoft.Playwright.IPlaywright? _playwright;
     private Microsoft.Playwright.IBrowser? _browser;
     private Microsoft.Playwright.IBrowserContext? _context;
     private Microsoft.Playwright.IPage? _page;
+    private INetworkInterceptor? _networkInterceptor;
+    private readonly object _networkInterceptorLock = new();
     private bool _disposed;
 
-    public PlaywrightBrowserAgent(ILogger<PlaywrightBrowserAgent> logger)
+    public PlaywrightBrowserAgent(ILogger<PlaywrightBrowserAgent> logger, ILoggerFactory loggerFactory)
     {
         _logger = logger;
+        _loggerFactory = loggerFactory;
     }
 
     /// <inheritdoc />
@@ -634,6 +638,28 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
             .WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // ========== Network Interception ==========
+
+    /// <inheritdoc />
+    public INetworkInterceptor? GetNetworkInterceptor()
+    {
+        if (_networkInterceptor == null && _page != null)
+        {
+            lock (_networkInterceptorLock)
+            {
+                // Double-check pattern for thread safety
+                if (_networkInterceptor == null && _page != null)
+                {
+                    // Lazy initialization of network interceptor
+                    var interceptorLogger = _loggerFactory.CreateLogger<PlaywrightNetworkInterceptor>();
+                    _networkInterceptor = new PlaywrightNetworkInterceptor(_page, interceptorLogger);
+                }
+            }
+        }
+        
+        return _networkInterceptor;
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
@@ -645,6 +671,12 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
         _disposed = true;
 
         var disposeTasks = new List<Task>();
+
+        // Dispose network interceptor first
+        if (_networkInterceptor is not null)
+        {
+            disposeTasks.Add(CloseResourceAsync(() => _networkInterceptor.DisposeAsync().AsTask(), "network interceptor"));
+        }
 
         if (_page is not null)
         {

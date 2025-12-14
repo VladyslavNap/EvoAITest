@@ -656,6 +656,9 @@ public sealed class ApiIntegrationTests
         public Task ClearPermissionsAsync(CancellationToken cancellationToken = default) 
             => Task.CompletedTask;
 
+        public INetworkInterceptor? GetNetworkInterceptor() 
+            => null; // No network interceptor in mock
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

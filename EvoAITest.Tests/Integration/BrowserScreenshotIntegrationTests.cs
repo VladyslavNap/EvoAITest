@@ -17,13 +17,15 @@ public sealed class BrowserScreenshotIntegrationTests : IAsyncDisposable
 {
     private PlaywrightBrowserAgent? _browserAgent;
     private Mock<ILogger<PlaywrightBrowserAgent>>? _mockLogger;
+    private Mock<ILoggerFactory>? _mockLoggerFactory;
     private bool _disposed;
 
     [TestInitialize]
     public async Task Setup()
     {
         _mockLogger = new Mock<ILogger<PlaywrightBrowserAgent>>();
-        _browserAgent = new PlaywrightBrowserAgent(_mockLogger.Object);
+        _mockLoggerFactory = new Mock<ILoggerFactory>();
+        _browserAgent = new PlaywrightBrowserAgent(_mockLogger.Object, _mockLoggerFactory.Object);
         
         await _browserAgent.InitializeAsync(CancellationToken.None);
     }

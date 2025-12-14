@@ -34,6 +34,7 @@ public class ToolExecutorIntegrationTests : IAsyncLifetime
     private readonly ITestOutputHelper _output;
     private readonly ILogger<PlaywrightBrowserAgent> _browserLogger;
     private readonly ILogger<DefaultToolExecutor> _executorLogger;
+    private readonly ILoggerFactory _loggerFactory;
     private PlaywrightBrowserAgent? _browserAgent;
     private DefaultToolExecutor? _executor;
     private readonly ToolExecutorOptions _options;
@@ -45,6 +46,7 @@ public class ToolExecutorIntegrationTests : IAsyncLifetime
         // Create loggers that output to xUnit test output
         _browserLogger = new XUnitLogger<PlaywrightBrowserAgent>(output);
         _executorLogger = new XUnitLogger<DefaultToolExecutor>(output);
+        _loggerFactory = new XUnitLoggerFactory(output);
         
         // Configure executor options for integration tests
         _options = new ToolExecutorOptions
@@ -63,7 +65,7 @@ public class ToolExecutorIntegrationTests : IAsyncLifetime
     {
         _output.WriteLine("Initializing Playwright browser agent...");
         
-        _browserAgent = new PlaywrightBrowserAgent(_browserLogger);
+        _browserAgent = new PlaywrightBrowserAgent(_browserLogger, _loggerFactory);
         await _browserAgent.InitializeAsync();
         
         // Create a simple in-memory tool registry for tests
@@ -599,6 +601,59 @@ internal class XUnitLogger<T> : ILogger<T>
         var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
         
         _output.WriteLine($"[{timestamp}] [{logLevel}] {typeof(T).Name}: {message}");
+        
+        if (exception != null)
+        {
+            _output.WriteLine($"  Exception: {exception.GetType().Name}: {exception.Message}");
+        }
+    }
+}
+
+internal class XUnitLoggerFactory : ILoggerFactory
+{
+    private readonly ITestOutputHelper _output;
+
+    public XUnitLoggerFactory(ITestOutputHelper output)
+    {
+        _output = output;
+    }
+
+    public void AddProvider(ILoggerProvider provider) { }
+
+    public ILogger CreateLogger(string categoryName)
+    {
+        return new XUnitLoggerNonGeneric(_output, categoryName);
+    }
+
+    public void Dispose() { }
+}
+
+internal class XUnitLoggerNonGeneric : ILogger
+{
+    private readonly ITestOutputHelper _output;
+    private readonly string _categoryName;
+
+    public XUnitLoggerNonGeneric(ITestOutputHelper output, string categoryName)
+    {
+        _output = output;
+        _categoryName = categoryName;
+    }
+
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+    public bool IsEnabled(LogLevel logLevel) => true;
+
+    public void Log<TState>(
+        LogLevel logLevel,
+        EventId eventId,
+        TState state,
+        Exception? exception,
+        Func<TState, Exception?, string> formatter)
+    {
+        var message = formatter(state, exception);
+        var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+        
+        _output.WriteLine($"[{timestamp}] [{logLevel}] {_categoryName}: {message}");
         
         if (exception != null)
         {
