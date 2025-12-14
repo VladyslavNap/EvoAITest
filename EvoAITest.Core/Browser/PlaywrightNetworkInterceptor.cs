@@ -14,7 +14,7 @@ public sealed class PlaywrightNetworkInterceptor : INetworkInterceptor
     private readonly Microsoft.Playwright.IPage _page;
     private readonly ILogger<PlaywrightNetworkInterceptor> _logger;
     private readonly ConcurrentBag<NetworkLog> _networkLogs = new();
-    private readonly List<string> _activeRoutes = new();
+    private readonly ConcurrentBag<string> _activeRoutes = new();
     private bool _networkLoggingEnabled;
     private bool _disposed;
 
