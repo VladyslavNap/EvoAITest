@@ -259,6 +259,59 @@ public static class BrowserToolRegistry
                 Name: "clear_permissions",
                 Description: "Revoke all previously granted browser permissions. Use this to test permission denial scenarios or reset permission state between tests.",
                 Parameters: new Dictionary<string, ParameterDef>()
+            ),
+
+            // ========== Network Interception Tools ==========
+
+            ["mock_response"] = new BrowserToolDefinition(
+                Name: "mock_response",
+                Description: "Mock HTTP responses for requests matching a URL pattern. Intercepts network requests and returns custom responses without making actual network calls. Useful for testing error states, offline scenarios, or controlling API responses. Supports glob patterns (e.g., '**/api/**', '**/*.json') and delays to simulate network latency.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["url_pattern"] = new ParameterDef("string", true, "URL pattern to match (glob syntax: '**/api/users', '**/*.jpg'). Use '**' for any path segment.", null),
+                    ["status"] = new ParameterDef("int", false, "HTTP status code to return (e.g., 200, 404, 500)", 200),
+                    ["body"] = new ParameterDef("string", false, "Response body content (JSON, HTML, text, etc.)", null),
+                    ["content_type"] = new ParameterDef("string", false, "Content-Type header value (e.g., 'application/json', 'text/html')", "application/json"),
+                    ["delay_ms"] = new ParameterDef("int", false, "Delay in milliseconds before responding (simulates network latency)", 0),
+                    ["headers"] = new ParameterDef("array", false, "Additional response headers as array of 'name:value' strings", null)
+                }
+            ),
+
+            ["block_request"] = new BrowserToolDefinition(
+                Name: "block_request",
+                Description: "Block network requests matching a URL pattern. Prevents requests from being sent to the server. Useful for blocking ads, trackers, analytics, images, or specific API endpoints to test offline behavior or improve test performance. Blocked requests fail immediately without network activity.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["url_pattern"] = new ParameterDef("string", true, "URL pattern to block (glob syntax: '**/*.{jpg,png,gif}' for images, '**/analytics/**' for analytics, '**/ads/**' for ads)", null)
+                }
+            ),
+
+            ["intercept_request"] = new BrowserToolDefinition(
+                Name: "intercept_request",
+                Description: "Set up custom request interception with a handler. Advanced tool for modifying requests on-the-fly, adding headers, changing payloads, or conditionally mocking based on request details. This tool sets up the interception pattern; actual handling is done by the automation framework.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["url_pattern"] = new ParameterDef("string", true, "URL pattern to intercept (glob syntax)", null),
+                    ["action"] = new ParameterDef("string", true, "Action to take: 'continue' (pass through), 'abort' (block), or 'fulfill' (mock)", "continue")
+                }
+            ),
+
+            ["get_network_logs"] = new BrowserToolDefinition(
+                Name: "get_network_logs",
+                Description: "Retrieve all captured network activity logs. Returns details about HTTP requests made by the page including URLs, methods, status codes, timing, and whether requests were blocked or mocked. Useful for verifying API calls, debugging network issues, or validating that specific requests occurred. Network logging must be enabled first.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["enable_logging"] = new ParameterDef("boolean", false, "Enable network logging if not already enabled", true)
+                }
+            ),
+
+            ["clear_interceptions"] = new BrowserToolDefinition(
+                Name: "clear_interceptions",
+                Description: "Clear all active network interceptions (mocks, blocks, and custom handlers). Removes all route handlers and allows requests to proceed normally. Use this to reset network state between test scenarios or when switching from mocked to real API testing.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["clear_logs"] = new ParameterDef("boolean", false, "Also clear the network activity logs", false)
+                }
             )
         };
     }

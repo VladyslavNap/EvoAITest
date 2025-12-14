@@ -617,6 +617,13 @@ public sealed class DefaultToolExecutor : IToolExecutor
                 "grant_permissions" => await ExecuteGrantPermissionsAsync(toolCall, cancellationToken).ConfigureAwait(false),
                 "clear_permissions" => await ExecuteClearPermissionsAsync(toolCall, cancellationToken).ConfigureAwait(false),
                 
+                // Network Interception Tools
+                "mock_response" => await ExecuteMockResponseAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "block_request" => await ExecuteBlockRequestAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "intercept_request" => await ExecuteInterceptRequestAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "get_network_logs" => await ExecuteGetNetworkLogsAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "clear_interceptions" => await ExecuteClearInterceptionsAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                
                 "extract_table" => throw new NotImplementedException($"Tool '{toolCall.ToolName}' is not yet implemented"),
                 "wait_for_url_change" => throw new NotImplementedException($"Tool '{toolCall.ToolName}' is not yet implemented"),
                 "select_option" => throw new NotImplementedException($"Tool '{toolCall.ToolName}' is not yet implemented"),
@@ -1091,6 +1098,203 @@ public sealed class DefaultToolExecutor : IToolExecutor
         return new Dictionary<string, object>
         {
             ["message"] = "All permissions cleared successfully"
+        };
+    }
+
+    #endregion
+
+    #region Network Interception Tool Execution
+
+    private async Task<object?> ExecuteMockResponseAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        var interceptor = _browserAgent.GetNetworkInterceptor();
+        if (interceptor == null)
+        {
+            return new Dictionary<string, object>
+            {
+                ["error"] = "Network interceptor not available"
+            };
+        }
+
+        var urlPattern = GetRequiredParameter<string>(toolCall, "url_pattern");
+        var status = GetOptionalParameter<int>(toolCall, "status", 200);
+        var body = GetOptionalParameter<string>(toolCall, "body", null);
+        var contentType = GetOptionalParameter<string>(toolCall, "content_type", "application/json");
+        var delayMs = GetOptionalParameter<int>(toolCall, "delay_ms", 0);
+
+        // Parse headers if provided
+        Dictionary<string, string>? headers = null;
+        if (toolCall.Parameters.TryGetValue("headers", out var headersObj) && headersObj is JsonElement headersJson)
+        {
+            headers = new Dictionary<string, string>();
+            if (headersJson.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in headersJson.EnumerateArray())
+                {
+                    var headerStr = item.GetString();
+                    if (!string.IsNullOrEmpty(headerStr) && headerStr.Contains(':'))
+                    {
+                        var parts = headerStr.Split(':', 2);
+                        headers[parts[0].Trim()] = parts[1].Trim();
+                    }
+                }
+            }
+        }
+
+        var mockResponse = new MockResponse
+        {
+            Status = status,
+            Body = body,
+            ContentType = contentType,
+            DelayMs = delayMs > 0 ? delayMs : null,
+            Headers = headers
+        };
+
+        await interceptor.MockResponseAsync(urlPattern, mockResponse, cancellationToken).ConfigureAwait(false);
+
+        return new Dictionary<string, object>
+        {
+            ["pattern"] = urlPattern,
+            ["status"] = status,
+            ["delay_ms"] = delayMs,
+            ["message"] = $"Mock response configured for pattern: {urlPattern}"
+        };
+    }
+
+    private async Task<object?> ExecuteBlockRequestAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        var interceptor = _browserAgent.GetNetworkInterceptor();
+        if (interceptor == null)
+        {
+            return new Dictionary<string, object>
+            {
+                ["error"] = "Network interceptor not available"
+            };
+        }
+
+        var urlPattern = GetRequiredParameter<string>(toolCall, "url_pattern");
+        await interceptor.BlockRequestAsync(urlPattern, cancellationToken).ConfigureAwait(false);
+
+        return new Dictionary<string, object>
+        {
+            ["pattern"] = urlPattern,
+            ["message"] = $"Requests matching '{urlPattern}' will be blocked"
+        };
+    }
+
+    private async Task<object?> ExecuteInterceptRequestAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        var interceptor = _browserAgent.GetNetworkInterceptor();
+        if (interceptor == null)
+        {
+            return new Dictionary<string, object>
+            {
+                ["error"] = "Network interceptor not available"
+            };
+        }
+
+        var urlPattern = GetRequiredParameter<string>(toolCall, "url_pattern");
+        var action = GetOptionalParameter<string>(toolCall, "action", "continue");
+
+        // For now, we'll set up basic interception based on action
+        switch (action.ToLowerInvariant())
+        {
+            case "abort":
+            case "block":
+                await interceptor.BlockRequestAsync(urlPattern, cancellationToken).ConfigureAwait(false);
+                break;
+
+            case "fulfill":
+            case "mock":
+                // Default mock response
+                await interceptor.MockResponseAsync(urlPattern, new MockResponse
+                {
+                    Status = 200,
+                    Body = "{}",
+                    ContentType = "application/json"
+                }, cancellationToken).ConfigureAwait(false);
+                break;
+
+            case "continue":
+            default:
+                // Set up pass-through interception (logs but doesn't modify)
+                await interceptor.InterceptRequestAsync(urlPattern, async request =>
+                {
+                    // Return null to continue with original request
+                    return await Task.FromResult<InterceptedResponse?>(null);
+                }, cancellationToken).ConfigureAwait(false);
+                break;
+        }
+
+        return new Dictionary<string, object>
+        {
+            ["pattern"] = urlPattern,
+            ["action"] = action,
+            ["message"] = $"Request interception configured for pattern: {urlPattern} (action: {action})"
+        };
+    }
+
+    private async Task<object?> ExecuteGetNetworkLogsAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        var interceptor = _browserAgent.GetNetworkInterceptor();
+        if (interceptor == null)
+        {
+            return new Dictionary<string, object>
+            {
+                ["error"] = "Network interceptor not available",
+                ["logs"] = Array.Empty<object>()
+            };
+        }
+
+        var enableLogging = GetOptionalParameter<bool>(toolCall, "enable_logging", true);
+        if (enableLogging && !interceptor.IsNetworkLoggingEnabled)
+        {
+            await interceptor.SetNetworkLoggingAsync(true, cancellationToken).ConfigureAwait(false);
+        }
+
+        var logs = await interceptor.GetNetworkLogsAsync(cancellationToken).ConfigureAwait(false);
+
+        return new Dictionary<string, object>
+        {
+            ["count"] = logs.Count,
+            ["logs"] = logs.Select(log => new Dictionary<string, object>
+            {
+                ["url"] = log.Url,
+                ["method"] = log.Method,
+                ["status_code"] = log.StatusCode ?? 0,
+                ["resource_type"] = log.ResourceType ?? "unknown",
+                ["duration_ms"] = log.DurationMs ?? 0,
+                ["was_blocked"] = log.WasBlocked,
+                ["was_mocked"] = log.WasMocked,
+                ["timestamp"] = log.Timestamp.ToString("O")
+            }).ToList()
+        };
+    }
+
+    private async Task<object?> ExecuteClearInterceptionsAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        var interceptor = _browserAgent.GetNetworkInterceptor();
+        if (interceptor == null)
+        {
+            return new Dictionary<string, object>
+            {
+                ["message"] = "Network interceptor not available"
+            };
+        }
+
+        var clearLogs = GetOptionalParameter<bool>(toolCall, "clear_logs", false);
+
+        await interceptor.ClearInterceptionsAsync(cancellationToken).ConfigureAwait(false);
+
+        if (clearLogs)
+        {
+            await interceptor.ClearNetworkLogsAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return new Dictionary<string, object>
+        {
+            ["message"] = "All network interceptions cleared",
+            ["logs_cleared"] = clearLogs
         };
     }
 

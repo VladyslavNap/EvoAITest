@@ -116,6 +116,7 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
     private Microsoft.Playwright.IBrowser? _browser;
     private Microsoft.Playwright.IBrowserContext? _context;
     private Microsoft.Playwright.IPage? _page;
+    private INetworkInterceptor? _networkInterceptor;
     private bool _disposed;
 
     public PlaywrightBrowserAgent(ILogger<PlaywrightBrowserAgent> logger)
@@ -634,6 +635,22 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
             .WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // ========== Network Interception ==========
+
+    /// <inheritdoc />
+    public INetworkInterceptor? GetNetworkInterceptor()
+    {
+        if (_networkInterceptor == null && _page != null)
+        {
+            // Lazy initialization of network interceptor
+            var loggerFactory = LoggerFactory.Create(builder => { });
+            var interceptorLogger = loggerFactory.CreateLogger<PlaywrightNetworkInterceptor>();
+            _networkInterceptor = new PlaywrightNetworkInterceptor(_page, interceptorLogger);
+        }
+        
+        return _networkInterceptor;
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
@@ -645,6 +662,12 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
         _disposed = true;
 
         var disposeTasks = new List<Task>();
+
+        // Dispose network interceptor first
+        if (_networkInterceptor is not null)
+        {
+            disposeTasks.Add(CloseResourceAsync(() => _networkInterceptor.DisposeAsync().AsTask(), "network interceptor"));
+        }
 
         if (_page is not null)
         {
