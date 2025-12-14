@@ -266,7 +266,7 @@ NETWORK_INTERCEPTION_PROGRESS.md
 
 ## Git Commit
 
-**Branch:** NaetworkIntercept  
+**Branch:** NetworkIntercept  
 **Commit Message:** "Update documentation: Add network interception to README and DOCUMENTATION_INDEX"  
 **Files Changed:** 2 (README.md, DOCUMENTATION_INDEX.md)  
 **Lines Changed:** 241 (219 insertions, 22 deletions)
