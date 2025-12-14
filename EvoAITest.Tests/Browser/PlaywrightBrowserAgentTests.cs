@@ -16,11 +16,13 @@ namespace EvoAITest.Tests.Browser;
 public class PlaywrightBrowserAgentTests : IAsyncLifetime
 {
     private readonly Mock<ILogger<PlaywrightBrowserAgent>> _mockLogger;
+    private readonly Mock<ILoggerFactory> _mockLoggerFactory;
     private PlaywrightBrowserAgent? _agent;
 
     public PlaywrightBrowserAgentTests()
     {
         _mockLogger = new Mock<ILogger<PlaywrightBrowserAgent>>();
+        _mockLoggerFactory = new Mock<ILoggerFactory>();
     }
 
     /// <summary>
@@ -29,7 +31,7 @@ public class PlaywrightBrowserAgentTests : IAsyncLifetime
     public Task InitializeAsync()
     {
         // Create a new agent for each test to ensure test isolation
-        _agent = new PlaywrightBrowserAgent(_mockLogger.Object);
+        _agent = new PlaywrightBrowserAgent(_mockLogger.Object, _mockLoggerFactory.Object);
         return Task.CompletedTask;
     }
 
@@ -534,16 +536,18 @@ public class PlaywrightBrowserAgentTests : IAsyncLifetime
 public class PlaywrightBrowserAgentIntegrationTests : IAsyncLifetime
 {
     private readonly Mock<ILogger<PlaywrightBrowserAgent>> _mockLogger;
+    private readonly Mock<ILoggerFactory> _mockLoggerFactory;
     private PlaywrightBrowserAgent? _agent;
 
     public PlaywrightBrowserAgentIntegrationTests()
     {
         _mockLogger = new Mock<ILogger<PlaywrightBrowserAgent>>();
+        _mockLoggerFactory = new Mock<ILoggerFactory>();
     }
 
     public Task InitializeAsync()
     {
-        _agent = new PlaywrightBrowserAgent(_mockLogger.Object);
+        _agent = new PlaywrightBrowserAgent(_mockLogger.Object, _mockLoggerFactory.Object);
         return Task.CompletedTask;
     }
 

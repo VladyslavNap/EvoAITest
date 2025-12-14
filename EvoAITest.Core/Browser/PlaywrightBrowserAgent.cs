@@ -111,17 +111,20 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
 }";
 
     private readonly ILogger<PlaywrightBrowserAgent> _logger;
+    private readonly ILoggerFactory _loggerFactory;
 
     private Microsoft.Playwright.IPlaywright? _playwright;
     private Microsoft.Playwright.IBrowser? _browser;
     private Microsoft.Playwright.IBrowserContext? _context;
     private Microsoft.Playwright.IPage? _page;
     private INetworkInterceptor? _networkInterceptor;
+    private readonly object _networkInterceptorLock = new();
     private bool _disposed;
 
-    public PlaywrightBrowserAgent(ILogger<PlaywrightBrowserAgent> logger)
+    public PlaywrightBrowserAgent(ILogger<PlaywrightBrowserAgent> logger, ILoggerFactory loggerFactory)
     {
         _logger = logger;
+        _loggerFactory = loggerFactory;
     }
 
     /// <inheritdoc />
@@ -642,10 +645,16 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
     {
         if (_networkInterceptor == null && _page != null)
         {
-            // Lazy initialization of network interceptor
-            var loggerFactory = LoggerFactory.Create(builder => { });
-            var interceptorLogger = loggerFactory.CreateLogger<PlaywrightNetworkInterceptor>();
-            _networkInterceptor = new PlaywrightNetworkInterceptor(_page, interceptorLogger);
+            lock (_networkInterceptorLock)
+            {
+                // Double-check pattern for thread safety
+                if (_networkInterceptor == null && _page != null)
+                {
+                    // Lazy initialization of network interceptor
+                    var interceptorLogger = _loggerFactory.CreateLogger<PlaywrightNetworkInterceptor>();
+                    _networkInterceptor = new PlaywrightNetworkInterceptor(_page, interceptorLogger);
+                }
+            }
         }
         
         return _networkInterceptor;

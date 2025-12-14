@@ -13,7 +13,7 @@ public sealed class PlaywrightNetworkInterceptor : INetworkInterceptor
 {
     private readonly Microsoft.Playwright.IPage _page;
     private readonly ILogger<PlaywrightNetworkInterceptor> _logger;
-    private readonly ConcurrentBag<NetworkLog> _networkLogs = new();
+    private readonly ConcurrentDictionary<Guid, NetworkLog> _networkLogs = new();
     private readonly ConcurrentBag<string> _activeRoutes = new();
     private bool _networkLoggingEnabled;
     private bool _disposed;
@@ -61,9 +61,10 @@ public sealed class PlaywrightNetworkInterceptor : INetworkInterceptor
                 };
 
                 // Log the request
+                Guid? logId = null;
                 if (_networkLoggingEnabled)
                 {
-                    LogRequest(interceptedRequest, stopwatch);
+                    logId = LogRequest(interceptedRequest, stopwatch);
                 }
 
                 // Call handler
@@ -84,9 +85,9 @@ public sealed class PlaywrightNetworkInterceptor : INetworkInterceptor
                     await route.FulfillAsync(fulfillOptions).ConfigureAwait(false);
 
                     // Log mocked response
-                    if (_networkLoggingEnabled)
+                    if (_networkLoggingEnabled && logId.HasValue)
                     {
-                        LogResponse(interceptedRequest, response.Status, stopwatch, wasMocked: true);
+                        LogResponse(logId.Value, response.Status, stopwatch, wasMocked: true);
                     }
 
                     _logger.LogDebug("Request intercepted and fulfilled: {Method} {Url}", request.Method, request.Url);
@@ -120,7 +121,7 @@ public sealed class PlaywrightNetworkInterceptor : INetworkInterceptor
 
             if (_networkLoggingEnabled)
             {
-                _networkLogs.Add(new NetworkLog
+                var log = new NetworkLog
                 {
                     Url = request.Url,
                     Method = request.Method,
@@ -128,7 +129,8 @@ public sealed class PlaywrightNetworkInterceptor : INetworkInterceptor
                     Timestamp = DateTimeOffset.UtcNow,
                     WasBlocked = true,
                     StatusCode = 0
-                });
+                };
+                _networkLogs.TryAdd(log.Id, log);
             }
 
             _logger.LogDebug("Blocking request: {Method} {Url}", request.Method, request.Url);
@@ -180,7 +182,7 @@ public sealed class PlaywrightNetworkInterceptor : INetworkInterceptor
 
             if (_networkLoggingEnabled)
             {
-                _networkLogs.Add(new NetworkLog
+                var log = new NetworkLog
                 {
                     Url = request.Url,
                     Method = request.Method,
@@ -191,7 +193,8 @@ public sealed class PlaywrightNetworkInterceptor : INetworkInterceptor
                     WasMocked = true,
                     RequestHeaders = request.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                     ResponseHeaders = headers
-                });
+                };
+                _networkLogs.TryAdd(log.Id, log);
             }
 
             _logger.LogDebug("Mocked response: {Method} {Url} -> {Status}", request.Method, request.Url, response.Status);
@@ -203,7 +206,7 @@ public sealed class PlaywrightNetworkInterceptor : INetworkInterceptor
     /// <inheritdoc />
     public Task<List<NetworkLog>> GetNetworkLogsAsync(CancellationToken cancellationToken = default)
     {
-        var logs = _networkLogs.OrderBy(l => l.Timestamp).ToList();
+        var logs = _networkLogs.Values.OrderBy(l => l.Timestamp).ToList();
         _logger.LogDebug("Retrieved {Count} network logs", logs.Count);
         return Task.FromResult(logs);
     }
@@ -267,31 +270,32 @@ public sealed class PlaywrightNetworkInterceptor : INetworkInterceptor
         _networkLogs.Clear();
     }
 
-    private void LogRequest(InterceptedRequest request, Stopwatch stopwatch)
+    private Guid LogRequest(InterceptedRequest request, Stopwatch stopwatch)
     {
-        _networkLogs.Add(new NetworkLog
+        var log = new NetworkLog
         {
             Url = request.Url,
             Method = request.Method,
             ResourceType = request.ResourceType,
             Timestamp = DateTimeOffset.UtcNow,
             RequestHeaders = request.Headers
-        });
+        };
+        _networkLogs.TryAdd(log.Id, log);
+        return log.Id;
     }
 
-    private void LogResponse(InterceptedRequest request, int statusCode, Stopwatch stopwatch, bool wasMocked = false)
+    private void LogResponse(Guid logId, int statusCode, Stopwatch stopwatch, bool wasMocked = false)
     {
-        // Find and update the existing log entry
-        var existingLog = _networkLogs.FirstOrDefault(l => l.Url == request.Url && l.Method == request.Method && !l.StatusCode.HasValue);
-        if (existingLog != null)
+        // Update the existing log entry in-place
+        if (_networkLogs.TryGetValue(logId, out var existingLog))
         {
-            // Can't modify record directly, so we'll add a new complete log
-            _networkLogs.Add(existingLog with
+            var updatedLog = existingLog with
             {
                 StatusCode = statusCode,
                 DurationMs = stopwatch.Elapsed.TotalMilliseconds,
                 WasMocked = wasMocked
-            });
+            };
+            _networkLogs.TryUpdate(logId, updatedLog, existingLog);
         }
     }
 }
