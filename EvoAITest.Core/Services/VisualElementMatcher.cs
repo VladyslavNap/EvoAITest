@@ -181,32 +181,23 @@ public sealed class VisualElementMatcher : IDisposable
 
         try
         {
-            var expectedHash = await CalculatePerceptualHashAsync(expectedScreenshot, cancellationToken);
-
-            foreach (var element in elements.Where(e => e.IsVisible))
-            {
-                // For now, use perceptual hash comparison
-                // In a full implementation, you would capture element screenshots
-                // and compare them directly
-                
-                // Placeholder: Use text similarity as a proxy for visual similarity
-                var textScore = element.Text != null ? 
-                    CalculateTextSimilarity(expectedScreenshot.ToString(), element.Text) : 0.0;
-
-                if (textScore > bestScore)
-                {
-                    bestScore = textScore;
-                    bestMatch = new SelectorCandidate
-                    {
-                        Selector = element.Selector,
-                        Strategy = HealingStrategy.VisualSimilarity,
-                        BaseConfidence = textScore,
-                        VisualSimilarityScore = textScore,
-                        ElementInfo = element,
-                        ElementText = element.Text
-                    };
-                }
-            }
+            // TODO: Implement actual screenshot comparison
+            // This requires capturing screenshots of individual elements from the page,
+            // which is not yet implemented. Until then, visual matching is not supported.
+            // 
+            // The expected implementation would:
+            // 1. Calculate perceptual hash: var expectedHash = await CalculatePerceptualHashAsync(expectedScreenshot, cancellationToken);
+            // 2. Capture screenshots of each candidate element
+            // 3. Calculate perceptual hash for each element screenshot
+            // 4. Compare with expectedHash using ComparePerceptualHashes()
+            // 5. Return the best matching element above the threshold
+            
+            _logger.LogWarning(
+                "Visual matching is not fully implemented. Element screenshot capture is required. " +
+                "Returning null until proper implementation is added.");
+            
+            // Return null as visual matching is not yet functional
+            return null;
         }
         catch (Exception ex)
         {
