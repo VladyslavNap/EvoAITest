@@ -186,12 +186,11 @@ public sealed class VisualElementMatcher : IDisposable
             // which is not yet implemented. Until then, visual matching is not supported.
             // 
             // The expected implementation would:
-            // 1. Capture screenshots of each candidate element
-            // 2. Calculate perceptual hash for each element screenshot
-            // 3. Compare with expectedHash using ComparePerceptualHashes()
-            // 4. Return the best matching element above the threshold
-            
-            var expectedHash = await CalculatePerceptualHashAsync(expectedScreenshot, cancellationToken);
+            // 1. Calculate perceptual hash: var expectedHash = await CalculatePerceptualHashAsync(expectedScreenshot, cancellationToken);
+            // 2. Capture screenshots of each candidate element
+            // 3. Calculate perceptual hash for each element screenshot
+            // 4. Compare with expectedHash using ComparePerceptualHashes()
+            // 5. Return the best matching element above the threshold
             
             _logger.LogWarning(
                 "Visual matching is not fully implemented. Element screenshot capture is required. " +
