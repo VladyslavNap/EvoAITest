@@ -725,320 +725,160 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - **Phase 2 Total:** 35,145 lines in ~66.5 hours
 - **Build Status:** ✅ Successful (0 errors, 0 warnings)
 
-### Phase 3: AI Enhancements (Future)
-- [ ] Self-healing tests (auto-fix selector changes)
-- [ ] Visual element detection (screenshot analysis)
-- [ ] Smart waiting strategies
-- [ ] Error recovery and retry logic
-- [ ] Test generation from recordings
+### Phase 3: AI Enhancements (Planned - Q1 2025)
 
-### Phase 4: Enterprise Features (Future)
-- [ ] Role-based access control
-- [ ] Audit logging
-- [ ] Test scheduling and orchestration
-- [ ] Parallel execution
-- [ ] Results dashboard and reporting
+> 📋 **[Complete Phase 3 Roadmap](PHASE_3_AI_ENHANCEMENTS_ROADMAP.md)** - Detailed implementation plan
 
-### Phase 5: CI/CD Integration (Next Priority)
-- [ ] GitHub Actions workflow for visual regression tests
-- [ ] Azure DevOps pipeline integration
-- [ ] Automated baseline management in CI
-- [ ] Container registry setup
-- [ ] Deployment automation
+**Overview:** Advanced AI-powered capabilities that enable intelligent, self-healing, and adaptive browser automation.
 
-## Visual Regression Testing
+**Estimated Duration:** 8 weeks (80-100 hours)  
+**Priority:** High  
+**Status:** 📋 Planning Complete - Ready for Implementation
 
-### Overview
+#### Features
 
-EvoAITest includes a **production-ready visual regression testing system** that automatically detects UI changes by comparing screenshots. This feature is powered by AI for intelligent failure diagnosis and healing.
+- [ ] **Self-Healing Tests** (25-30 hours)
+  - Automatic selector healing when page structure changes
+  - Visual similarity matching for element identification
+  - LLM-powered selector generation with confidence scoring
+  - Multi-strategy healing: visual, text, ARIA, position, fuzzy attributes
+  - Healing history and learning system
+  - 90%+ healing success rate target
 
-### Key Features
+- [ ] **Visual Element Detection** (20-25 hours)
+  - AI-powered vision analysis using GPT-4 Vision and Azure Computer Vision
+  - Detect and locate UI elements in screenshots without selectors
+  - OCR for text extraction with 95%+ accuracy
+  - Natural language element finding ("click the blue button on the right")
+  - 4 new vision-based automation tools
 
-✅ **4 Checkpoint Types**
-- **FullPage** - Capture entire scrollable page
-- **Viewport** - Capture visible area only
-- **Element** - Capture specific element by selector
-- **Region** - Capture rectangular region by coordinates
+- [ ] **Smart Waiting Strategies** (15-20 hours)
+  - Context-aware adaptive timeouts based on historical data
+  - Multi-condition waiting (network idle, animations, DOM stability)
+  - Page stability detection and monitoring
+  - 50% reduction in unnecessary wait time
+  - 80% reduction in timing-related failures
 
-✅ **Intelligent Comparison**
-- Pixel-by-pixel comparison with configurable tolerance
-- SSIM (Structural Similarity Index) calculation
-- Anti-aliasing detection
-- Difference region identification with flood-fill algorithm
+- [ ] **Error Recovery and Retry Logic** (12-15 hours)
+  - Intelligent error classification (transient, selector, navigation, etc.)
+  - Context-aware retry strategies based on error type
+  - Automatic recovery actions (refresh, alternative selector, wait)
+  - Learning from past recoveries
+  - 85%+ automatic recovery success rate
 
-✅ **Baseline Management**
-- Automatic baseline creation on first run
-- Approval workflow with audit trail
-- Branch-specific baselines (Git integration)
-- Retention policy for cleanup
+- [ ] **Test Generation from Recordings** (25-30 hours)
+  - Record user interactions in browser
+  - AI-powered action analysis and intent detection
+  - Automatic test generation with natural language descriptions
+  - Smart assertion creation
+  - Blazor recording UI component
+  - 90%+ accuracy in action recognition
 
-✅ **AI-Powered Healing**
-- LLM analyzes visual regression failures
-- Suggests 4 healing strategies:
-  - Adjust tolerance for minor rendering differences
-  - Add ignore regions for dynamic content
-  - Wait for stability (animations/loading)
-  - Flag for manual approval (design changes)
+#### New Capabilities
 
-✅ **Enterprise-Grade UI**
-- Interactive visual regression viewer
-- Side-by-side image comparison
-- Diff overlay with color-coded regions
-- Live tolerance adjustment with pass/fail preview
-- One-click baseline approval
+**10 New Browser Tools:**
+- `find_element_by_image` - Locate by visual appearance
+- `click_by_description` - Natural language element targeting
+- `extract_text_from_image` - OCR text extraction
+- `verify_element_by_image` - Visual verification
+- `smart_wait` - Adaptive multi-condition waiting
+- `wait_for_stable` - Page stability detection
+- `wait_for_animations` - Animation completion
+- `wait_for_network_idle` - Network request monitoring
+- `heal_selector` - Manual healing trigger
+- `record_session` - Recording control
 
-✅ **REST API**
-- Complete CRUD operations for baselines
-- Comparison history with pagination
-- Healing strategy recommendations
-- Image serving endpoints
+**Total Tools After Phase 3:** 35 (14 core + 6 mobile + 5 network + 10 AI)
 
-### Quick Start
+#### Technical Components
 
-```csharp
-// Define a visual checkpoint in your automation task
-var task = new AutomationTask
-{
-    Name = "Homepage Visual Test",
-    VisualCheckpoints = new List<VisualCheckpoint>
-    {
-        new()
-        {
-            Name = "HomePage_Header",
-            Type = CheckpointType.Element,
-            Selector = "header.main-header",
-            Tolerance = 0.01, // 1% difference allowed
-            Environment = "production",
-            Browser = "chromium",
-            Viewport = "1920x1080"
-        }
-    }
-};
+**New Services:**
+- SelectorHealingService - Multi-strategy selector healing
+- VisualElementMatcher - Image similarity analysis
+- VisionAnalysisService - GPT-4 Vision & Azure CV integration
+- SmartWaitService - Adaptive waiting logic
+- PageStabilityDetector - Page state monitoring
+- ErrorRecoveryService - Intelligent error handling
+- BrowserRecorderService - Interaction capture
+- TestGeneratorAgent - LLM-powered test generation
 
-// Execute task - visual checks run automatically
-var result = await executor.ExecuteAsync(task);
+**Database Additions:**
+- SelectorHealingHistory table
+- WaitHistory table
+- RecoveryHistory table
+- RecordedSessions table
+- RecordedActions table
 
-// Check for visual failures
-if (result.VisualComparisons.Any(v => !v.Passed))
-{
-    // AI-powered healing
-    var strategies = await healer.HealVisualRegressionAsync(
-        result.VisualComparisons.Where(v => !v.Passed).ToList(),
-        context);
-    
-    // Apply strategies and retry
-}
-```
+**API Endpoints:**
+- 6 new endpoint groups (Healing, Vision, Recording, Analytics)
+- 15+ new REST endpoints
 
-### Documentation
+#### Expected Outcomes
 
-- 📖 **[Visual Regression User Guide](docs/VisualRegressionUserGuide.md)** - Complete usage guide
-- 🔧 **[Visual Regression API](docs/VisualRegressionAPI.md)** - REST API reference
-- 👨‍💻 **[Development Guide](docs/VisualRegressionDevelopment.md)** - Architecture and extension
-- 🚀 **[Quick Start](docs/VisualRegressionQuickStart.md)** - Get started in 5 minutes
-- 🔍 **[Troubleshooting](docs/Troubleshooting.md)** - Common issues and solutions
+**Efficiency Gains:**
+- ✅ 80% reduction in test maintenance time
+- ✅ 95%+ test reliability rate
+- ✅ 50% faster test creation from recordings
+- ✅ 90%+ selector healing success rate
+- ✅ Zero manual intervention for common failures
 
-### Performance
+**Cost Savings:**
+- $50K-100K/year saved in maintenance
+- 50% reduction in false failures
+- 2-4 hours saved per test created
+- ROI break-even in 2-3 months
 
-- **Comparison Speed:** <3 seconds for 1920x1080 images
-- **Storage:** <5MB per checkpoint
-- **API Response:** <500ms for baseline retrieval
-- **Test Coverage:** >90%
+**Quality Improvements:**
+- Self-healing tests adapt to UI changes
+- Visual validation without brittle selectors
+- Intelligent retry reduces flakiness
+- Faster test authoring with recordings
 
-### Architecture
+#### Prerequisites
 
-```
-Visual Regression System Architecture:
+**Azure Services:**
+- Azure Computer Vision (optional, for OCR)
+- GPT-4 with Vision capabilities
+- Azure Blob Storage (for recordings)
 
-┌─────────────────────────────────────────────────────────────┐
-│                     Blazor Web UI                            │
-│  VisualRegressionViewer │ Dialogs │ Components              │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                     REST API Layer                           │
-│  Visual Endpoints │ Baseline Approval │ History             │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                  Visual Comparison Service                   │
-│  Orchestration │ Workflow │ Baseline Management             │
-└─────────────────────────────────────────────────────────────┘
-                            │
-            ┌───────────────┼───────────────┐
-            ↓               ↓               ↓
-┌──────────────────┐ ┌─────────────┐ ┌────────────┐
-│ Comparison Engine│ │   Storage   │ │ Repository │
-│ Pixel + SSIM     │ │   Service   │ │   Layer    │
-│ Diff Generation  │ │  File I/O   │ │  Database  │
-└──────────────────┘ └─────────────┘ └────────────┘
-            │
-            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                     Healer Agent (AI)                        │
-│  Failure Analysis │ Strategy Generation │ LLM Integration   │
-└─────────────────────────────────────────────────────────────┘
+**New Dependencies:**
+- Azure.AI.Vision.ImageAnalysis
+- SixLabors.ImageSharp (image processing)
+- Microsoft.ML (machine learning)
+- Shipwreck.Phash (perceptual hashing)
 
-```
+#### Documentation
 
-## Network Interception and Mocking
+- 📖 Self-Healing Tests User Guide
+- 📖 Vision Automation Guide
+- 📖 Smart Wait Strategies Guide
+- 📖 Recording & Test Generation Tutorial
+- 📖 Phase 3 Troubleshooting Guide
+- 🔧 API Reference for AI Services
+- 👨‍💻 Architecture & Extension Guide
 
-### Overview
+#### Timeline
 
-EvoAITest includes a **production-ready network interception system** that allows you to mock HTTP responses, block requests, and log network activity. This feature is essential for testing APIs, simulating error states, and controlling network conditions.
+**Phase 3.1 (Weeks 1-2):** Foundation
+- Self-healing models and core service
+- Smart wait service and stability detection
+- Database migrations and unit tests
 
-### Key Features
+**Phase 3.2 (Weeks 3-4):** Intelligence
+- LLM-powered selector generation
+- Vision integration (Azure CV & GPT-4)
+- Error classification and recovery
 
-✅ **Request Interception**
-- Custom handler functions for advanced scenarios
-- Modify requests on-the-fly
-- Pass-through logging without modification
+**Phase 3.3 (Weeks 5-6):** Advanced Features
+- Vision-based automation tools
+- Adaptive timeouts and learning
+- Recovery actions and integration
 
-✅ **Response Mocking**
-- Custom HTTP status codes (200, 404, 500, etc.)
-- Custom response bodies (JSON, HTML, text)
-- Custom headers and content types
-- Latency simulation with configurable delays
+**Phase 3.4 (Weeks 7-8):** Recording & Generation
+- Browser recorder service
+- Test generator agent
+- Recording API and Blazor UI
 
-✅ **Request Blocking**
-- Block by URL patterns (glob syntax)
-- Block ads, trackers, analytics
-- Block images for faster tests
-- Zero network activity for blocked requests
+---
 
-✅ **Network Logging**
-- Capture all HTTP requests and responses
-- Track timing and duration
-- Identify blocked and mocked requests
-- Thread-safe logging with ConcurrentBag
-
-✅ **Natural Language Integration**
-- 5 network tools for LLM automation
-- Seamless integration with existing tools
-- No code required for common scenarios
-
-### Quick Start
-
-```csharp
-// Get network interceptor
-var interceptor = browserAgent.GetNetworkInterceptor();
-
-// Mock API response
-await interceptor.MockResponseAsync("**/api/users", new MockResponse
-{
-    Status = 200,
-    Body = "{\"users\": [{\"id\": 1, \"name\": \"John\"}]}",
-    ContentType = "application/json",
-    DelayMs = 100 // Simulate 100ms latency
-});
-
-// Block resources
-await interceptor.BlockRequestAsync("**/*.{jpg,png,gif}");
-
-// Enable logging
-await interceptor.SetNetworkLoggingAsync(true);
-
-// Navigate and test
-await browserAgent.NavigateAsync("https://example.com");
-
-// Get network logs
-var logs = await interceptor.GetNetworkLogsAsync();
-```
-
-### Natural Language Example
-
-```csharp
-var task = new AutomationTask
-{
-    Name = "Test API Error Handling",
-    NaturalLanguagePrompt = @"
-        1. Mock the /api/login endpoint to return 500 error
-        2. Navigate to https://example.com/login
-        3. Enter credentials and submit
-        4. Verify error message is displayed
-        5. Get network logs to confirm 500 status
-    "
-};
-
-var result = await executor.ExecuteAsync(task);
-```
-
-### Available Tools
-
-| Tool | Description |
-|------|-------------|
-| **mock_response** | Mock HTTP responses with custom status, body, headers, and delay |
-| **block_request** | Block requests matching URL patterns (ads, trackers, images) |
-| **intercept_request** | Set up custom request interception handlers |
-| **get_network_logs** | Retrieve all captured network activity |
-| **clear_interceptions** | Clear all active mocks and blocks |
-
-### Use Cases
-
-**API Testing**
-- Mock backend responses for frontend testing
-- Simulate error states (404, 500, timeout)
-- Test retry logic and error handling
-
-**Performance Testing**
-- Block images and stylesheets for faster tests
-- Simulate network latency with delays
-- Measure application behavior under load
-
-**Offline Testing**
-- Block all external requests
-- Mock only critical APIs
-- Test offline mode and service workers
-
-**Security Testing**
-- Block tracking and analytics
-- Test CORS handling
-- Validate request headers
-
-### Documentation
-
-- 📖 **[Network Interception Complete](NETWORK_INTERCEPTION_COMPLETE.md)** - Full implementation guide
-- 📋 **[Network Interception Progress](NETWORK_INTERCEPTION_PROGRESS.md)** - Development history
-
-### Performance
-
-- **Interception Overhead:** <10ms per request
-- **Mock Response Time:** Configurable (0ms to any delay)
-- **Logging:** Thread-safe with ConcurrentBag
-- **Memory Usage:** ~1KB per logged request
-
-### Architecture
-
-```
-Network Interception Architecture:
-
-┌─────────────────────────────────────────────────────────────┐
-│                  Browser Automation                          │
-│  Natural Language Prompt → Tool Calls                        │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                  Tool Executor                               │
-│  mock_response │ block_request │ get_network_logs           │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│             PlaywrightBrowserAgent                           │
-│  GetNetworkInterceptor() → Lazy Initialization               │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│          PlaywrightNetworkInterceptor                        │
-│  InterceptRequestAsync │ BlockRequestAsync │ MockResponseAsync│
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│              Microsoft.Playwright.IPage                      │
-│  RouteAsync() │ UnrouteAsync() │ Network Events             │
-└─────────────────────────────────────────────────────────────┘
+**See [PHASE_3_AI_ENHANCEMENTS_ROADMAP.md](PHASE_3_AI_ENHANCEMENTS_ROADMAP.md) for complete implementation details, architecture diagrams, and success criteria.**
