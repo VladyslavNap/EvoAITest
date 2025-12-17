@@ -329,18 +329,18 @@ Console.WriteLine($"Page contains: {observations}");
 ## Testing Strategy
 
 ### Unit Tests (Planned)
-- ? ElementBoundingBox calculations (Contains, Overlaps, IoU)
-- ? ElementFilter matching logic
-- ? DetectedElement validation
-- ? VisionAnalysisResult factory methods
-- ? Provider integration tests
-- ? Element detection accuracy tests
+- ⏳ ElementBoundingBox calculations (Contains, Overlaps, IoU)
+- ⏳ ElementFilter matching logic
+- ⏳ DetectedElement validation
+- ⏳ VisionAnalysisResult factory methods
+- ⏳ Provider integration tests
+- ⏳ Element detection accuracy tests
 
 ### Integration Tests (Planned)
-- ? End-to-end vision analysis
-- ? Natural language element finding
-- ? OCR text extraction
-- ? Screenshot comparison
+- ⏳ End-to-end vision analysis
+- ⏳ Natural language element finding
+- ⏳ OCR text extraction
+- ⏳ Screenshot comparison
 
 ---
 
