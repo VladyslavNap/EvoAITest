@@ -305,7 +305,7 @@ Console.WriteLine($"Page contains: {observations}");
 
 ### New (To Be Added in Step 3-4)
 - ? Azure.AI.OpenAI (for GPT-4 Vision)
-- ? Azure.AI.Vision.ImageAnalysis (for Azure CV)
+- ⏳ Azure.AI.Vision.ImageAnalysis (for Azure CV)
 - ? System.Text.Json (already included)
 
 ---
