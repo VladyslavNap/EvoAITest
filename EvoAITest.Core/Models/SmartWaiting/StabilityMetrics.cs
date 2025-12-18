@@ -113,14 +113,16 @@ public sealed record StabilityMetrics
 
     /// <summary>
     /// Calculates the overall stability score based on individual metrics.
-    /// The score is computed as the average of seven individual metric scores, each ranging from 0.0 to 1.0:
+    /// The score is computed as the average of 4-7 individual metric scores, each ranging from 0.0 to 1.0:
     /// 1. DOM Stability: 1.0 if stable, otherwise scaled by mutation count relative to threshold (100 mutations)
     /// 2. Animation Completion: 1.0 if complete, otherwise scaled by active animations relative to threshold (10 animations)
     /// 3. Network Idle: 1.0 if idle, otherwise scaled by active requests relative to threshold (5 requests)
     /// 4. Loader Visibility: 1.0 if hidden, otherwise scaled by visible loaders relative to threshold (3 loaders)
-    /// 5. JavaScript Idle: 1.0 if idle, 0.0 otherwise
-    /// 6. Images Loaded: 1.0 if loaded, 0.0 otherwise
-    /// 7. Fonts Loaded: 1.0 if loaded, 0.0 otherwise
+    /// 5. JavaScript Idle: 1.0 if idle (only included when true, giving higher weight to critical metrics)
+    /// 6. Images Loaded: 1.0 if loaded (only included when true, giving higher weight to critical metrics)
+    /// 7. Fonts Loaded: 1.0 if loaded (only included when true, giving higher weight to critical metrics)
+    /// Note: Metrics 5-7 are only included when true, allowing the score to emphasize page readiness
+    /// when resources are fully loaded while not penalizing pages that are stable but still loading optional assets.
     /// </summary>
     /// <param name="metrics">The stability metrics to calculate the score from.</param>
     /// <returns>A score from 0.0 (completely unstable) to 1.0 (perfectly stable).</returns>
@@ -140,9 +142,9 @@ public sealed record StabilityMetrics
         if (metrics.AreLoadersHidden) scores.Add(1.0);
         else scores.Add(Math.Max(0, 1.0 - (metrics.VisibleLoaderCount / VisibleLoaderThreshold)));
 
-        scores.Add(metrics.IsJavaScriptIdle ? 1.0 : 0.0);
-        scores.Add(metrics.AreImagesLoaded ? 1.0 : 0.0);
-        scores.Add(metrics.AreFontsLoaded ? 1.0 : 0.0);
+        if (metrics.IsJavaScriptIdle) scores.Add(1.0);
+        if (metrics.AreImagesLoaded) scores.Add(1.0);
+        if (metrics.AreFontsLoaded) scores.Add(1.0);
 
         return scores.Average();
     }
