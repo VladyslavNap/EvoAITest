@@ -6,6 +6,26 @@ namespace EvoAITest.Core.Models.SmartWaiting;
 public sealed class HistoricalData
 {
     /// <summary>
+    /// Default timeout in milliseconds when no historical data is available.
+    /// </summary>
+    public const int DefaultTimeoutMs = 10000;
+
+    /// <summary>
+    /// Minimum allowed timeout in milliseconds.
+    /// </summary>
+    public const int MinimumTimeoutMs = 1000;
+
+    /// <summary>
+    /// Maximum allowed timeout in milliseconds.
+    /// </summary>
+    public const int MaximumTimeoutMs = 60000;
+
+    /// <summary>
+    /// Maximum number of samples to keep in history to prevent memory issues.
+    /// </summary>
+    public const int MaxSampleCount = 100;
+
+    /// <summary>
     /// Gets the action or operation being waited for.
     /// </summary>
     public required string Action { get; init; }
@@ -116,7 +136,7 @@ public sealed class HistoricalData
     public int CalculateAdaptiveTimeout(WaitStrategy strategy = WaitStrategy.Percentile, double safetyMultiplier = 1.5)
     {
         if (WaitTimesMs.Count == 0)
-            return 10000; // Default 10 seconds
+            return DefaultTimeoutMs;
 
         var baseTimeout = strategy switch
         {
@@ -129,7 +149,7 @@ public sealed class HistoricalData
         var timeout = (int)(baseTimeout * safetyMultiplier);
 
         // Ensure reasonable bounds
-        return Math.Max(1000, Math.Min(timeout, 60000)); // Min 1s, Max 60s
+        return Math.Max(MinimumTimeoutMs, Math.Min(timeout, MaximumTimeoutMs));
     }
 
     /// <summary>
@@ -178,10 +198,10 @@ public sealed class HistoricalData
     {
         var newWaitTimes = new List<int>(WaitTimesMs) { waitTimeMs };
         
-        // Keep only last 100 samples to prevent memory issues
-        if (newWaitTimes.Count > 100)
+        // Keep only last MaxSampleCount samples to prevent memory issues
+        if (newWaitTimes.Count > MaxSampleCount)
         {
-            newWaitTimes = newWaitTimes.Skip(newWaitTimes.Count - 100).ToList();
+            newWaitTimes = newWaitTimes.Skip(newWaitTimes.Count - MaxSampleCount).ToList();
         }
 
         var totalAttempts = SampleCount + 1;

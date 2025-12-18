@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using EvoAITest.Core.Abstractions;
 using EvoAITest.Core.Models.SmartWaiting;
 using Microsoft.Extensions.Logging;
@@ -9,9 +10,14 @@ namespace EvoAITest.Core.Services;
 /// </summary>
 public sealed class SmartWaitService : ISmartWaitService
 {
+    /// <summary>
+    /// Default stability period in milliseconds for checking DOM stability.
+    /// </summary>
+    private const int DefaultStabilityPeriodMs = 500;
+
     private readonly IPageStabilityDetector _stabilityDetector;
     private readonly ILogger<SmartWaitService> _logger;
-    private readonly Dictionary<string, HistoricalData> _historicalData = new();
+    private readonly ConcurrentDictionary<string, HistoricalData> _historicalData = new();
 
     public WaitStrategy DefaultStrategy { get; }
     public int DefaultMaxWaitMs { get; }
@@ -252,14 +258,12 @@ public sealed class SmartWaitService : ISmartWaitService
         WaitConditions conditions,
         CancellationToken cancellationToken)
     {
-        var results = new List<bool>();
-
-        foreach (var condition in conditions.Conditions)
+        var checkTasks = conditions.Conditions.Select(async condition =>
         {
-            var result = condition switch
+            return condition switch
             {
                 WaitConditionType.NetworkIdle => await CheckNetworkIdleAsync(conditions, cancellationToken),
-                WaitConditionType.DomStable => await _stabilityDetector.IsDomStableAsync(500, cancellationToken),
+                WaitConditionType.DomStable => await _stabilityDetector.IsDomStableAsync(DefaultStabilityPeriodMs, cancellationToken),
                 WaitConditionType.AnimationsComplete => await _stabilityDetector.AreAnimationsCompleteAsync(
                     conditions.Selector, cancellationToken),
                 WaitConditionType.LoadersHidden => await _stabilityDetector.AreLoadersHiddenAsync(cancellationToken),
@@ -272,11 +276,10 @@ public sealed class SmartWaitService : ISmartWaitService
                 WaitConditionType.DomContentLoaded => true, // Handled separately
                 _ => false
             };
+        });
 
-            results.Add(result);
-        }
-
-        return results;
+        var results = await Task.WhenAll(checkTasks);
+        return results.ToList();
     }
 
     /// <summary>
