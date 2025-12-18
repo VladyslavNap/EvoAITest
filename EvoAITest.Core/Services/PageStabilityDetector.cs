@@ -16,7 +16,7 @@ public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
     private CancellationTokenSource? _monitoringCts;
     private Task? _monitoringTask;
     private StabilityMetrics? _currentMetrics;
-    private PlaywrightPage? _page;
+    private volatile PlaywrightPage? _page;
 
     public bool IsMonitoring { get; private set; }
     public StabilityMetrics? CurrentMetrics => _currentMetrics;
