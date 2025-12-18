@@ -133,9 +133,14 @@ public sealed class HistoricalData
     }
 
     /// <summary>
+    /// Default minimum number of samples required to consider data sufficient.
+    /// </summary>
+    public const int MinimumSamplesForSufficientData = 10;
+
+    /// <summary>
     /// Determines if there is enough data for reliable adaptive timeouts.
     /// </summary>
-    public bool HasSufficientData(int minSamples = 10)
+    public bool HasSufficientData(int minSamples = MinimumSamplesForSufficientData)
     {
         return SampleCount >= minSamples;
     }
