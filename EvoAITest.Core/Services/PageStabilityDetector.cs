@@ -237,15 +237,16 @@ public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
 
         try
         {
-            var checkTasks = LoaderSelectors.Select(async selector =>
+            async Task<string?> CheckSelectorAsync(string selector)
             {
                 var elements = await _page!.QuerySelectorAllAsync(selector);
                 var visibilityTasks = elements.Select(element => element.IsVisibleAsync());
                 var visibilityResults = await Task.WhenAll(visibilityTasks);
                 
                 return visibilityResults.Any(isVisible => isVisible) ? selector : null;
-            });
+            }
 
+            var checkTasks = LoaderSelectors.Select(CheckSelectorAsync);
             var results = await Task.WhenAll(checkTasks);
             var visibleLoaders = results.Where(selector => selector != null).Select(s => s!).ToList();
 
