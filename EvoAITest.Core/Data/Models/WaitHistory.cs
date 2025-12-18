@@ -1,3 +1,5 @@
+using EvoAITest.Core.Models;
+
 namespace EvoAITest.Core.Data.Models;
 
 /// <summary>
