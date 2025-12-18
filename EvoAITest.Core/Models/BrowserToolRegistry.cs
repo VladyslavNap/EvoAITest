@@ -312,6 +312,50 @@ public static class BrowserToolRegistry
                 {
                     ["clear_logs"] = new ParameterDef("boolean", false, "Also clear the network activity logs", false)
                 }
+            ),
+
+            // Smart Waiting Tools
+            ["smart_wait"] = new BrowserToolDefinition(
+                Name: "smart_wait",
+                Description: "Intelligent adaptive waiting for multiple page stability conditions. Waits for DOM stability, animations completion, network idle, and loading indicators to disappear. Use this for complex pages with dynamic content, AJAX calls, or animations. More reliable than fixed timeouts as it adapts to actual page behavior.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["conditions"] = new ParameterDef("array", false, "Array of conditions to wait for: 'dom_stable', 'animations_complete', 'network_idle', 'loaders_hidden'. Default: all conditions", null),
+                    ["require_all"] = new ParameterDef("boolean", false, "If true, all conditions must be met (AND). If false, any condition is sufficient (OR)", true),
+                    ["max_wait_ms"] = new ParameterDef("int", false, "Maximum time to wait in milliseconds", 10000),
+                    ["selector"] = new ParameterDef("string", false, "Optional selector to check conditions for specific element", null)
+                }
+            ),
+
+            ["wait_for_stable"] = new BrowserToolDefinition(
+                Name: "wait_for_stable",
+                Description: "Wait for the page to reach a completely stable state (DOM stable + no animations + no network activity + no loaders). This is the most comprehensive wait ensuring the page is fully loaded and ready for interaction. Use after navigation, form submissions, or any action that triggers page updates. Recommended for flaky tests or complex SPAs.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["max_wait_ms"] = new ParameterDef("int", false, "Maximum time to wait in milliseconds", 10000),
+                    ["stability_period_ms"] = new ParameterDef("int", false, "How long the page must remain stable before considering it ready", 500)
+                }
+            ),
+
+            ["wait_for_animations"] = new BrowserToolDefinition(
+                Name: "wait_for_animations",
+                Description: "Wait for CSS animations and transitions to complete on the page or a specific element. Detects running animations using the Web Animations API. Use this after triggering animations (hover, click), before taking screenshots, or when waiting for modal/drawer animations. Essential for visual regression tests.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["selector"] = new ParameterDef("string", false, "Optional CSS selector to check animations for specific element. If not provided, checks all page animations", null),
+                    ["max_wait_ms"] = new ParameterDef("int", false, "Maximum time to wait for animations to complete", 5000)
+                }
+            ),
+
+            ["wait_for_network_idle"] = new BrowserToolDefinition(
+                Name: "wait_for_network_idle",
+                Description: "Wait for network activity to become idle (no active HTTP requests). Useful after actions that trigger API calls, when loading data, or before assertions that depend on server responses. More reliable than fixed waits as it adapts to actual network speed and API response times.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["max_active_requests"] = new ParameterDef("int", false, "Maximum number of active requests to consider as 'idle' (0 = no requests, 2 = up to 2 concurrent requests allowed)", 0),
+                    ["idle_duration_ms"] = new ParameterDef("int", false, "How long network must be idle before considering it stable", 500),
+                    ["max_wait_ms"] = new ParameterDef("int", false, "Maximum time to wait for network idle", 10000)
+                }
             )
         };
     }
