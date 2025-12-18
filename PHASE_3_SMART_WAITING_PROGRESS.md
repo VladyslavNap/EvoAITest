@@ -537,7 +537,7 @@ CREATE INDEX IX_WaitHistory_Success ON WaitHistory(Success);
 |-----------|--------|--------|
 | Wait time reduction | 50% | ? Ready |
 | Timing failure reduction | 80% | ? Ready |
-| Adaptive timeouts | ±10% optimal | ? Implemented |
+| Adaptive timeouts | Â±10% optimal | ? Implemented |
 | False timeout failures | 0% | ? Smart detection |
 | Background monitoring | Yes | ? Implemented |
 | Historical learning | Yes | ? Implemented |

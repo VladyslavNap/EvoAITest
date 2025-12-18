@@ -11,6 +11,16 @@ namespace EvoAITest.Core.Services;
 /// </summary>
 public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
 {
+    /// <summary>
+    /// Default interval in milliseconds for background stability monitoring checks.
+    /// </summary>
+    private const int MonitoringIntervalMs = 1000;
+
+    /// <summary>
+    /// Default stability period in milliseconds for checking page stability.
+    /// </summary>
+    private const int DefaultStabilityPeriodMs = 500;
+
     private readonly ILogger<PageStabilityDetector> _logger;
     private readonly SemaphoreSlim _monitoringLock = new(1, 1);
     private CancellationTokenSource? _monitoringCts;
@@ -127,21 +137,28 @@ public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
 
         try
         {
-            var script = selector != null
-                ? $@"
-                    () => {{
-                        const element = document.querySelector('{selector}');
+            int result;
+            if (selector != null)
+            {
+                var script = @"
+                    (selector) => {
+                        const element = document.querySelector(selector);
                         if (!element) return 0;
                         const animations = element.getAnimations();
                         return animations.filter(a => a.playState === 'running').length;
-                    }}"
-                : @"
+                    }";
+                result = await _page!.EvaluateAsync<int>(script, selector);
+            }
+            else
+            {
+                var script = @"
                     () => {
                         const animations = document.getAnimations();
                         return animations.filter(a => a.playState === 'running').length;
                     }";
+                result = await _page!.EvaluateAsync<int>(script);
+            }
 
-            var result = await _page!.EvaluateAsync<int>(script);
             _logger.LogDebug("Active animations: {Count}", result);
             return result;
         }
@@ -218,32 +235,28 @@ public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
     {
         EnsurePageSet();
 
-        var visibleLoaders = new List<string>();
-
         try
         {
-            foreach (var selector in LoaderSelectors)
+            var checkTasks = LoaderSelectors.Select(async selector =>
             {
                 var elements = await _page!.QuerySelectorAllAsync(selector);
-                foreach (var element in elements)
-                {
-                    var isVisible = await element.IsVisibleAsync();
-                    if (isVisible)
-                    {
-                        visibleLoaders.Add(selector);
-                        break; // Only need to know if this selector has visible elements
-                    }
-                }
-            }
+                var visibilityTasks = elements.Select(element => element.IsVisibleAsync());
+                var visibilityResults = await Task.WhenAll(visibilityTasks);
+                
+                return visibilityResults.Any(isVisible => isVisible) ? selector : null;
+            });
+
+            var results = await Task.WhenAll(checkTasks);
+            var visibleLoaders = results.Where(selector => selector != null).Select(s => s!).ToList();
 
             _logger.LogDebug("Detected {Count} visible loaders", visibleLoaders.Count);
+            return visibleLoaders;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error detecting loaders");
+            return new List<string>();
         }
-
-        return visibleLoaders;
     }
 
     public async Task<bool> IsJavaScriptIdleAsync(CancellationToken cancellationToken = default)
@@ -319,21 +332,58 @@ public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
 
         try
         {
-            var isDomStable = await IsDomStableAsync(500, cancellationToken);
-            var domMutations = isDomStable ? 0 : await MonitorDomMutationsAsync(500, cancellationToken);
-            
-            var areAnimationsComplete = await AreAnimationsCompleteAsync(null, cancellationToken);
-            var activeAnimations = areAnimationsComplete ? 0 : await GetActiveAnimationCountAsync(null, cancellationToken);
-            
-            var isNetworkIdle = await IsNetworkIdleAsync(0, 500, cancellationToken);
-            var activeRequests = await GetActiveRequestCountAsync(cancellationToken);
-            
-            var areLoadersHidden = await AreLoadersHiddenAsync(cancellationToken);
-            var loaders = await DetectLoadersAsync(cancellationToken);
-            
-            var isJsIdle = await IsJavaScriptIdleAsync(cancellationToken);
-            var areImagesLoaded = await AreImagesLoadedAsync(cancellationToken);
-            var areFontsLoaded = await AreFontsLoadedAsync(cancellationToken);
+            // Start independent checks concurrently
+            var domStableTask = IsDomStableAsync(DefaultStabilityPeriodMs, cancellationToken);
+            var animationsCompleteTask = AreAnimationsCompleteAsync(null, cancellationToken);
+            var networkIdleTask = IsNetworkIdleAsync(0, DefaultStabilityPeriodMs, cancellationToken);
+            var activeRequestsTask = GetActiveRequestCountAsync(cancellationToken);
+            var loadersTask = DetectLoadersAsync(cancellationToken);
+            var jsIdleTask = IsJavaScriptIdleAsync(cancellationToken);
+            var imagesLoadedTask = AreImagesLoadedAsync(cancellationToken);
+            var fontsLoadedTask = AreFontsLoadedAsync(cancellationToken);
+
+            // Await all independent checks together
+            await Task.WhenAll(
+                domStableTask,
+                animationsCompleteTask,
+                networkIdleTask,
+                activeRequestsTask,
+                loadersTask,
+                jsIdleTask,
+                imagesLoadedTask,
+                fontsLoadedTask);
+
+            var isDomStable = await domStableTask;
+            var areAnimationsComplete = await animationsCompleteTask;
+            var isNetworkIdle = await networkIdleTask;
+            var activeRequests = await activeRequestsTask;
+            var loaders = await loadersTask;
+            var isJsIdle = await jsIdleTask;
+            var areImagesLoaded = await imagesLoadedTask;
+            var areFontsLoaded = await fontsLoadedTask;
+
+            // Dependent checks: only when needed, and run them in parallel if both are required
+            var domMutations = 0;
+            var activeAnimations = 0;
+
+            if (!isDomStable && !areAnimationsComplete)
+            {
+                var domMutationsTask = MonitorDomMutationsAsync(DefaultStabilityPeriodMs, cancellationToken);
+                var activeAnimationsTask = GetActiveAnimationCountAsync(null, cancellationToken);
+
+                await Task.WhenAll(domMutationsTask, activeAnimationsTask);
+
+                domMutations = await domMutationsTask;
+                activeAnimations = await activeAnimationsTask;
+            }
+            else if (!isDomStable)
+            {
+                domMutations = await MonitorDomMutationsAsync(DefaultStabilityPeriodMs, cancellationToken);
+            }
+            else if (!areAnimationsComplete)
+            {
+                activeAnimations = await GetActiveAnimationCountAsync(null, cancellationToken);
+            }
 
             var metrics = new StabilityMetrics
             {
@@ -343,7 +393,7 @@ public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
                 ActiveAnimationCount = activeAnimations,
                 IsNetworkIdle = isNetworkIdle,
                 ActiveRequestCount = activeRequests,
-                AreLoadersHidden = areLoadersHidden,
+                AreLoadersHidden = loaders.Count == 0,
                 VisibleLoaderCount = loaders.Count,
                 IsJavaScriptIdle = isJsIdle,
                 AreImagesLoaded = areImagesLoaded,
@@ -410,26 +460,33 @@ public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
 
             _monitoringTask = Task.Run(async () =>
             {
-                _logger.LogInformation("Started background stability monitoring");
-
-                while (!_monitoringCts.Token.IsCancellationRequested)
+                try
                 {
-                    try
-                    {
-                        _currentMetrics = await GetStabilityMetricsAsync(_monitoringCts.Token);
-                        await Task.Delay(1000, _monitoringCts.Token); // Check every second
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Error during stability monitoring");
-                    }
-                }
+                    _logger.LogInformation("Started background stability monitoring");
 
-                _logger.LogInformation("Stopped background stability monitoring");
+                    while (!_monitoringCts.Token.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            _currentMetrics = await GetStabilityMetricsAsync(_monitoringCts.Token);
+                            await Task.Delay(MonitoringIntervalMs, _monitoringCts.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error during stability monitoring");
+                        }
+                    }
+
+                    _logger.LogInformation("Stopped background stability monitoring");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unhandled exception in background stability monitoring");
+                }
             }, _monitoringCts.Token);
         }
         finally

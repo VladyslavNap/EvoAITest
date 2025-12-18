@@ -6,6 +6,30 @@ namespace EvoAITest.Core.Models.SmartWaiting;
 public sealed record StabilityMetrics
 {
     /// <summary>
+    /// Threshold for DOM mutations in stability score calculation.
+    /// A page with more mutations relative to this threshold receives a lower stability score.
+    /// </summary>
+    private const double DomMutationThreshold = 100.0;
+
+    /// <summary>
+    /// Threshold for active animations in stability score calculation.
+    /// A page with more active animations relative to this threshold receives a lower stability score.
+    /// </summary>
+    private const double AnimationCountThreshold = 10.0;
+
+    /// <summary>
+    /// Threshold for active requests in stability score calculation.
+    /// A page with more active requests relative to this threshold receives a lower stability score.
+    /// </summary>
+    private const double ActiveRequestThreshold = 5.0;
+
+    /// <summary>
+    /// Threshold for visible loaders in stability score calculation.
+    /// A page with more visible loaders relative to this threshold receives a lower stability score.
+    /// </summary>
+    private const double VisibleLoaderThreshold = 3.0;
+
+    /// <summary>
     /// Gets whether the DOM is stable (no mutations for a period).
     /// </summary>
     public required bool IsDomStable { get; init; }
@@ -89,22 +113,32 @@ public sealed record StabilityMetrics
 
     /// <summary>
     /// Calculates the overall stability score based on individual metrics.
+    /// The score is computed as the average of seven individual metric scores, each ranging from 0.0 to 1.0:
+    /// 1. DOM Stability: 1.0 if stable, otherwise scaled by mutation count relative to threshold (100 mutations)
+    /// 2. Animation Completion: 1.0 if complete, otherwise scaled by active animations relative to threshold (10 animations)
+    /// 3. Network Idle: 1.0 if idle, otherwise scaled by active requests relative to threshold (5 requests)
+    /// 4. Loader Visibility: 1.0 if hidden, otherwise scaled by visible loaders relative to threshold (3 loaders)
+    /// 5. JavaScript Idle: 1.0 if idle, 0.0 otherwise
+    /// 6. Images Loaded: 1.0 if loaded, 0.0 otherwise
+    /// 7. Fonts Loaded: 1.0 if loaded, 0.0 otherwise
     /// </summary>
+    /// <param name="metrics">The stability metrics to calculate the score from.</param>
+    /// <returns>A score from 0.0 (completely unstable) to 1.0 (perfectly stable).</returns>
     public static double CalculateStabilityScore(StabilityMetrics metrics)
     {
         var scores = new List<double>();
 
         if (metrics.IsDomStable) scores.Add(1.0);
-        else scores.Add(Math.Max(0, 1.0 - (metrics.DomMutationCount / 100.0)));
+        else scores.Add(Math.Max(0, 1.0 - (metrics.DomMutationCount / DomMutationThreshold)));
 
         if (metrics.AreAnimationsComplete) scores.Add(1.0);
-        else scores.Add(Math.Max(0, 1.0 - (metrics.ActiveAnimationCount / 10.0)));
+        else scores.Add(Math.Max(0, 1.0 - (metrics.ActiveAnimationCount / AnimationCountThreshold)));
 
         if (metrics.IsNetworkIdle) scores.Add(1.0);
-        else scores.Add(Math.Max(0, 1.0 - (metrics.ActiveRequestCount / 5.0)));
+        else scores.Add(Math.Max(0, 1.0 - (metrics.ActiveRequestCount / ActiveRequestThreshold)));
 
         if (metrics.AreLoadersHidden) scores.Add(1.0);
-        else scores.Add(Math.Max(0, 1.0 - (metrics.VisibleLoaderCount / 3.0)));
+        else scores.Add(Math.Max(0, 1.0 - (metrics.VisibleLoaderCount / VisibleLoaderThreshold)));
 
         if (metrics.IsJavaScriptIdle) scores.Add(1.0);
         if (metrics.AreImagesLoaded) scores.Add(1.0);
