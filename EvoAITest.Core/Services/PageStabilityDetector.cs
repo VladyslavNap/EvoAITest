@@ -484,7 +484,22 @@ public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
 
     public void Dispose()
     {
-        StopMonitoringAsync().Wait();
-        _monitoringLock.Dispose();
+        // Best-effort synchronous cleanup without blocking on async operations
+        try
+        {
+            if (IsMonitoring)
+            {
+                _monitoringCts?.Cancel();
+            }
+
+            _monitoringCts?.Dispose();
+            _monitoringCts = null;
+            _monitoringTask = null;
+            IsMonitoring = false;
+        }
+        finally
+        {
+            _monitoringLock.Dispose();
+        }
     }
 }
