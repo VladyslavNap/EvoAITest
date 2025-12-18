@@ -140,9 +140,9 @@ public sealed record StabilityMetrics
         if (metrics.AreLoadersHidden) scores.Add(1.0);
         else scores.Add(Math.Max(0, 1.0 - (metrics.VisibleLoaderCount / VisibleLoaderThreshold)));
 
-        if (metrics.IsJavaScriptIdle) scores.Add(1.0);
-        if (metrics.AreImagesLoaded) scores.Add(1.0);
-        if (metrics.AreFontsLoaded) scores.Add(1.0);
+        scores.Add(metrics.IsJavaScriptIdle ? 1.0 : 0.0);
+        scores.Add(metrics.AreImagesLoaded ? 1.0 : 0.0);
+        scores.Add(metrics.AreFontsLoaded ? 1.0 : 0.0);
 
         return scores.Average();
     }

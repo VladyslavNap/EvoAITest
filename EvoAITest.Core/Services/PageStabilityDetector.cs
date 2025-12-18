@@ -353,14 +353,14 @@ public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
                 imagesLoadedTask,
                 fontsLoadedTask);
 
-            var isDomStable = await domStableTask;
-            var areAnimationsComplete = await animationsCompleteTask;
-            var isNetworkIdle = await networkIdleTask;
-            var activeRequests = await activeRequestsTask;
-            var loaders = await loadersTask;
-            var isJsIdle = await jsIdleTask;
-            var areImagesLoaded = await imagesLoadedTask;
-            var areFontsLoaded = await fontsLoadedTask;
+            var isDomStable = domStableTask.Result;
+            var areAnimationsComplete = animationsCompleteTask.Result;
+            var isNetworkIdle = networkIdleTask.Result;
+            var activeRequests = activeRequestsTask.Result;
+            var loaders = loadersTask.Result;
+            var isJsIdle = jsIdleTask.Result;
+            var areImagesLoaded = imagesLoadedTask.Result;
+            var areFontsLoaded = fontsLoadedTask.Result;
 
             // Dependent checks: only when needed, and run them in parallel if both are required
             var domMutations = 0;
@@ -373,8 +373,8 @@ public sealed class PageStabilityDetector : IPageStabilityDetector, IDisposable
 
                 await Task.WhenAll(domMutationsTask, activeAnimationsTask);
 
-                domMutations = await domMutationsTask;
-                activeAnimations = await activeAnimationsTask;
+                domMutations = domMutationsTask.Result;
+                activeAnimations = activeAnimationsTask.Result;
             }
             else if (!isDomStable)
             {
