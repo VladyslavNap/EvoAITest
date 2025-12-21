@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using EvoAITest.Core.Models;
+using EvoAITest.Core.Data.Models;
 
 namespace EvoAITest.Core.Data;
 
@@ -46,6 +47,16 @@ public sealed class EvoAIDbContext : DbContext
     /// Gets or sets the VisualComparisonResults DbSet.
     /// </summary>
     public DbSet<VisualComparisonResult> VisualComparisonResults => Set<VisualComparisonResult>();
+
+    /// <summary>
+    /// Gets or sets the WaitHistory DbSet.
+    /// </summary>
+    public DbSet<WaitHistory> WaitHistory => Set<WaitHistory>();
+
+    /// <summary>
+    /// Gets or sets the SelectorHealingHistory DbSet.
+    /// </summary>
+    public DbSet<SelectorHealingHistory> SelectorHealingHistory => Set<SelectorHealingHistory>();
 
     /// <summary>
     /// Configures the database model using the specified model builder.
@@ -261,6 +272,42 @@ public sealed class EvoAIDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.BaselineId)
                 .OnDelete(DeleteBehavior.NoAction); // Prevent cascade cycles
+        });
+
+        // Configure SelectorHealingHistory entity
+        modelBuilder.Entity<SelectorHealingHistory>(entity =>
+        {
+            // Primary key
+            entity.HasKey(e => e.Id);
+
+            // Table name
+            entity.ToTable("SelectorHealingHistory");
+
+            // Required fields
+            entity.Property(e => e.TaskId).IsRequired();
+            entity.Property(e => e.OriginalSelector).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.HealedSelector).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.HealingStrategy).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.ConfidenceScore).IsRequired();
+            entity.Property(e => e.Success).IsRequired();
+            entity.Property(e => e.HealedAt).IsRequired();
+
+            // Optional fields
+            entity.Property(e => e.PageUrl).HasMaxLength(2000);
+            entity.Property(e => e.ExpectedText).HasMaxLength(500);
+            entity.Property(e => e.Context).HasColumnType("nvarchar(max)");
+
+            // Indexes
+            entity.HasIndex(e => e.TaskId);
+            entity.HasIndex(e => e.Success);
+            entity.HasIndex(e => e.HealedAt);
+            entity.HasIndex(e => e.HealingStrategy);
+
+            // Relationships
+            entity.HasOne(e => e.Task)
+                .WithMany()
+                .HasForeignKey(e => e.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 
