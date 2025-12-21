@@ -12,7 +12,7 @@ namespace EvoAITest.Agents.Agents;
 /// AI-powered selector generation agent that uses LLM to analyze page structure
 /// and generate robust CSS selectors with multiple alternatives.
 /// </summary>
-public sealed class SelectorAgent
+public sealed class SelectorAgent : ISelectorAgent
 {
     private readonly ILLMProvider _llmProvider;
     private readonly ILogger<SelectorAgent> _logger;
@@ -340,13 +340,50 @@ Return your response as JSON following the specified format.";
         return false;
     }
 
+    #region ISelectorAgent Implementation
+
     /// <summary>
-    /// Response model for LLM selector generation.
+    /// Generates selector candidates using LLM analysis (interface implementation).
     /// </summary>
-    private class SelectorGenerationResponse
+    Task<List<SelectorCandidate>> ISelectorAgent.GenerateSelectorCandidatesAsync(
+        PageState pageState,
+        string failedSelector,
+        string? expectedText,
+        CancellationToken cancellationToken)
     {
-        public List<CandidateDto> Candidates { get; set; } = new();
+        // Create healing context from parameters
+        var context = new HealingContext
+        {
+            FailedSelector = failedSelector,
+            PageState = pageState,
+            ExpectedText = expectedText
+        };
+
+        // Call existing implementation
+        return GenerateSelectorCandidatesAsync(context, cancellationToken);
     }
+
+    /// <summary>
+    /// Generates the best selector using LLM analysis (interface implementation).
+    /// </summary>
+    async Task<SelectorCandidate?> ISelectorAgent.GenerateBestSelectorAsync(
+        PageState pageState,
+        string failedSelector,
+        string? expectedText,
+        CancellationToken cancellationToken)
+    {
+        var candidates = await ((ISelectorAgent)this).GenerateSelectorCandidatesAsync(
+            pageState, failedSelector, expectedText, cancellationToken);
+
+        // Return the candidate with highest confidence
+        return candidates
+            .OrderByDescending(c => c.BaseConfidence)
+            .FirstOrDefault();
+    }
+
+    #endregion
+
+    #region Response Models
 
     private class CandidateDto
     {
@@ -356,4 +393,11 @@ Return your response as JSON following the specified format.";
         public string? Reasoning { get; set; }
         public bool IsValidCss { get; set; } = true;
     }
+
+    private class SelectorGenerationResponse
+    {
+        public List<CandidateDto> Candidates { get; set; } = new();
+    }
+
+    #endregion
 }

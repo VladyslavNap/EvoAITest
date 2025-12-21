@@ -11,14 +11,17 @@ namespace EvoAITest.Core.Services;
 public sealed class SelectorHealingService : ISelectorHealingService
 {
     private readonly VisualElementMatcher _visualMatcher;
+    private readonly ISelectorAgent? _selectorAgent;
     private readonly ILogger<SelectorHealingService> _logger;
 
     public SelectorHealingService(
         VisualElementMatcher visualMatcher,
-        ILogger<SelectorHealingService> logger)
+        ILogger<SelectorHealingService> logger,
+        ISelectorAgent? selectorAgent = null)
     {
         _visualMatcher = visualMatcher ?? throw new ArgumentNullException(nameof(visualMatcher));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _selectorAgent = selectorAgent; // Optional for LLM strategy
     }
 
     public async Task<HealedSelector?> HealSelectorAsync(
@@ -404,9 +407,31 @@ public sealed class SelectorHealingService : ISelectorHealingService
         HealingContext context,
         CancellationToken cancellationToken)
     {
-        // TODO: Integrate with SelectorAgent when abstraction is created
-        _logger.LogDebug("LLM strategy not yet integrated");
-        return new List<SelectorCandidate>();
+        if (_selectorAgent == null)
+        {
+            _logger.LogDebug("LLM strategy skipped: ISelectorAgent not available");
+            return new List<SelectorCandidate>();
+        }
+
+        try
+        {
+            _logger.LogInformation("Using LLM to generate selector candidates");
+            
+            var candidates = await _selectorAgent.GenerateSelectorCandidatesAsync(
+                context.PageState,
+                context.FailedSelector,
+                context.ExpectedText,
+                cancellationToken);
+
+            _logger.LogInformation("LLM generated {Count} selector candidates", candidates.Count);
+            
+            return candidates;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "LLM selector generation failed");
+            return new List<SelectorCandidate>();
+        }
     }
 
     /// <summary>
