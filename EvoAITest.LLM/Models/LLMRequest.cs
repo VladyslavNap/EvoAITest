@@ -105,6 +105,11 @@ public sealed class Message
     /// Gets or sets the timestamp when the message was created.
     /// </summary>
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// Gets or sets the image URL for vision requests (base64 data URL).
+    /// </summary>
+    public string? ImageUrl { get; set; }
 }
 
 /// <summary>
