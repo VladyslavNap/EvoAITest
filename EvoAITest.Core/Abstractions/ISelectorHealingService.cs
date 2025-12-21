@@ -113,12 +113,12 @@ public interface ISelectorHealingService
     /// Saves a successful healing to the database for future learning.
     /// </summary>
     /// <param name="healedSelector">The healed selector to save.</param>
-    /// <param name="taskId">The task ID this healing is associated with.</param>
+    /// <param name="taskId">The task ID this healing is associated with (can be null if outside task context).</param>
     /// <param name="success">Whether the healing was successful.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SaveHealingHistoryAsync(
         HealedSelector healedSelector,
-        Guid taskId,
+        Guid? taskId,
         bool success,
         CancellationToken cancellationToken = default);
 

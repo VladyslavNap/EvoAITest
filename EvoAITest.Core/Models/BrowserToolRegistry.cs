@@ -356,6 +356,19 @@ public static class BrowserToolRegistry
                     ["idle_duration_ms"] = new ParameterDef("int", false, "How long network must be idle before considering it stable", 500),
                     ["max_wait_ms"] = new ParameterDef("int", false, "Maximum time to wait for network idle", 10000)
                 }
+            ),
+
+            // Self-Healing Tool
+            ["heal_selector"] = new BrowserToolDefinition(
+                Name: "heal_selector",
+                Description: "Attempts to heal a failed CSS selector by finding alternative selectors using multiple intelligent strategies. Returns healed selector with confidence score.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["failed_selector"] = new ParameterDef("string", true, "The CSS selector that failed to locate the element", null),
+                    ["expected_text"] = new ParameterDef("string", false, "Optional expected text content of the element (helps with text-based matching)", null),
+                    ["page_url"] = new ParameterDef("string", false, "Optional page URL context for healing history", null),
+                    ["confidence_threshold"] = new ParameterDef("number", false, "Minimum confidence score (0.0-1.0) to accept a healed selector", 0.75)
+                }
             )
         };
     }
