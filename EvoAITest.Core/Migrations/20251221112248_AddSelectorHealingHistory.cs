@@ -96,8 +96,9 @@ namespace EvoAITest.Core.Migrations
             migrationBuilder.DropTable(
                 name: "SelectorHealingHistory");
 
-            migrationBuilder.DropTable(
-                name: "WaitHistory");
+            migrationBuilder.DropIndex(
+                name: "IX_WaitHistory_TaskId",
+                table: "WaitHistory");
         }
     }
 }
