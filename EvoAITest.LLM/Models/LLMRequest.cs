@@ -107,7 +107,9 @@ public sealed class Message
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
-    /// Gets or sets the image URL for vision requests (base64 data URL).
+    /// Gets or sets the image URL for vision requests as a base64-encoded data URL.
+    /// Expected format: <c>data:image/png;base64,{base64Image}</c>
+    /// Currently only PNG format is supported by the GPT4VisionProvider implementation.
     /// </summary>
     public string? ImageUrl { get; set; }
 }

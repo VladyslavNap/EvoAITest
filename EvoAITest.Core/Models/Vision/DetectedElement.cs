@@ -2,11 +2,15 @@ namespace EvoAITest.Core.Models.Vision;
 
 /// <summary>
 /// Represents a UI element detected in a screenshot using vision analysis.
+/// Design note: This is a class (not a record) to support mutability for LLM parsing scenarios
+/// where properties may need to be set incrementally during deserialization.
 /// </summary>
 public sealed class DetectedElement
 {
     /// <summary>
     /// Gets or sets the type of element (button, input, link, etc.).
+    /// Design note: String type (instead of enum) allows flexibility for LLM-generated element types
+    /// that may not fit predefined categories. Common values: "button", "input", "link", "div", "span".
     /// </summary>
     public required string ElementType { get; set; }
 

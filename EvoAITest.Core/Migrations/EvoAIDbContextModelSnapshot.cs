@@ -112,16 +112,9 @@ namespace EvoAITest.Core.Migrations
 
                     b.Property<string>("WaitCondition")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Action");
-
-                    b.HasIndex("RecordedAt");
-
-                    b.HasIndex("Success");
 
                     b.HasIndex("TaskId");
 

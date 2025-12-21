@@ -59,6 +59,37 @@ public sealed class DefaultToolExecutor : IToolExecutor
         "active_tool_executions",
         description: "Number of currently executing tools");
     
+    // Selector error detection patterns
+    private static readonly string[] SelectorErrorPatterns =
+    {
+        "css selector",
+        "xpath",
+        "no such element",
+        "unable to locate element",
+        "element not found",
+        "element is not attached to the page document",
+        "timeout waiting for selector",
+        "timeout waiting for element",
+        "waiting for selector",
+        "waiting for element"
+    };
+    
+    // Compiled regexes for selector text extraction
+    private static readonly System.Text.RegularExpressions.Regex ContainsRegex = 
+        new(@":contains\([""']([^""']+)[""']\)", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | 
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+    
+    private static readonly System.Text.RegularExpressions.Regex HasTextRegex = 
+        new(@":has-text\([""']([^""']+)[""']\)", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | 
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+    
+    private static readonly System.Text.RegularExpressions.Regex TextAttrRegex = 
+        new(@"\[text=[""']([^""']+)[""']\]", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | 
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+    
     // In-memory execution history keyed by correlation ID
     private readonly ConcurrentDictionary<string, List<ToolExecutionResult>> _executionHistory = new();
     private readonly Random _jitterRandom = new();
@@ -679,7 +710,10 @@ public sealed class DefaultToolExecutor : IToolExecutor
             // Attempt automatic healing
             _logger.LogInformation("Attempting automatic selector healing for failed selector: {Selector}", selector);
             
-            var healedSelector = await TryHealSelectorAsync(selector, null, cancellationToken).ConfigureAwait(false);
+            // Try to extract expected text from the selector if it contains text-based selectors
+            string? expectedText = ExtractExpectedTextFromSelector(selector);
+            
+            var healedSelector = await TryHealSelectorAsync(selector, expectedText, cancellationToken).ConfigureAwait(false);
             
             if (healedSelector != null)
             {
@@ -1613,7 +1647,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
         {
             await _selectorHealingService.SaveHealingHistoryAsync(
                 healedSelector,
-                Guid.Empty,
+                null, // TaskId is null when healing occurs outside of a specific task context
                 true,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -1625,11 +1659,45 @@ public sealed class DefaultToolExecutor : IToolExecutor
 
     private static bool IsSelectorError(Exception ex)
     {
-        var message = ex.Message.ToLowerInvariant();
-        return message.Contains("selector") ||
-               message.Contains("element") ||
-               message.Contains("not found") ||
-               message.Contains("timeout");
+        var message = ex.Message;
+        if (string.IsNullOrWhiteSpace(message))
+            return false;
+
+        message = message.ToLowerInvariant();
+
+        foreach (var pattern in SelectorErrorPatterns)
+        {
+            if (message.Contains(pattern))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Attempts to extract expected text from a CSS selector containing text-based selectors.
+    /// </summary>
+    private static string? ExtractExpectedTextFromSelector(string selector)
+    {
+        if (string.IsNullOrWhiteSpace(selector))
+            return null;
+            
+        // Extract from :contains() pseudo-class
+        var containsMatch = ContainsRegex.Match(selector);
+        if (containsMatch.Success)
+            return containsMatch.Groups[1].Value;
+            
+        // Extract from :has-text() pseudo-class
+        var hasTextMatch = HasTextRegex.Match(selector);
+        if (hasTextMatch.Success)
+            return hasTextMatch.Groups[1].Value;
+            
+        // Extract from text attribute
+        var textAttrMatch = TextAttrRegex.Match(selector);
+        if (textAttrMatch.Success)
+            return textAttrMatch.Groups[1].Value;
+        
+        return null;
     }
 
     #endregion
