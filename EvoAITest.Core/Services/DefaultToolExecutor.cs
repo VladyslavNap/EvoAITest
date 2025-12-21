@@ -679,7 +679,10 @@ public sealed class DefaultToolExecutor : IToolExecutor
             // Attempt automatic healing
             _logger.LogInformation("Attempting automatic selector healing for failed selector: {Selector}", selector);
             
-            var healedSelector = await TryHealSelectorAsync(selector, null, cancellationToken).ConfigureAwait(false);
+            // Try to extract expected text from the selector if it contains text-based selectors
+            string? expectedText = ExtractExpectedTextFromSelector(selector);
+            
+            var healedSelector = await TryHealSelectorAsync(selector, expectedText, cancellationToken).ConfigureAwait(false);
             
             if (healedSelector != null)
             {
@@ -1613,7 +1616,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
         {
             await _selectorHealingService.SaveHealingHistoryAsync(
                 healedSelector,
-                Guid.Empty,
+                null, // TaskId is null when healing occurs outside of a specific task context
                 true,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -1625,11 +1628,69 @@ public sealed class DefaultToolExecutor : IToolExecutor
 
     private static bool IsSelectorError(Exception ex)
     {
-        var message = ex.Message.ToLowerInvariant();
-        return message.Contains("selector") ||
-               message.Contains("element") ||
-               message.Contains("not found") ||
-               message.Contains("timeout");
+        var message = ex.Message;
+        if (string.IsNullOrWhiteSpace(message))
+            return false;
+
+        message = message.ToLowerInvariant();
+        
+        // Use more specific patterns to avoid false positives
+        string[] selectorErrorPatterns =
+        {
+            "css selector",
+            "xpath",
+            "no such element",
+            "unable to locate element",
+            "element not found",
+            "element is not attached to the page document",
+            "timeout waiting for selector",
+            "timeout waiting for element",
+            "waiting for selector",
+            "waiting for element"
+        };
+
+        foreach (var pattern in selectorErrorPatterns)
+        {
+            if (message.Contains(pattern))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Attempts to extract expected text from a CSS selector containing text-based selectors.
+    /// </summary>
+    private static string? ExtractExpectedTextFromSelector(string selector)
+    {
+        // Try to extract text from common text-based selector patterns
+        // Example: button:contains("Submit") or [text="Login"]
+        
+        if (string.IsNullOrWhiteSpace(selector))
+            return null;
+            
+        // Extract from :contains() pseudo-class
+        var containsMatch = System.Text.RegularExpressions.Regex.Match(
+            selector, @":contains\([""']([^""']+)[""']\)", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (containsMatch.Success)
+            return containsMatch.Groups[1].Value;
+            
+        // Extract from :has-text() pseudo-class
+        var hasTextMatch = System.Text.RegularExpressions.Regex.Match(
+            selector, @":has-text\([""']([^""']+)[""']\)", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (hasTextMatch.Success)
+            return hasTextMatch.Groups[1].Value;
+            
+        // Extract from text attribute
+        var textAttrMatch = System.Text.RegularExpressions.Regex.Match(
+            selector, @"\[text=[""']([^""']+)[""']\]", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (textAttrMatch.Success)
+            return textAttrMatch.Groups[1].Value;
+        
+        return null;
     }
 
     #endregion

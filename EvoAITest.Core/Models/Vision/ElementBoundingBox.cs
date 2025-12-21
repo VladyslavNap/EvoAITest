@@ -8,22 +8,22 @@ public sealed class ElementBoundingBox
     /// <summary>
     /// Gets or sets the X coordinate (left position) in pixels.
     /// </summary>
-    public int X { get; set; }
+    public int X { get; init; }
 
     /// <summary>
     /// Gets or sets the Y coordinate (top position) in pixels.
     /// </summary>
-    public int Y { get; set; }
+    public int Y { get; init; }
 
     /// <summary>
     /// Gets or sets the width in pixels.
     /// </summary>
-    public int Width { get; set; }
+    public int Width { get; init; }
 
     /// <summary>
     /// Gets or sets the height in pixels.
     /// </summary>
-    public int Height { get; set; }
+    public int Height { get; init; }
 
     /// <summary>
     /// Gets the center X coordinate.

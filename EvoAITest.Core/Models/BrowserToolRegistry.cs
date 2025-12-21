@@ -361,7 +361,7 @@ public static class BrowserToolRegistry
             // Self-Healing Tool
             ["heal_selector"] = new BrowserToolDefinition(
                 Name: "heal_selector",
-                Description: "Manually trigger selector healing when a selector fails to locate an element. Uses multiple intelligent strategies (text matching, ARIA labels, visual similarity, position proximity, LLM generation) to find the element and suggest an alternative selector. Returns a healed selector with confidence score. Use this when selectors break due to page structure changes or to proactively test healing capabilities.",
+                Description: "Attempts to heal a failed CSS selector by finding alternative selectors using multiple intelligent strategies. Returns healed selector with confidence score.",
                 Parameters: new Dictionary<string, ParameterDef>
                 {
                     ["failed_selector"] = new ParameterDef("string", true, "The CSS selector that failed to locate the element", null),

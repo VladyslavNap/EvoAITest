@@ -46,9 +46,24 @@ public sealed class GPT4VisionProvider
             _logger.LogInformation("Detected {Count} elements", elements.Count);
             return elements;
         }
+        catch (System.Text.Json.JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to parse element detection response - LLM returned invalid JSON");
+            return new List<DetectedElement>();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP request failed while detecting elements - check network connectivity and API endpoint");
+            return new List<DetectedElement>();
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogWarning(ex, "Element detection request timed out or was cancelled");
+            return new List<DetectedElement>();
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error detecting elements in screenshot");
+            _logger.LogError(ex, "Unexpected error detecting elements in screenshot");
             return new List<DetectedElement>();
         }
     }

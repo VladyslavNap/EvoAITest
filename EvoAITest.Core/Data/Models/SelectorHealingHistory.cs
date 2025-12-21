@@ -14,8 +14,9 @@ public sealed class SelectorHealingHistory
 
     /// <summary>
     /// Gets or sets the task ID this healing is associated with.
+    /// Can be null if healing occurs outside of a specific task context.
     /// </summary>
-    public Guid TaskId { get; set; }
+    public Guid? TaskId { get; set; }
 
     /// <summary>
     /// Gets or sets the original selector that failed.

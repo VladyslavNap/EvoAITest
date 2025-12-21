@@ -198,12 +198,13 @@ Return your response as JSON following the specified format.";
     /// </summary>
     private string FormatElementInfo(ElementInfo element, int number)
     {
-        var info = $"Element {number}:\n";
-        info += $"  Tag: {element.TagName}\n";
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Element {number}:");
+        sb.AppendLine($"  Tag: {element.TagName}");
 
         if (!string.IsNullOrWhiteSpace(element.Selector))
         {
-            info += $"  Selector: {element.Selector}\n";
+            sb.AppendLine($"  Selector: {element.Selector}");
         }
 
         if (!string.IsNullOrWhiteSpace(element.Text))
@@ -211,7 +212,7 @@ Return your response as JSON following the specified format.";
             var truncatedText = element.Text.Length > 100 
                 ? element.Text.Substring(0, 100) + "..." 
                 : element.Text;
-            info += $"  Text: {truncatedText}\n";
+            sb.AppendLine($"  Text: {truncatedText}");
         }
 
         // Include relevant attributes
@@ -221,15 +222,15 @@ Return your response as JSON following the specified format.";
 
         foreach (var attr in relevantAttrs)
         {
-            info += $"  @{attr.Key}: {attr.Value}\n";
+            sb.AppendLine($"  @{attr.Key}: {attr.Value}");
         }
 
         if (element.BoundingBox != null)
         {
-            info += $"  Position: ({element.BoundingBox.X}, {element.BoundingBox.Y})\n";
+            sb.AppendLine($"  Position: ({element.BoundingBox.X}, {element.BoundingBox.Y})");
         }
 
-        return info;
+        return sb.ToString();
     }
 
     /// <summary>
@@ -268,32 +269,30 @@ Return your response as JSON following the specified format.";
                 return new List<SelectorCandidate>();
             }
 
-            var candidates = new List<SelectorCandidate>();
-
-            foreach (var candidate in response.Candidates)
-            {
-                if (string.IsNullOrWhiteSpace(candidate.Selector))
-                    continue;
-
-                // Parse strategy enum
-                if (!Enum.TryParse<HealingStrategy>(candidate.Strategy, true, out var strategy))
+            var candidates = response.Candidates
+                .Where(candidate => !string.IsNullOrWhiteSpace(candidate.Selector))
+                .Select(candidate =>
                 {
-                    strategy = HealingStrategy.LLMGenerated;
-                }
-
-                candidates.Add(new SelectorCandidate
-                {
-                    Selector = candidate.Selector,
-                    Strategy = strategy,
-                    BaseConfidence = Math.Clamp(candidate.Confidence, 0.0, 1.0),
-                    Reasoning = candidate.Reasoning ?? "LLM-generated selector",
-                    Context = new Dictionary<string, object>
+                    // Parse strategy enum
+                    if (!Enum.TryParse<HealingStrategy>(candidate.Strategy, true, out var strategy))
                     {
-                        ["llm_generated"] = true,
-                        ["is_valid_css"] = candidate.IsValidCss
+                        strategy = HealingStrategy.LLMGenerated;
                     }
-                });
-            }
+
+                    return new SelectorCandidate
+                    {
+                        Selector = candidate.Selector,
+                        Strategy = strategy,
+                        BaseConfidence = Math.Clamp(candidate.Confidence, 0.0, 1.0),
+                        Reasoning = candidate.Reasoning ?? "LLM-generated selector",
+                        Context = new Dictionary<string, object>
+                        {
+                            ["llm_generated"] = true,
+                            ["is_valid_css"] = candidate.IsValidCss
+                        }
+                    };
+                })
+                .ToList();
 
             return candidates;
         }
