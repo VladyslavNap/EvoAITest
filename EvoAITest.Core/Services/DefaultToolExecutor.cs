@@ -41,6 +41,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
     private readonly ToolExecutorOptions _options;
     private readonly ILogger<DefaultToolExecutor> _logger;
     private readonly IVisualComparisonService? _visualComparisonService;
+    private readonly ISelectorHealingService? _selectorHealingService;
     
     // OpenTelemetry tracing
     private static readonly ActivitySource ActivitySource = new("EvoAITest.ToolExecutor", "1.0.0");
@@ -70,18 +71,21 @@ public sealed class DefaultToolExecutor : IToolExecutor
     /// <param name="options">Configuration options for retry behavior and timeouts.</param>
     /// <param name="logger">Logger for structured telemetry.</param>
     /// <param name="visualComparisonService">Optional service for visual regression testing.</param>
+    /// <param name="selectorHealingService">Optional service for automatic selector healing.</param>
     public DefaultToolExecutor(
         IBrowserAgent browserAgent,
         IBrowserToolRegistry toolRegistry,
         IOptions<ToolExecutorOptions> options,
         ILogger<DefaultToolExecutor> logger,
-        IVisualComparisonService? visualComparisonService = null)
+        IVisualComparisonService? visualComparisonService = null,
+        ISelectorHealingService? selectorHealingService = null)
     {
         _browserAgent = browserAgent ?? throw new ArgumentNullException(nameof(browserAgent));
         _toolRegistry = toolRegistry ?? throw new ArgumentNullException(nameof(toolRegistry));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _visualComparisonService = visualComparisonService; // Optional for backwards compatibility
+        _selectorHealingService = selectorHealingService; // Optional for self-healing capability
         
         // Validate options on construction
         _options.Validate();
@@ -664,8 +668,38 @@ public sealed class DefaultToolExecutor : IToolExecutor
     {
         var selector = GetRequiredParameter<string>(toolCall, "selector");
         var maxRetries = GetOptionalParameter(toolCall, "maxRetries", 3);
-        await _browserAgent.ClickAsync(selector, maxRetries, cancellationToken).ConfigureAwait(false);
-        return null;
+        
+        try
+        {
+            await _browserAgent.ClickAsync(selector, maxRetries, cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        catch (Exception ex) when (_selectorHealingService != null && IsSelectorError(ex))
+        {
+            // Attempt automatic healing
+            _logger.LogInformation("Attempting automatic selector healing for failed selector: {Selector}", selector);
+            
+            var healedSelector = await TryHealSelectorAsync(selector, null, cancellationToken).ConfigureAwait(false);
+            
+            if (healedSelector != null)
+            {
+                // Retry with healed selector
+                _logger.LogInformation(
+                    "Healed selector found with {Strategy} strategy (confidence: {Confidence:F2}). Retrying click...",
+                    healedSelector.Strategy, healedSelector.ConfidenceScore);
+                
+                await _browserAgent.ClickAsync(healedSelector.NewSelector, maxRetries, cancellationToken).ConfigureAwait(false);
+                
+                // Log successful healing
+                await LogSuccessfulHealingAsync(selector, healedSelector, cancellationToken).ConfigureAwait(false);
+                
+                return null;
+            }
+            
+            // Healing failed, re-throw original exception
+            _logger.LogWarning("Selector healing failed for: {Selector}", selector);
+            throw;
+        }
     }
 
     private async Task<object?> ExecuteTypeAsync(ToolCall toolCall, CancellationToken cancellationToken)
@@ -1534,6 +1568,71 @@ public sealed class DefaultToolExecutor : IToolExecutor
         // Record execution duration
         ToolExecutionDuration.Record(duration.TotalMilliseconds, tags);
     }
+
+    #region Selector Healing Helpers
+
+    private async Task<EvoAITest.Core.Models.SelfHealing.HealedSelector?> TryHealSelectorAsync(
+        string failedSelector, 
+        string? expectedText,
+        CancellationToken cancellationToken)
+    {
+        if (_selectorHealingService == null)
+            return null;
+
+        try
+        {
+            var pageState = await _browserAgent.GetPageStateAsync(cancellationToken).ConfigureAwait(false);
+            var screenshotBase64 = await _browserAgent.TakeScreenshotAsync(cancellationToken).ConfigureAwait(false);
+            byte[]? screenshot = !string.IsNullOrEmpty(screenshotBase64) 
+                ? Convert.FromBase64String(screenshotBase64) 
+                : null;
+            
+            return await _selectorHealingService.HealSelectorAsync(
+                failedSelector,
+                pageState,
+                expectedText,
+                screenshot,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Selector healing attempt failed for selector: {Selector}", failedSelector);
+            return null;
+        }
+    }
+
+    private async Task LogSuccessfulHealingAsync(
+        string originalSelector,
+        EvoAITest.Core.Models.SelfHealing.HealedSelector healedSelector,
+        CancellationToken cancellationToken)
+    {
+        if (_selectorHealingService == null)
+            return;
+
+        try
+        {
+            await _selectorHealingService.SaveHealingHistoryAsync(
+                healedSelector,
+                Guid.Empty,
+                true,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to log healing history");
+        }
+    }
+
+    private static bool IsSelectorError(Exception ex)
+    {
+        var message = ex.Message.ToLowerInvariant();
+        return message.Contains("selector") ||
+               message.Contains("element") ||
+               message.Contains("not found") ||
+               message.Contains("timeout");
+    }
+
+    #endregion
 
     #endregion
 }
