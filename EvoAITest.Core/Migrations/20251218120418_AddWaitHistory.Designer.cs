@@ -4,6 +4,7 @@ using EvoAITest.Core.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EvoAITest.Core.Migrations
 {
     [DbContext(typeof(EvoAIDbContext))]
-    partial class EvoAIDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251218120418_AddWaitHistory")]
+    partial class AddWaitHistory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,63 +24,6 @@ namespace EvoAITest.Core.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("EvoAITest.Core.Data.Models.SelectorHealingHistory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<double>("ConfidenceScore")
-                        .HasColumnType("float");
-
-                    b.Property<string>("Context")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ExpectedText")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTimeOffset>("HealedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("HealedSelector")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("HealingStrategy")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("OriginalSelector")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("PageUrl")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<bool>("Success")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid>("TaskId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("HealedAt");
-
-                    b.HasIndex("HealingStrategy");
-
-                    b.HasIndex("Success");
-
-                    b.HasIndex("TaskId");
-
-                    b.ToTable("SelectorHealingHistory", (string)null);
-                });
 
             modelBuilder.Entity("EvoAITest.Core.Data.Models.WaitHistory", b =>
                 {
@@ -87,19 +33,22 @@ namespace EvoAITest.Core.Migrations
 
                     b.Property<string>("Action")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("ActualWaitMs")
                         .HasColumnType("int");
 
                     b.Property<string>("PageUrl")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<DateTimeOffset>("RecordedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Selector")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<bool>("Success")
                         .HasColumnType("bit");
@@ -441,17 +390,6 @@ namespace EvoAITest.Core.Migrations
                     b.HasIndex("TaskId");
 
                     b.ToTable("VisualComparisonResults", (string)null);
-                });
-
-            modelBuilder.Entity("EvoAITest.Core.Data.Models.SelectorHealingHistory", b =>
-                {
-                    b.HasOne("EvoAITest.Core.Models.AutomationTask", "Task")
-                        .WithMany()
-                        .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Task");
                 });
 
             modelBuilder.Entity("EvoAITest.Core.Data.Models.WaitHistory", b =>
