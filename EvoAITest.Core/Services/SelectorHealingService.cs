@@ -2,6 +2,7 @@ using EvoAITest.Core.Abstractions;
 using EvoAITest.Core.Models;
 using EvoAITest.Core.Models.SelfHealing;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 
 namespace EvoAITest.Core.Services;
 

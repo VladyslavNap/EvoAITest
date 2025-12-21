@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 using EvoAITest.Core.Abstractions;
 using EvoAITest.Core.Models;
