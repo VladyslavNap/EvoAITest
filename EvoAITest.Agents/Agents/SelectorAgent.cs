@@ -110,7 +110,7 @@ Your task is to analyze a failed CSS selector and the current page structure, th
 2. Prefer unique attributes (id, data-*, aria-*, name) over generic classes
 3. Use attribute selectors [attr=""value""] when possible
 4. Avoid overly specific selectors that break on minor DOM changes
-5. Consider text content matching using :contains() or similar
+5. Consider text content matching using :contains() or :has-text() (Playwright-specific pseudo-classes)
 6. Include reasoning for each selector explaining why it should work
 
 ## Selector Priority (from best to worst):
@@ -119,8 +119,11 @@ Your task is to analyze a failed CSS selector and the current page structure, th
 3. Unique ARIA labels: [aria-label=""value""]
 4. Unique name attributes: [name=""value""]
 5. Combination of tag + attributes: button[type=""submit""]
-6. Text content: button:has-text(""Submit"")
+6. Text content (Playwright syntax): button:has-text(""Submit"")
 7. Position-based (least reliable): .parent > .child:nth-child(2)
+
+Note: :contains() and :has-text() are Playwright-specific extensions and not standard CSS.
+If standard CSS is required, use attribute selectors instead.
 
 ## Output Format:
 Return a JSON object with this structure:

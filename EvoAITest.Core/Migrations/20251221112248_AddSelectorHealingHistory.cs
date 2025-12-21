@@ -16,7 +16,7 @@ namespace EvoAITest.Core.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TaskId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    TaskId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     OriginalSelector = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
                     HealedSelector = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
                     HealingStrategy = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
@@ -35,7 +35,7 @@ namespace EvoAITest.Core.Migrations
                         column: x => x.TaskId,
                         principalTable: "AutomationTasks",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(

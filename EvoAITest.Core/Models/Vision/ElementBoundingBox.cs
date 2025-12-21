@@ -2,6 +2,9 @@ namespace EvoAITest.Core.Models.Vision;
 
 /// <summary>
 /// Represents the bounding box coordinates of a detected element.
+/// Design note: Properties use 'init' setters for immutability after construction.
+/// Coordinate types are int (not double) as browser coordinates are typically pixel-perfect integers.
+/// For sub-pixel precision scenarios (high-DPI, zoom), consider rounding at the capture point.
 /// </summary>
 public sealed class ElementBoundingBox
 {
