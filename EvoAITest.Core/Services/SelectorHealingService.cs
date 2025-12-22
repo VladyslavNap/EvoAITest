@@ -2,7 +2,6 @@ using EvoAITest.Core.Abstractions;
 using EvoAITest.Core.Models;
 using EvoAITest.Core.Models.SelfHealing;
 using Microsoft.Extensions.Logging;
-using System.Linq;
 
 namespace EvoAITest.Core.Services;
 
@@ -11,28 +10,15 @@ namespace EvoAITest.Core.Services;
 /// </summary>
 public sealed class SelectorHealingService : ISelectorHealingService
 {
-    // Confidence threshold constants
-    private const double MinimumConfidenceThreshold = 0.7;
-    
-    // Distance normalization constants (in pixels)
-    /// <summary>Maximum visual distance in pixels for normalization (visual similarity strategy).</summary>
-    private const double MaxVisualDistancePx = 1000.0;
-    
-    /// <summary>Maximum position distance in pixels for normalization (position strategy).</summary>
-    private const double MaxPositionDistancePx = 500.0;
-    
     private readonly VisualElementMatcher _visualMatcher;
-    private readonly ISelectorAgent? _selectorAgent;
     private readonly ILogger<SelectorHealingService> _logger;
 
     public SelectorHealingService(
         VisualElementMatcher visualMatcher,
-        ILogger<SelectorHealingService> logger,
-        ISelectorAgent? selectorAgent = null)
+        ILogger<SelectorHealingService> logger)
     {
         _visualMatcher = visualMatcher ?? throw new ArgumentNullException(nameof(visualMatcher));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _selectorAgent = selectorAgent; // Optional for LLM strategy
     }
 
     public async Task<HealedSelector?> HealSelectorAsync(
@@ -183,7 +169,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
 
     public Task SaveHealingHistoryAsync(
         HealedSelector healedSelector,
-        Guid? taskId,
+        Guid taskId,
         bool success,
         CancellationToken cancellationToken = default)
     {
@@ -229,25 +215,29 @@ public sealed class SelectorHealingService : ISelectorHealingService
         if (string.IsNullOrWhiteSpace(context.ExpectedText))
             return Task.FromResult(new List<SelectorCandidate>());
 
-        var candidates = context.PageState.InteractiveElements
-            .Where(element => element.Text != null && element.Selector != null)
-            .Select(element => new 
-            { 
-                Element = element, 
-                Similarity = CalculateTextSimilarity(context.ExpectedText, element.Text!) 
-            })
-            .Where(x => x.Similarity >= MinimumConfidenceThreshold)
-            .Select(x => new SelectorCandidate
+        var candidates = new List<SelectorCandidate>();
+
+        foreach (var element in context.PageState.InteractiveElements)
+        {
+            if (element.Text == null)
+                continue;
+
+            var similarity = CalculateTextSimilarity(context.ExpectedText, element.Text);
+            
+            if (similarity >= 0.7 && element.Selector != null)
             {
-                Selector = x.Element.Selector!,
-                Strategy = HealingStrategy.TextContent,
-                BaseConfidence = x.Similarity,
-                ElementInfo = x.Element,
-                ElementText = x.Element.Text,
-                TextSimilarityScore = x.Similarity,
-                Reasoning = $"Text match: '{x.Element.Text}' (similarity: {x.Similarity:F2})"
-            })
-            .ToList();
+                candidates.Add(new SelectorCandidate
+                {
+                    Selector = element.Selector,
+                    Strategy = HealingStrategy.TextContent,
+                    BaseConfidence = similarity,
+                    ElementInfo = element,
+                    ElementText = element.Text,
+                    TextSimilarityScore = similarity,
+                    Reasoning = $"Text match: '{element.Text}' (similarity: {similarity:F2})"
+                });
+            }
+        }
 
         return Task.FromResult(candidates);
     }
@@ -259,28 +249,31 @@ public sealed class SelectorHealingService : ISelectorHealingService
         HealingContext context,
         CancellationToken cancellationToken)
     {
-        var candidates = context.PageState.InteractiveElements
-            .Where(element => element.Attributes.TryGetValue("aria-label", out var ariaLabel) && 
-                            !string.IsNullOrWhiteSpace(ariaLabel) &&
-                            element.Selector != null)
-            .Select(element =>
+        var candidates = new List<SelectorCandidate>();
+
+        foreach (var element in context.PageState.InteractiveElements)
+        {
+            if (!element.Attributes.TryGetValue("aria-label", out var ariaLabel) || 
+                string.IsNullOrWhiteSpace(ariaLabel))
+                continue;
+
+            var similarity = !string.IsNullOrWhiteSpace(context.ExpectedText)
+                ? CalculateTextSimilarity(context.ExpectedText, ariaLabel)
+                : 0.8; // Default score if no expected text
+
+            if (element.Selector != null)
             {
-                var ariaLabel = element.Attributes["aria-label"];
-                var similarity = !string.IsNullOrWhiteSpace(context.ExpectedText)
-                    ? CalculateTextSimilarity(context.ExpectedText, ariaLabel)
-                    : 0.8; // Default score if no expected text
-                
-                return new SelectorCandidate
+                candidates.Add(new SelectorCandidate
                 {
-                    Selector = element.Selector!,
+                    Selector = element.Selector,
                     Strategy = HealingStrategy.AriaLabel,
                     BaseConfidence = similarity,
                     ElementInfo = element,
                     AriaMatchScore = similarity,
                     Reasoning = $"ARIA label match: '{ariaLabel}'"
-                };
-            })
-            .ToList();
+                });
+            }
+        }
 
         return Task.FromResult(candidates);
     }
@@ -320,38 +313,45 @@ public sealed class SelectorHealingService : ISelectorHealingService
 
     /// <summary>
     /// Tries to find elements by visual similarity.
-    /// NOTE: Currently uses position-based matching as a proxy since actual visual comparison 
-    /// requires element-specific screenshots which are not yet implemented.
     /// </summary>
     private async Task<List<SelectorCandidate>> TryVisualSimilarityStrategyAsync(
         HealingContext context,
         CancellationToken cancellationToken)
     {
-        if (context.ExpectedScreenshot == null || context.ExpectedPosition == null)
+        if (context.ExpectedScreenshot == null)
             return new List<SelectorCandidate>();
 
-        var candidates = context.PageState.InteractiveElements
-            .Where(element => element.BoundingBox != null && element.Selector != null)
-            .Select(element =>
+        var candidates = new List<SelectorCandidate>();
+
+        foreach (var element in context.PageState.InteractiveElements)
+        {
+            if (element.BoundingBox == null || element.Selector == null)
+                continue;
+
+            // Note: Would need actual element screenshot here
+            // For now, use position-based matching as proxy
+            if (context.ExpectedPosition != null)
             {
                 var distance = CalculateDistance(
-                    element.BoundingBox!.X, element.BoundingBox.Y,
+                    element.BoundingBox.X, element.BoundingBox.Y,
                     context.ExpectedPosition.X, context.ExpectedPosition.Y);
-                var normalizedScore = Math.Max(0, 1.0 - (distance / MaxVisualDistancePx));
-                
-                return new { Element = element, Distance = distance, Score = normalizedScore };
-            })
-            .Where(x => x.Score >= MinimumConfidenceThreshold)
-            .Select(x => new SelectorCandidate
-            {
-                Selector = x.Element.Selector!,
-                Strategy = HealingStrategy.VisualSimilarity,
-                BaseConfidence = x.Score,
-                ElementInfo = x.Element,
-                VisualSimilarityScore = x.Score,
-                Reasoning = $"Position-based match (distance: {x.Distance:F0}px) - actual visual comparison not yet implemented"
-            })
-            .ToList();
+
+                var normalizedScore = Math.Max(0, 1.0 - (distance / 1000.0)); // Normalize to 0-1
+
+                if (normalizedScore >= 0.7)
+                {
+                    candidates.Add(new SelectorCandidate
+                    {
+                        Selector = element.Selector,
+                        Strategy = HealingStrategy.VisualSimilarity,
+                        BaseConfidence = normalizedScore,
+                        ElementInfo = element,
+                        VisualSimilarityScore = normalizedScore,
+                        Reasoning = $"Visual/position match (distance: {distance:F0}px)"
+                    });
+                }
+            }
+        }
 
         return candidates;
     }
@@ -366,28 +366,33 @@ public sealed class SelectorHealingService : ISelectorHealingService
         if (context.ExpectedPosition == null)
             return Task.FromResult(new List<SelectorCandidate>());
 
-        var candidates = context.PageState.InteractiveElements
-            .Where(element => element.BoundingBox != null && element.Selector != null)
-            .Select(element =>
+        var candidates = new List<SelectorCandidate>();
+
+        foreach (var element in context.PageState.InteractiveElements)
+        {
+            if (element.BoundingBox == null || element.Selector == null)
+                continue;
+
+            var distance = CalculateDistance(
+                element.BoundingBox.X, element.BoundingBox.Y,
+                context.ExpectedPosition.X, context.ExpectedPosition.Y);
+
+            // Closer is better - normalize to 0-1 score
+            var normalizedScore = Math.Max(0, 1.0 - (distance / 500.0));
+            
+            if (normalizedScore >= 0.7)
             {
-                var distance = CalculateDistance(
-                    element.BoundingBox!.X, element.BoundingBox.Y,
-                    context.ExpectedPosition.X, context.ExpectedPosition.Y);
-                var normalizedScore = Math.Max(0, 1.0 - (distance / MaxPositionDistancePx));
-                
-                return new { Element = element, Distance = distance, Score = normalizedScore };
-            })
-            .Where(x => x.Score >= MinimumConfidenceThreshold)
-            .Select(x => new SelectorCandidate
-            {
-                Selector = x.Element.Selector!,
-                Strategy = HealingStrategy.Position,
-                BaseConfidence = x.Score,
-                ElementInfo = x.Element,
-                PositionScore = x.Score,
-                Reasoning = $"Position proximity (distance: {x.Distance:F0}px)"
-            })
-            .ToList();
+                candidates.Add(new SelectorCandidate
+                {
+                    Selector = element.Selector,
+                    Strategy = HealingStrategy.Position,
+                    BaseConfidence = normalizedScore,
+                    ElementInfo = element,
+                    PositionScore = normalizedScore,
+                    Reasoning = $"Position proximity (distance: {distance:F0}px)"
+                });
+            }
+        }
 
         return Task.FromResult(candidates);
     }
@@ -399,31 +404,9 @@ public sealed class SelectorHealingService : ISelectorHealingService
         HealingContext context,
         CancellationToken cancellationToken)
     {
-        if (_selectorAgent == null)
-        {
-            _logger.LogDebug("LLM strategy skipped: ISelectorAgent not available");
-            return new List<SelectorCandidate>();
-        }
-
-        try
-        {
-            _logger.LogInformation("Using LLM to generate selector candidates");
-            
-            var candidates = await _selectorAgent.GenerateSelectorCandidatesAsync(
-                context.PageState,
-                context.FailedSelector,
-                context.ExpectedText,
-                cancellationToken);
-
-            _logger.LogInformation("LLM generated {Count} selector candidates", candidates.Count);
-            
-            return candidates;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "LLM selector generation failed");
-            return new List<SelectorCandidate>();
-        }
+        // TODO: Integrate with SelectorAgent when abstraction is created
+        _logger.LogDebug("LLM strategy not yet integrated");
+        return new List<SelectorCandidate>();
     }
 
     /// <summary>
@@ -484,7 +467,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
         if (expected.Count == 0)
             return 0;
 
-        double matchScore = 0;
+        int matchCount = 0;
         int totalCount = expected.Count;
 
         foreach (var (key, expectedValue) in expected)
@@ -493,18 +476,18 @@ public sealed class SelectorHealingService : ISelectorHealingService
             {
                 if (expectedValue.Equals(actualValue, StringComparison.OrdinalIgnoreCase))
                 {
-                    matchScore += 1.0;
+                    matchCount++;
                 }
                 else
                 {
                     // Partial credit for similar values
                     var similarity = CalculateTextSimilarity(expectedValue, actualValue);
-                    matchScore += similarity * 0.5;
+                    matchCount += (int)(similarity * 0.5);
                 }
             }
         }
 
-        return matchScore / totalCount;
+        return (double)matchCount / totalCount;
     }
 
     /// <summary>
