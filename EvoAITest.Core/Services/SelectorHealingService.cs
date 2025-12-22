@@ -1,6 +1,8 @@
 using EvoAITest.Core.Abstractions;
+using EvoAITest.Core.Data;
 using EvoAITest.Core.Models;
 using EvoAITest.Core.Models.SelfHealing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace EvoAITest.Core.Services;
@@ -12,13 +14,19 @@ public sealed class SelectorHealingService : ISelectorHealingService
 {
     private readonly VisualElementMatcher _visualMatcher;
     private readonly ILogger<SelectorHealingService> _logger;
+    private readonly ISelectorAgent? _selectorAgent;
+    private readonly EvoAIDbContext _dbContext;
 
     public SelectorHealingService(
         VisualElementMatcher visualMatcher,
-        ILogger<SelectorHealingService> logger)
+        ILogger<SelectorHealingService> logger,
+        EvoAIDbContext dbContext,
+        ISelectorAgent? selectorAgent = null)
     {
         _visualMatcher = visualMatcher ?? throw new ArgumentNullException(nameof(visualMatcher));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _selectorAgent = selectorAgent;
     }
 
     public async Task<HealedSelector?> HealSelectorAsync(
@@ -158,51 +166,205 @@ public sealed class SelectorHealingService : ISelectorHealingService
         return Task.FromResult(matches == 1);
     }
 
-    public Task<List<HealedSelector>> GetHealingHistoryAsync(
+    public async Task<List<HealedSelector>> GetHealingHistoryAsync(
         Guid taskId,
         CancellationToken cancellationToken = default)
     {
-        // TODO: Implement database query when SelectorHealingHistory entity is added
-        _logger.LogWarning("GetHealingHistoryAsync not yet implemented - requires database migration");
-        return Task.FromResult(new List<HealedSelector>());
+        try
+        {
+            var history = await _dbContext.SelectorHealingHistory
+                .Where(h => h.TaskId == taskId)
+                .OrderByDescending(h => h.HealedAt)
+                .ToListAsync(cancellationToken);
+
+            return history.Select(h => new HealedSelector
+            {
+                OriginalSelector = h.OriginalSelector,
+                NewSelector = h.HealedSelector,
+                Strategy = Enum.TryParse<HealingStrategy>(h.HealingStrategy, out var strategy) 
+                    ? strategy 
+                    : HealingStrategy.TextContent,
+                ConfidenceScore = h.ConfidenceScore,
+                HealedAt = h.HealedAt,
+                PageUrl = h.PageUrl,
+                Reasoning = $"Historical healing using {h.HealingStrategy}",
+                Context = string.IsNullOrEmpty(h.Context) 
+                    ? new Dictionary<string, object>() 
+                    : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(h.Context) 
+                      ?? new Dictionary<string, object>()
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve healing history for task {TaskId}", taskId);
+            return new List<HealedSelector>();
+        }
     }
 
-    public Task SaveHealingHistoryAsync(
+    public async Task SaveHealingHistoryAsync(
         HealedSelector healedSelector,
-        Guid taskId,
+        Guid? taskId,
         bool success,
         CancellationToken cancellationToken = default)
     {
-        // TODO: Implement database save when SelectorHealingHistory entity is added
-        _logger.LogInformation(
-            "Healing history (not yet persisted): {Original} -> {New}, success: {Success}",
-            healedSelector.OriginalSelector, healedSelector.NewSelector, success);
-        
-        return Task.CompletedTask;
+        try
+        {
+            var historyEntry = new Data.Models.SelectorHealingHistory
+            {
+                Id = Guid.NewGuid(),
+                TaskId = taskId ?? Guid.Empty,
+                OriginalSelector = healedSelector.OriginalSelector,
+                HealedSelector = healedSelector.NewSelector,
+                HealingStrategy = healedSelector.Strategy.ToString(),
+                ConfidenceScore = healedSelector.ConfidenceScore,
+                Success = success,
+                HealedAt = healedSelector.HealedAt,
+                PageUrl = healedSelector.PageUrl,
+                ExpectedText = healedSelector.Context.TryGetValue("expected_text", out var text) 
+                    ? text?.ToString() 
+                    : null,
+                Context = System.Text.Json.JsonSerializer.Serialize(healedSelector.Context)
+            };
+
+            _dbContext.SelectorHealingHistory.Add(historyEntry);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Saved healing history: {Original} -> {Healed} (Strategy: {Strategy}, Success: {Success})",
+                healedSelector.OriginalSelector,
+                healedSelector.NewSelector,
+                healedSelector.Strategy,
+                success);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save healing history to database");
+        }
     }
 
-    public Task<Dictionary<string, object>> LearnFromHistoryAsync(
+    public async Task<Dictionary<string, object>> LearnFromHistoryAsync(
         Guid? taskId = null,
         CancellationToken cancellationToken = default)
     {
-        // TODO: Implement learning logic when history data is available
-        return Task.FromResult(new Dictionary<string, object>
+        try
         {
-            ["learned"] = false,
-            ["message"] = "Learning not yet implemented - requires healing history data"
-        });
+            var query = _dbContext.SelectorHealingHistory.AsQueryable();
+            
+            if (taskId.HasValue)
+            {
+                query = query.Where(h => h.TaskId == taskId.Value);
+            }
+
+            var history = await query.ToListAsync(cancellationToken);
+
+            if (history.Count == 0)
+            {
+                return new Dictionary<string, object>
+                {
+                    ["total_attempts"] = 0,
+                    ["message"] = "No healing history available for learning"
+                };
+            }
+
+            // Calculate success rate by strategy
+            var strategyStats = history
+                .GroupBy(h => h.HealingStrategy)
+                .Select(g => new
+                {
+                    Strategy = g.Key,
+                    TotalAttempts = g.Count(),
+                    SuccessCount = g.Count(h => h.Success),
+                    SuccessRate = g.Count(h => h.Success) / (double)g.Count(),
+                    AvgConfidence = g.Average(h => h.ConfidenceScore)
+                })
+                .OrderByDescending(s => s.SuccessRate)
+                .ToList();
+
+            var bestStrategy = strategyStats.FirstOrDefault();
+
+            var learningResults = new Dictionary<string, object>
+            {
+                ["total_attempts"] = history.Count,
+                ["successful_attempts"] = history.Count(h => h.Success),
+                ["overall_success_rate"] = history.Count(h => h.Success) / (double)history.Count,
+                ["average_confidence"] = history.Average(h => h.ConfidenceScore),
+                ["strategy_stats"] = strategyStats,
+                ["best_strategy"] = bestStrategy?.Strategy ?? "None",
+                ["best_strategy_success_rate"] = bestStrategy?.SuccessRate ?? 0.0
+            };
+
+            _logger.LogInformation(
+                "Learning analysis complete: {Total} attempts, {Success:P} success rate, best strategy: {Strategy}",
+                history.Count,
+                learningResults["overall_success_rate"],
+                learningResults["best_strategy"]);
+
+            return learningResults;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to learn from healing history");
+            return new Dictionary<string, object>
+            {
+                ["error"] = ex.Message
+            };
+        }
     }
 
-    public Task<Dictionary<string, object>> GetHealingStatisticsAsync(
+    public async Task<Dictionary<string, object>> GetHealingStatisticsAsync(
         CancellationToken cancellationToken = default)
     {
-        // TODO: Implement statistics when history data is available
-        return Task.FromResult(new Dictionary<string, object>
+        try
         {
-            ["total_healings"] = 0,
-            ["success_rate"] = 0.0,
-            ["message"] = "Statistics not yet implemented - requires healing history data"
-        });
+            var allHistory = await _dbContext.SelectorHealingHistory
+                .ToListAsync(cancellationToken);
+
+            if (allHistory.Count == 0)
+            {
+                return new Dictionary<string, object>
+                {
+                    ["total_healings"] = 0,
+                    ["message"] = "No healing data available"
+                };
+            }
+
+            var recentHistory = allHistory
+                .Where(h => h.HealedAt >= DateTimeOffset.UtcNow.AddDays(-7))
+                .ToList();
+
+            var stats = new Dictionary<string, object>
+            {
+                ["total_healings"] = allHistory.Count,
+                ["successful_healings"] = allHistory.Count(h => h.Success),
+                ["success_rate"] = allHistory.Count(h => h.Success) / (double)allHistory.Count,
+                ["average_confidence"] = allHistory.Average(h => h.ConfidenceScore),
+                ["recent_healings_7days"] = recentHistory.Count,
+                ["recent_success_rate"] = recentHistory.Count > 0 
+                    ? recentHistory.Count(h => h.Success) / (double)recentHistory.Count 
+                    : 0.0,
+                ["unique_pages_healed"] = allHistory.Select(h => h.PageUrl).Distinct().Count(),
+                ["most_common_strategy"] = allHistory
+                    .GroupBy(h => h.HealingStrategy)
+                    .OrderByDescending(g => g.Count())
+                    .First()
+                    .Key
+            };
+
+            _logger.LogInformation(
+                "Healing statistics: {Total} total, {Success:P} success rate",
+                stats["total_healings"],
+                stats["success_rate"]);
+
+            return stats;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get healing statistics");
+            return new Dictionary<string, object>
+            {
+                ["error"] = ex.Message
+            };
+        }
     }
 
     /// <summary>
@@ -404,9 +566,31 @@ public sealed class SelectorHealingService : ISelectorHealingService
         HealingContext context,
         CancellationToken cancellationToken)
     {
-        // TODO: Integrate with SelectorAgent when abstraction is created
-        _logger.LogDebug("LLM strategy not yet integrated");
-        return new List<SelectorCandidate>();
+        if (_selectorAgent == null)
+        {
+            _logger.LogDebug("LLM strategy skipped: ISelectorAgent not available");
+            return new List<SelectorCandidate>();
+        }
+
+        try
+        {
+            _logger.LogInformation("Using LLM to generate selector candidates");
+            
+            var candidates = await _selectorAgent.GenerateSelectorCandidatesAsync(
+                context.PageState,
+                context.FailedSelector,
+                context.ExpectedText,
+                cancellationToken);
+
+            _logger.LogInformation("LLM generated {Count} selector candidates", candidates.Count);
+            
+            return candidates;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "LLM selector generation failed");
+            return new List<SelectorCandidate>();
+        }
     }
 
     /// <summary>
