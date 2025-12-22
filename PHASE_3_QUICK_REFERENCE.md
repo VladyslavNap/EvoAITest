@@ -1,11 +1,11 @@
 # Phase 3: AI Enhancements - Quick Reference
 
-## ?? Implementation Status: IN PROGRESS
+## ✅ Implementation Status: IN PROGRESS
 
-**Last Updated:** 2025-12-09  
-**Overall Progress:** 17% (5 of 29 steps complete)  
-**Features Started:** 2 of 5  
-**Lines Implemented:** ~1,870
+**Last Updated:** 2025-12-21  
+**Overall Progress:** 48% (16 of 33 steps complete)  
+**Features Started:** 3 of 5  
+**Lines Implemented:** ~3,600
 
 ---
 
@@ -18,9 +18,9 @@
 
 ## ?? Features (5)
 
-### 1. Self-Healing Tests ? **[?? 37.5% COMPLETE]**
+### 1. Self-Healing Tests 🤖 **[🚧 87.5% COMPLETE]**
 **Priority:** Critical | **Time:** 25-30h | **ROI:** Highest  
-**Branch:** `SelfHealing` | **Files:** 7 | **Lines:** ~1,015
+**Branch:** `selfhealingv2` (merged) | **Files:** 12 | **Lines:** ~2,100
 
 **What it does:**
 - Automatically fixes broken selectors when pages change
@@ -28,26 +28,29 @@
 - Learns from past healings
 
 **Key Components:**
-- ? SelectorHealingService (models complete)
-- ? VisualElementMatcher (SSIM + perceptual hashing)
-- ? LLM Selector Generator
-- ? Healing History DB
+- ✅ SelectorHealingService (multi-strategy pipeline)
+- ✅ VisualElementMatcher (SSIM + perceptual hashing)
+- ✅ LLM SelectorAgent (GPT-powered selector generation)
+- ✅ SelectorHealingHistory entity + migration
+- 🚧 Healing history persistence/tests
 
 **Progress:**
-- ? Step 1: Foundation models (3h) - Complete
-- ? Step 2: Service interface (1h) - Complete
-- ? Step 3: Visual matching (4h) - Complete
-- ? Step 4: LLM integration (5h) - Next
-- ? Step 5: Database (3h) - Pending
-- ? Step 6: Executor integration (4h) - Pending
+- ✅ Step 1: Foundation models (3h)
+- ✅ Step 2: Service interface (1h)
+- ✅ Step 3: Visual matching (4h)
+- ✅ Step 4: SelectorHealingService core (6h)
+- ✅ Step 5: SelectorHealingHistory entity + migration (3h)
+- ✅ Step 6: LLM SelectorAgent integration (5h)
+- ✅ Step 7: DefaultToolExecutor + BrowserToolRegistry integration (4h)
+- ⏳ Step 8: Testing & documentation (unit/integration tests + persistence wiring)
 
-?? **[Progress Document](PHASE_3_SELF_HEALING_PROGRESS.md)**
+📄 **[Progress Document](PHASE_3_SELF_HEALING_PROGRESS.md)**
 
 ---
 
-### 2. Visual Element Detection ?? **[?? 33% COMPLETE]**
+### 2. Visual Element Detection 👁️ **[🚧 50% COMPLETE]**
 **Priority:** High | **Time:** 20-25h | **ROI:** High  
-**Branch:** `ScreenshotAnalysis` | **Files:** 6 | **Lines:** ~855
+**Branch:** `ScreenshotAnalysis` | **Files:** 7 | **Lines:** ~1,300
 
 **What it does:**
 - Find elements by looking at screenshots
@@ -55,38 +58,40 @@
 - OCR for text extraction
 
 **Key Components:**
-- ? Vision models (5 models with IoU)
-- ? IVisionAnalysisService interface
-- ? GPT-4 Vision integration
-- ? Azure Computer Vision
-- ? 4 new vision tools
+- ✅ Vision models (ElementType, ElementBoundingBox, DetectedElement, ElementFilter, VisionAnalysisResult)
+- ✅ `IVisionAnalysisService` interface
+- ✅ GPT-4 Vision provider (`GPT4VisionProvider`)
+- ⏳ Azure Computer Vision provider (optional)
+- ⏳ VisionAnalysisService + 4 new tools
 
 **Progress:**
-- ? Step 1: Vision models (5h) - Complete
-- ? Step 2: Service interface (2h) - Complete
-- ? Step 3: GPT-4 Vision (5h) - Next
-- ? Step 4: Azure CV (6h) - Pending
-- ? Step 5: Service core (6h) - Pending
-- ? Step 6: Vision tools (4h) - Pending
+- ✅ Step 1: Vision models (5h)
+- ✅ Step 2: Service interface (2h)
+- ✅ Step 3: GPT-4 Vision provider (6h)
+- ⏳ Step 4: Azure CV provider (optional)
+- ⏳ Step 5: VisionAnalysisService core
+- ⏳ Step 6: Vision tools + executor wiring
 
-?? **[Progress Document](PHASE_3_VISION_PROGRESS.md)**
+📄 **[Progress Document](PHASE_3_VISION_PROGRESS.md)**
 
 ---
 
-### 3. Smart Waiting ?? **[? NOT STARTED]**
+### 3. Smart Waiting ⚡ **[✅ 100% COMPLETE]**
 **Priority:** Medium-High | **Time:** 15-20h | **ROI:** High
 
 **What it does:**
-- Intelligent, adaptive timeouts
-- Detects page stability
-- Learns optimal wait times
+- Intelligent, adaptive timeouts driven by historical wait telemetry
+- Detects DOM stability, animations, network idle, and loader states
+- Provides four new waiting tools for agents and human-authored plans
 
 **Key Components:**
-- SmartWaitService
-- PageStabilityDetector
-- Wait History & Learning
+- ✅ `WaitConditions`, `StabilityMetrics`, `HistoricalData`
+- ✅ `ISmartWaitService` + `IPageStabilityDetector`
+- ✅ `SmartWaitService` + `PageStabilityDetector`
+- ✅ `WaitHistory` entity + migration (metrics per task/action)
+- ✅ Browser tools: `smart_wait`, `wait_for_stable`, `wait_for_animations`, `wait_for_network_idle`
 
-**Status:** Planning complete, ready to start
+📄 **[Completion Report](PHASE_3_SMART_WAITING_PROGRESS.md)**
 
 ---
 
@@ -128,44 +133,29 @@
 
 | Tool | Feature | Status | Description |
 |------|---------|--------|-------------|
-| `find_element_by_image` | Vision | ? Pending | Find by appearance |
-| `click_by_description` | Vision | ? Pending | Click by description |
-| `extract_text_from_image` | Vision | ? Pending | OCR extraction |
-| `verify_element_by_image` | Vision | ? Pending | Visual verification |
-| `smart_wait` | Smart Wait | ? Pending | Adaptive waiting |
-| `wait_for_stable` | Smart Wait | ? Pending | Stability detection |
-| `wait_for_animations` | Smart Wait | ? Pending | Animation complete |
-| `wait_for_network_idle` | Smart Wait | ? Pending | Network idle |
-| `heal_selector` | Self-Healing | ? Pending | Manual healing |
-| `record_session` | Recording | ? Pending | Control recording |
+| `find_element_by_image` | Vision | ⏳ Pending | Find by appearance |
+| `click_by_description` | Vision | ⏳ Pending | Click by description |
+| `extract_text_from_image` | Vision | ⏳ Pending | OCR extraction |
+| `verify_element_by_image` | Vision | ⏳ Pending | Visual verification |
+| `smart_wait` | Smart Wait | ✅ Complete | Adaptive waiting |
+| `wait_for_stable` | Smart Wait | ✅ Complete | Stability detection |
+| `wait_for_animations` | Smart Wait | ✅ Complete | Animation complete |
+| `wait_for_network_idle` | Smart Wait | ✅ Complete | Network idle |
+| `heal_selector` | Self-Healing | ✅ Complete | Manual healing & telemetry |
+| `record_session` | Recording | ⏳ Pending | Control recording |
 
 ---
 
-## ?? Timeline (8 weeks)
+## 🗓️ Timeline (8 weeks)
 
-```
-? = Complete | ?? = In Progress | ? = Not Started
+- **Week 1 (Complete):** Self-Healing foundation (models, interface, visual matcher) + Vision models/interfaces.
+- **Week 2 (Complete):** Smart Waiting end-to-end (service, detector, history, tools).
+- **Week 3 (Current):** Self-Healing service/agent/executor integration + GPT-4 Vision provider.
+- **Week 4 (Next):** VisionAnalysisService + remaining vision tools, healing persistence/tests.
+- **Weeks 5-6:** Error Recovery feature kickoff, recording design.
+- **Weeks 7-8:** Recording + UI work, polish & rollout.
 
-Week 1-2: Foundation (40h)
-??? ?? Selector healing (15h) - 37.5% done
-??? ?? Vision models (7h) - 33% done
-
-Week 3-4: Intelligence (40h)
-??? ? LLM selector gen (5h)
-??? ? Vision integration (11h)
-??? ? Error recovery (8h)
-
-Week 5-6: Advanced (40h)
-??? ? Vision tools (10h)
-??? ? Wait learning (6h)
-??? ? Recovery actions (6h)
-
-Week 7-8: Recording (30h)
-??? ? Full recording system (30h)
-```
-
-**Current:** Week 1 (Day 3)  
-**Estimated Completion:** Week 8
+**Estimated Completion:** Week 8 (unchanged) | **Overall:** 48% complete
 
 ---
 
@@ -173,8 +163,8 @@ Week 7-8: Recording (30h)
 
 | Table | Feature | Status |
 |-------|---------|--------|
-| **SelectorHealingHistory** | Self-Healing | ? Pending |
-| **WaitHistory** | Smart Wait | ? Pending |
+| **SelectorHealingHistory** | Self-Healing | ✅ Complete (migration applied) |
+| **WaitHistory** | Smart Wait | ✅ Complete (Aspire-managed SQL) |
 | **RecoveryHistory** | Error Recovery | ? Pending |
 | **RecordedSessions** | Recording | ? Pending |
 | **RecordedActions** | Recording | ? Pending |

@@ -56,7 +56,7 @@ Implements Microsoft's recommended retry pattern:
 var exponentialDelay = initialDelay * Math.Pow(2, retryAttempt);
 var cappedDelay = Math.Min(exponentialDelay, maxDelay);
 
-// Jitter (±25%) to prevent thundering herd
+// Jitter (+/-25%) to prevent thundering herd
 var jitterRange = cappedDelay * 0.25;
 var jitter = (random.NextDouble() * 2 - 1) * jitterRange;
 var finalDelay = cappedDelay + jitter;
@@ -94,22 +94,34 @@ Smart error detection for retry decisions:
 
 Comprehensive mapping of all 13 browser tools to IBrowserAgent methods:
 
-| Tool Name | IBrowserAgent Method | Parameters |
-|-----------|---------------------|------------|
-| `navigate` | `NavigateAsync` | `url` |
-| `click` | `ClickAsync` | `selector`, `maxRetries` |
-| `type` | `TypeAsync` | `selector`, `text` |
-| `get_text` / `extract_text` | `GetTextAsync` | `selector` |
-| `take_screenshot` | `TakeScreenshotAsync` | none |
-| `wait_for_element` | `WaitForElementAsync` | `selector`, `timeout_ms` |
-| `get_page_state` | `GetPageStateAsync` | none |
-| `get_page_html` | `GetPageHtmlAsync` | none |
-| `clear_input` | `TypeAsync` (with empty string) | `selector` |
-| `extract_table` | ? Not yet implemented | - |
-| `wait_for_url_change` | ? Not yet implemented | - |
-| `select_option` | ? Not yet implemented | - |
-| `submit_form` | ? Not yet implemented | - |
-| `verify_element_exists` | ? Not yet implemented | - |
+| Tool Name | IBrowserAgent Method | Parameters | Status |
+|-----------|---------------------|------------|--------|
+| `navigate` | `NavigateAsync` | `url` | Complete |
+| `click` | `ClickAsync` | `selector`, `maxRetries` | Complete (auto-healing enabled) |
+| `type` | `TypeAsync` | `selector`, `text` | Complete |
+| `get_text` / `extract_text` | `GetTextAsync` | `selector` | Complete |
+| `take_screenshot` | `TakeScreenshotAsync` | none | Complete |
+| `wait_for_element` | `WaitForElementAsync` | `selector`, `timeout_ms` | Complete |
+| `get_page_state` | `GetPageStateAsync` | none | Complete |
+| `get_page_html` | `GetPageHtmlAsync` | none | Complete |
+| `clear_input` | `TypeAsync` (with empty string) | `selector` | Complete |
+| `extract_table` | (pending) | - | Not implemented |
+| `wait_for_url_change` | (pending) | - | Not implemented |
+| `select_option` | (pending) | - | Not implemented |
+| `submit_form` | (pending) | - | Not implemented |
+| `verify_element_exists` | (pending) | - | Not implemented |
+| `smart_wait` / `wait_for_stable` / `wait_for_animations` / `wait_for_network_idle` | (SmartWaitService) | conditions, thresholds | Registry ready; executor wiring pending |
+| `heal_selector` | `ISelectorHealingService` | failed selector context | Used implicitly during click retries |
+
+### Phase 3 Enhancements: Automatic Selector Healing
+
+- `DefaultToolExecutor` now accepts an optional `ISelectorHealingService` (and downstream `ISelectorAgent`) to recover from selector failures transparently.
+- Inside `ExecuteClickAsync`, selector-specific exceptions trigger a healing attempt:
+  1. Extracts expected text (if present) and grabs latest `PageState`.
+  2. Calls `SelectorHealingService` which iterates text/ARIA/attribute/visual/LLM strategies.
+  3. On success, retries the click with the healed selector, logs strategy + confidence, and records healing metadata.
+- Healing respects the same retry budget and cancellation tokens to avoid runaway attempts.
+- When the healing service persists history (Step 8), the executor will populate `SelectorHealingHistory` automatically for analytics/telemetry.
 
 ### ? 5. Comprehensive Logging
 

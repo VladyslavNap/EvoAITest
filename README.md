@@ -736,37 +736,39 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 
 **Estimated Duration:** 8 weeks (80-100 hours)  
 **Priority:** High  
-**Status:** 🚧 **IN PROGRESS** - 2 features started, 1,870+ lines implemented
+**Status:** 🚧 **IN PROGRESS** - 3 features started, 3,600+ lines implemented
 
 #### Features
 
-- [🚧] **Self-Healing Tests** (25-30 hours) - **37.5% Complete** (Steps 1-3/8)
-  - ✅ Foundation models (HealingStrategy, HealedSelector, SelectorCandidate, HealingContext, ConfidenceMetrics)
-  - ✅ ISelectorHealingService interface with 9 methods
-  - ✅ VisualElementMatcher with SSIM and perceptual hashing
-  - ⏳ Database migration (SelectorHealingHistory)
-  - ⏳ SelectorHealingService implementation
-  - ⏳ LLM-powered selector generation
-  - Branch: `SelfHealing` - 7 files, ~1,015 lines, 2 commits
+- [🚧] **Self-Healing Tests** (25-30 hours) - **87.5% Complete** (Steps 1-7/8)
+  - ✅ Foundation models + `ISelectorHealingService`
+  - ✅ `VisualElementMatcher` (SSIM + perceptual hashing)
+  - ✅ `SelectorHealingService` core with multi-strategy pipeline
+  - ✅ `SelectorHealingHistory` entity + migration (nullable TaskId)
+  - ✅ GPT-powered `SelectorAgent` integrated via `ISelectorAgent`
+  - ✅ `DefaultToolExecutor` auto-healing + `heal_selector` tool registration
+  - ⏳ Step 8: persistence wiring + targeted tests/documentation
+  - Branch: `selfhealingv2` (merged) - 12 files, ~2,100 lines
   - [📄 Progress Document](PHASE_3_SELF_HEALING_PROGRESS.md)
 
-- [🚧] **Visual Element Detection** (20-25 hours) - **33% Complete** (Steps 1-2/6)
+- [🚧] **Visual Element Detection** (20-25 hours) - **50% Complete** (Steps 1-3/6)
   - ✅ Vision models (ElementType, ElementBoundingBox, DetectedElement, ElementFilter, VisionAnalysisResult)
-  - ✅ IVisionAnalysisService interface with 11 methods
-  - ✅ IoU calculation for bounding box comparison
-  - ⏳ GPT-4 Vision provider
+  - ✅ `IVisionAnalysisService` interface with 11 methods
+  - ✅ `GPT4VisionProvider` (element detection, OCR, screenshot narration)
   - ⏳ Azure Computer Vision provider (optional)
-  - ⏳ VisionAnalysisService core implementation
-  - ⏳ 4 new vision-based automation tools
-  - Branch: `ScreenshotAnalysis` - 6 files, ~855 lines, 2 commits
+  - ⏳ `VisionAnalysisService` core + caching
+  - ⏳ 4 new vision-based automation tools (`find_element_by_image`, etc.)
+  - Branch: `ScreenshotAnalysis` - 7 files, ~1,300 lines
   - [📄 Progress Document](PHASE_3_VISION_PROGRESS.md)
 
-- [ ] **Smart Waiting Strategies** (15-20 hours) - **Not Started**
-  - Context-aware adaptive timeouts based on historical data
-  - Multi-condition waiting (network idle, animations, DOM stability)
-  - Page stability detection and monitoring
-  - 50% reduction in unnecessary wait time
-  - 80% reduction in timing-related failures
+- [✅] **Smart Waiting Strategies** (15-20 hours) - **100% Complete**
+  - ✅ `WaitConditions`, `StabilityMetrics`, `HistoricalData`
+  - ✅ `ISmartWaitService` + `IPageStabilityDetector`
+  - ✅ `SmartWaitService` & `PageStabilityDetector` implementations
+  - ✅ `WaitHistory` entity/migration and telemetry integration
+  - ✅ Browser tools: `smart_wait`, `wait_for_stable`, `wait_for_animations`, `wait_for_network_idle`
+  - Branch: `SmartWaiting` (merged) - 10 files, ~1,000 lines
+  - [📄 Completion Report](PHASE_3_SMART_WAITING_PROGRESS.md)
 
 - [ ] **Error Recovery and Retry Logic** (12-15 hours) - **Not Started**
   - Intelligent error classification (transient, selector, navigation, etc.)
@@ -785,47 +787,40 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 
 #### Implementation Progress
 
-**Current Status (as of 2025-12-09):**
-- **Features Started:** 2 of 5 (40%)
-- **Steps Completed:** 5 of 29 total steps (17%)
-- **Lines Implemented:** ~1,870 production lines
-- **Files Created:** 13
-- **Git Branches:** 2 (SelfHealing, ScreenshotAnalysis)
+**Current Status (as of 2025-12-21):**
+- **Features Started:** 3 of 5 (60%)
+- **Steps Completed:** 16 of 33 total steps (48%)
+- **Lines Implemented:** ~3,600 production lines
+- **Files Created/Updated:** 22 major files
+- **Git Branches:** `selfhealingv2` + `ScreenshotAnalysis` (active) + `SmartWaiting` (merged)
 - **Build Status:** ✅ All successful
-- **Time Invested:** ~15 hours
-- **Documentation:** 840+ lines of progress docs
+- **Time Invested:** ~35 hours
+- **Documentation:** 1,200+ lines of updates
 
 **Feature 1 Progress:**
-- ✅ Step 1: Foundation models (3 hours) - Complete
-- ✅ Step 2: Service interface (1 hour) - Complete
-- ✅ Step 3: Visual matching (4 hours) - Complete
-- ⏳ Step 4: LLM integration (5 hours) - Pending
-- ⏳ Step 5: Database & persistence (3 hours) - Pending
-- ⏳ Step 6: Executor integration (4 hours) - Pending
+- Steps 1-7 complete (models → executor); Step 8 (tests + persistence + docs) remains.
 
 **Feature 2 Progress:**
-- ✅ Step 1: Vision models (5 hours) - Complete
-- ✅ Step 2: Service interface (2 hours) - Complete
-- ⏳ Step 3: GPT-4 Vision provider (5 hours) - Next
-- ⏳ Step 4: Azure CV provider (6 hours) - Pending
-- ⏳ Step 5: Vision service core (6 hours) - Pending
-- ⏳ Step 6: Vision tools (4 hours) - Pending
+- Steps 1-3 complete (models, interface, GPT-4 Vision). Azure CV + service/tooling queued next.
+
+**Feature 3 Progress:**
+- All 6 steps complete (models, services, WaitHistory, tooling, docs).
 
 #### New Capabilities
 
-**10 New Browser Tools:**
-- `find_element_by_image` - Locate by visual appearance
-- `click_by_description` - Natural language element targeting
-- `extract_text_from_image` - OCR text extraction
-- `verify_element_by_image` - Visual verification
-- `smart_wait` - Adaptive multi-condition waiting
-- `wait_for_stable` - Page stability detection
-- `wait_for_animations` - Animation completion
-- `wait_for_network_idle` - Network request monitoring
-- `heal_selector` - Manual healing trigger
-- `record_session` - Recording control
+**10 New Browser Tools (5 shipped / 5 pending):**
+- ✅ `smart_wait` - Adaptive multi-condition waiting
+- ✅ `wait_for_stable` - Page stability detection
+- ✅ `wait_for_animations` - Animation completion
+- ✅ `wait_for_network_idle` - Network request monitoring
+- ✅ `heal_selector` - Manual healing trigger
+- ⏳ `find_element_by_image` - Locate by visual appearance
+- ⏳ `click_by_description` - Natural language element targeting
+- ⏳ `extract_text_from_image` - OCR text extraction
+- ⏳ `verify_element_by_image` - Visual verification
+- ⏳ `record_session` - Recording control
 
-**Total Tools After Phase 3:** 35 (14 core + 6 mobile + 5 network + 10 AI)
+**Current Tool Count:** 30 (core + mobile + network + smart wait + healing) — grows to 35 once vision/recording tools land.
 
 #### Technical Components
 

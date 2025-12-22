@@ -57,7 +57,7 @@ var clickTool = new BrowserToolDefinition(
 ```
 
 ### 3. BrowserToolRegistry Static Class ?
-**Static registry with 13 pre-defined tools**
+**Static registry with 30 pre-defined tools (core, mobile, network, smart wait, healing)**
 
 ## 13 Browser Automation Tools
 
@@ -140,6 +140,18 @@ Verify element exists and check its state
 - **should_be_visible** (boolean, optional, default: true) - Must be visible or just in DOM
 - **timeout_ms** (int, optional, default: 5000) - Maximum wait time
 
+### Smart Waiting & Healing Additions (Phase 3)
+
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `smart_wait` | Adaptive multi-condition waiting (DOM, animations, network, loaders) | `conditions[]`, `require_all`, `max_wait_ms`, `selector` |
+| `wait_for_stable` | Ensures page stays stable for a configurable period | `max_wait_ms`, `stability_period_ms` |
+| `wait_for_animations` | Waits for CSS animations/transitions to finish | `selector`, `max_wait_ms` |
+| `wait_for_network_idle` | Blocks until HTTP traffic drops below threshold | `max_active_requests`, `idle_duration_ms`, `max_wait_ms` |
+| `heal_selector` | Invokes SelectorHealingService to repair broken CSS selectors | `failed_selector`, `expected_text`, `page_url`, `confidence_threshold` |
+
+These new definitions reuse the same registry + serialization helpers, so they are automatically exposed to planning agents and the DefaultToolExecutor.
+
 ## Registry Methods
 
 ### GetAllTools() ?
@@ -218,7 +230,7 @@ string[] names = BrowserToolRegistry.GetToolNames();
 
 **ToolCount Property**
 ```csharp
-int count = BrowserToolRegistry.ToolCount; // 13
+int count = BrowserToolRegistry.ToolCount; // 30 (core + mobile + network + smart wait + healing)
 ```
 
 ## Design Features
@@ -382,10 +394,10 @@ public async Task<string> GenerateAutomationPlan(
 ### Unit Tests
 ```csharp
 [Fact]
-public void GetAllTools_Returns13Tools()
+public void GetAllTools_Returns30Tools()
 {
     var tools = BrowserToolRegistry.GetAllTools();
-    Assert.Equal(13, tools.Count);
+    Assert.Equal(30, tools.Count);
 }
 
 [Fact]
