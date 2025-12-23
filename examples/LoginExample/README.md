@@ -321,15 +321,14 @@ Options:
     "Core": {
       "LLMProvider": "Ollama",
       "OllamaEndpoint": "http://localhost:11434",
-      "OllamaModel": "qwen2.5:32b"
+      "OllamaModel": "qwen3:30b"
     }
   }
 }
 ```
 
 Available models:
-- `qwen2.5:32b` - Best quality (requires 32GB RAM)
-- `qwen2.5-7b` - Balanced (requires 8GB RAM)
+- `qwen3:30b` - Best quality (requires 32GB RAM)
 - `mistral` - Fast and capable
 - `llama3` - Good general-purpose model
 
@@ -340,7 +339,7 @@ Available models:
     "Core": {
       "LLMProvider": "AzureOpenAI",
       "AzureOpenAIEndpoint": "https://your-resource.openai.azure.com",
-      "AzureOpenAIDeployment": "gpt-5",
+      "AzureOpenAIDeployment": "gpt-5.2-chat",
       "AzureOpenAIApiKey": "YOUR_API_KEY"
     }
   }
