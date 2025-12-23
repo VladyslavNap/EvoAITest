@@ -105,6 +105,7 @@ export OLLAMA_MODEL=mistral
 
 | Model | Size | Context | Best For | Speed |
 |-------|------|---------|----------|-------|
+| **qwen3:30b** | ~19 GB | 32K | Browser automation, reasoning | ?? Moderate (hardware dependent) |
 | **qwen2.5-7b** | 4.4 GB | 8K | Browser automation | ??? Fast |
 | **llama3** | 4.7 GB | 8K | General purpose | ??? Fast |
 | **mistral** | 4.1 GB | 8K | Balanced | ???? Very Fast |
@@ -117,13 +118,13 @@ export OLLAMA_MODEL=mistral
 ### Model Selection Guide
 
 **For Browser Automation:**
-- Primary: `qwen2.5-7b` (best balance of speed/capability)
+- Primary: `qwen3:30b` (best balance of reasoning/capability; requires ample RAM)
 - Alternative: `mistral` (faster but less reasoning)
 - Budget: `phi` (ultra-fast, good for simple tasks)
 
 **For Development:**
-- Start with: `qwen2.5-7b`
-- Complex logic: `mixtral` (if you have 16GB+ RAM)
+- Start with: `qwen3:30b`
+- Complex logic: `mixtral` (if you have 32GB+ RAM)
 - Code-heavy: `codellama`
 
 ## Usage Examples
@@ -426,7 +427,7 @@ FROM ollama/ollama:latest
 
 # Pull models during build (optional)
 RUN ollama serve & sleep 5 && \
-    ollama pull qwen2.5-7b && \
+    ollama pull qwen3:30b && \
     ollama pull mistral
 
 EXPOSE 11434

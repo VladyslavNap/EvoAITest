@@ -1,6 +1,6 @@
 # EvoAITest
 
-**AI-Powered Browser Automation Framework with Azure OpenAI (GPT-5)**
+**AI-Powered Browser Automation Framework with Azure OpenAI (GPT-5.2-Chat)**
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Azure](https://img.shields.io/badge/Azure-OpenAI%20GPT--5-0078D4?logo=microsoft-azure)](https://azure.microsoft.com/en-us/products/ai-services/openai-service)
@@ -14,12 +14,12 @@
 
 ## Overview
 
-EvoAITest is a modern, cloud-native browser automation framework that uses Azure OpenAI (GPT-5) to enable intelligent, natural language-driven web testing and automation with comprehensive **Visual Regression Testing** capabilities. Built on .NET 10 with Aspire orchestration, it combines enterprise-grade Azure AI with local development flexibility using Ollama.
+EvoAITest is a modern, cloud-native browser automation framework that uses Azure OpenAI (GPT-5.2-Chat) to enable intelligent, natural language-driven web testing and automation with comprehensive **Visual Regression Testing** capabilities. Built on .NET 10 with Aspire orchestration, it combines enterprise-grade Azure AI with local development flexibility using Ollama.
 
 ### Key Features
 
-- 🤖 **Azure OpenAI (GPT-5) Integration** - Production-ready AI-powered automation
-- 🦙 **Local Ollama Support** - Offline development with open-source models
+- 🤖 **Azure OpenAI (GPT-5.2-Chat) Integration** - Production-ready AI-powered automation
+- 🦙 **Local Ollama Support** - Offline development with open-source models (qwen3:30b recommended)
 - 🔐 **Azure Key Vault** - Secure secret management with managed identity
 - 💬 **Natural Language Commands** - Describe tasks in plain English
 - 🌐 **Playwright Browser Agent** - Resilient automation with 25 built-in tools and accessibility-aware state capture
@@ -606,7 +606,7 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - **ASP.NET Core** - High-performance web APIs
 
 ### Azure Services
-- **Azure OpenAI (GPT-5)** - AI-powered automation
+- **Azure OpenAI (GPT-5.2-Chat)** - AI-powered automation
 - **Azure Key Vault** - Secure secret management
 - **Azure Container Apps** - Serverless containers
 - **Azure Monitor** - Application insights
@@ -618,7 +618,7 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - **xUnit + FluentAssertions** - Testing
 
 ### Local Development
-- **Ollama** - Local LLM (qwen2.5-7b, llama2, mistral)
+- **Ollama** - Local LLM (qwen3:30b, llama2, mistral)
 - **Docker** - Container development
 - **PowerShell 7** - Cross-platform scripting
 
@@ -630,7 +630,7 @@ See [scripts/README-verify-day5.md](scripts/README-verify-day5.md) for detailed 
 - Screenshot capture: ~200ms
 - Page state extraction: ~1s
 
-### Benchmarks (Azure OpenAI GPT-5)
+### Benchmarks (Azure OpenAI GPT-5.2-Chat)
 - Task planning: ~1-3 seconds
 - API latency: ~200-500ms
 - Token processing: 1000-2000 tokens/sec
