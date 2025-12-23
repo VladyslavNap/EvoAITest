@@ -212,7 +212,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
             var historyEntry = new Data.Models.SelectorHealingHistory
             {
                 Id = Guid.NewGuid(),
-                TaskId = taskId ?? Guid.Empty,
+                TaskId = taskId,
                 OriginalSelector = healedSelector.OriginalSelector,
                 HealedSelector = healedSelector.NewSelector,
                 HealingStrategy = healedSelector.Strategy.ToString(),
