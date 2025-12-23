@@ -218,11 +218,11 @@ Returns:
 
 | Model | Description | Context Window | Use Case |
 |-------|-------------|----------------|----------|
-| gpt-4 | Flagship model | 8K-128K | Complex reasoning |
-| gpt-4-turbo | Faster GPT-4 | 128K | Speed + quality |
+| gpt-5.2-chat | Latest chat model (2025-12-11) | 128K | Cutting edge chat + reasoning |
 | gpt-4o | Multimodal | 128K | Vision + text |
 | gpt-4o-mini | Cost-effective | 128K | High volume |
-| gpt-5 | Latest model | 128K | Cutting edge |
+| gpt-4-turbo | Faster GPT-4 | 128K | Speed + quality |
+| gpt-4 | Flagship model | 8K-128K | Complex reasoning |
 | gpt-3.5-turbo | Fast + cheap | 16K | Simple tasks |
 | o1 | Reasoning | 200K | Complex logic |
 | o1-mini | Reasoning lite | 128K | Cost-effective reasoning |

@@ -330,9 +330,9 @@ dotnet user-secrets list --project EvoAITest.ApiService
 | Property | Type | Default | Required | Source |
 |----------|------|---------|----------|--------|
 | `AzureOpenAIEndpoint` | string | "" | Yes (AzureOpenAI) | Environment variable |
-| `AzureOpenAIDeployment` | string | "gpt-5" | Yes (AzureOpenAI) | Config file |
+| `AzureOpenAIDeployment` | string | "gpt-5.2-chat" | Yes (AzureOpenAI) | Config file |
 | `AzureOpenAIApiKey` | string | "" | Yes (AzureOpenAI) | Key Vault |
-| `AzureOpenAIApiVersion` | string | "2025-01-01-preview" | Yes (AzureOpenAI) | Config file |
+| `AzureOpenAIApiVersion` | string | "2025-12-11" | Yes (AzureOpenAI) | Config file |
 
 ### Ollama Properties
 
