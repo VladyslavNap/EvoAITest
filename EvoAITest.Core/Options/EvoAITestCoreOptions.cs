@@ -6,8 +6,8 @@ namespace EvoAITest.Core.Options;
 /// <remarks>
 /// <para>
 /// This configuration class supports multiple LLM providers:
-/// - Azure OpenAI (gpt-4o-mini): Production deployment using Azure AI services with Key Vault for secrets
-/// - Ollama: Local development with open-source models (qwen2.5:32b)
+/// - Azure OpenAI (gpt-5.2-chat): Production deployment using Azure AI services with Key Vault for secrets
+/// - Ollama: Local development with open-source models (qwen3:30b)
 /// - Local: Custom HTTP LLM endpoints for specialized deployments
 /// </para>
 /// <para>
@@ -23,7 +23,7 @@ namespace EvoAITest.Core.Options;
 ///     "Core": {
 ///       "LLMProvider": "Ollama",
 ///       "OllamaEndpoint": "http://localhost:11434",
-///       "OllamaModel": "qwen2.5:32b"
+///       "OllamaModel": "qwen3:30b"
 ///     }
 ///   }
 /// }
@@ -36,8 +36,8 @@ namespace EvoAITest.Core.Options;
 ///   "EvoAITest": {
 ///     "Core": {
 ///       "LLMProvider": "AzureOpenAI",
-///       "LLMModel": "gpt-4o-mini",
-///       "AzureOpenAIDeployment": "gpt-4o-mini",
+///       "LLMModel": "gpt-5.2-chat",
+///       "AzureOpenAIDeployment": "gpt-5.2-chat",
 ///       "AzureOpenAIApiVersion": "2024-10-21"
 ///     }
 ///   }
@@ -59,8 +59,8 @@ public sealed class EvoAITestCoreOptions
     /// <remarks>
     /// <para>
     /// Valid values:
-    /// - "AzureOpenAI": Use Azure OpenAI Service with gpt-4o-mini (production)
-    /// - "Ollama": Use local Ollama server with qwen2.5:32b (development)
+    /// - "AzureOpenAI": Use Azure OpenAI Service with gpt-5.2-chat (production)
+    /// - "Ollama": Use local Ollama server with qwen3:30b (development)
     /// - "Local": Use custom local HTTP LLM endpoint
     /// </para>
     /// <para>
@@ -78,14 +78,14 @@ public sealed class EvoAITestCoreOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Default: "gpt-4o-mini"
+    /// Default: "gpt-5.2-chat"
     /// </para>
     /// <para>
     /// This setting is only used when LLMProvider is "AzureOpenAI".
     /// For Ollama and Local providers, the model is determined by the endpoint configuration.
     /// </para>
     /// </remarks>
-    public string LLMModel { get; set; } = "gpt-4o-mini";
+    public string LLMModel { get; set; } = "gpt-5.2-chat";
 
     // ============================================================
     // Azure OpenAI Configuration
@@ -116,7 +116,7 @@ public sealed class EvoAITestCoreOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Default: "gpt-4o-mini"
+    /// Default: "gpt-5.2-chat"
     /// </para>
     /// <para>
     /// This is the name of your deployment in the Azure OpenAI resource.
@@ -126,7 +126,7 @@ public sealed class EvoAITestCoreOptions
     /// Required when LLMProvider is "AzureOpenAI".
     /// </para>
     /// </remarks>
-    public string AzureOpenAIDeployment { get; set; } = "gpt-4o-mini";
+    public string AzureOpenAIDeployment { get; set; } = "gpt-5.2-chat";
 
     /// <summary>
     /// Gets or sets the Azure OpenAI API key.
@@ -445,7 +445,7 @@ public sealed class EvoAITestCoreOptions
                 {
                     throw new InvalidOperationException(
                         "Ollama model is required when LLMProvider is 'Ollama'. " +
-                        "Install a model with: ollama pull qwen2.5:32b");
+                        "Install a model with: ollama pull qwen3:30b");
                 }
                 break;
 
