@@ -45,7 +45,7 @@ The file needs to be manually reconstructed with these additions:
 // 1. Add using statements
 using EvoAITest.Core.Data;
 using EvoAITest.Core.Data.Models;
-using Microsoft.EntityFrameworkContext;
+using Microsoft.EntityFrameworkCore;
 
 // 2. Add dependencies to constructor
 private readonly ISelectorAgent? _selectorAgent;
