@@ -60,9 +60,9 @@ public sealed class SelectorHealingService : ISelectorHealingService
                 HealingStrategy.TextContent => await TryTextContentStrategyAsync(context, cancellationToken),
                 HealingStrategy.AriaLabel => await TryAriaLabelStrategyAsync(context, cancellationToken),
                 HealingStrategy.FuzzyAttributes => await TryFuzzyAttributesStrategyAsync(context, cancellationToken),
-                HealingStrategy.VisualSimilarity when screenshot != null => 
+                HealingStrategy.VisualSimilarity when screenshot != null =>
                     await TryVisualSimilarityStrategyAsync(context, cancellationToken),
-                HealingStrategy.Position when context.ExpectedPosition != null => 
+                HealingStrategy.Position when context.ExpectedPosition != null =>
                     await TryPositionStrategyAsync(context, cancellationToken),
                 HealingStrategy.LLMGenerated => await TryLLMGeneratedStrategyAsync(context, cancellationToken),
                 _ => new List<SelectorCandidate>()
@@ -76,7 +76,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
                 .OrderByDescending(c => c.CalculateFinalConfidence())
                 .FirstOrDefault();
 
-            if (bestCandidate != null && 
+            if (bestCandidate != null &&
                 bestCandidate.CalculateFinalConfidence() >= context.MinConfidenceThreshold)
             {
                 _logger.LogInformation(
@@ -128,9 +128,9 @@ public sealed class SelectorHealingService : ISelectorHealingService
                 HealingStrategy.TextContent => await TryTextContentStrategyAsync(context, cancellationToken),
                 HealingStrategy.AriaLabel => await TryAriaLabelStrategyAsync(context, cancellationToken),
                 HealingStrategy.FuzzyAttributes => await TryFuzzyAttributesStrategyAsync(context, cancellationToken),
-                HealingStrategy.VisualSimilarity when context.ExpectedScreenshot != null => 
+                HealingStrategy.VisualSimilarity when context.ExpectedScreenshot != null =>
                     await TryVisualSimilarityStrategyAsync(context, cancellationToken),
-                HealingStrategy.Position when context.ExpectedPosition != null => 
+                HealingStrategy.Position when context.ExpectedPosition != null =>
                     await TryPositionStrategyAsync(context, cancellationToken),
                 HealingStrategy.LLMGenerated => await TryLLMGeneratedStrategyAsync(context, cancellationToken),
                 _ => new List<SelectorCandidate>()
@@ -181,16 +181,16 @@ public sealed class SelectorHealingService : ISelectorHealingService
             {
                 OriginalSelector = h.OriginalSelector,
                 NewSelector = h.HealedSelector,
-                Strategy = Enum.TryParse<HealingStrategy>(h.HealingStrategy, out var strategy) 
-                    ? strategy 
+                Strategy = Enum.TryParse<HealingStrategy>(h.HealingStrategy, out var strategy)
+                    ? strategy
                     : HealingStrategy.TextContent,
                 ConfidenceScore = h.ConfidenceScore,
                 HealedAt = h.HealedAt,
                 PageUrl = h.PageUrl,
                 Reasoning = $"Historical healing using {h.HealingStrategy}",
-                Context = string.IsNullOrEmpty(h.Context) 
-                    ? new Dictionary<string, object>() 
-                    : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(h.Context) 
+                Context = string.IsNullOrEmpty(h.Context)
+                    ? new Dictionary<string, object>()
+                    : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(h.Context)
                       ?? new Dictionary<string, object>()
             }).ToList();
         }
@@ -220,8 +220,8 @@ public sealed class SelectorHealingService : ISelectorHealingService
                 Success = success,
                 HealedAt = healedSelector.HealedAt,
                 PageUrl = healedSelector.PageUrl,
-                ExpectedText = healedSelector.Context.TryGetValue("expected_text", out var text) 
-                    ? text?.ToString() 
+                ExpectedText = healedSelector.Context.TryGetValue("expected_text", out var text)
+                    ? text?.ToString()
                     : null,
                 Context = System.Text.Json.JsonSerializer.Serialize(healedSelector.Context)
             };
@@ -249,15 +249,15 @@ public sealed class SelectorHealingService : ISelectorHealingService
         try
         {
             var query = _dbContext.SelectorHealingHistory.AsQueryable();
-            
+
             if (taskId.HasValue)
             {
                 query = query.Where(h => h.TaskId == taskId.Value);
             }
 
-            var history = await query.ToListAsync(cancellationToken);
+            var totalAttempts = await query.CountAsync(cancellationToken);
 
-            if (history.Count == 0)
+            if (totalAttempts == 0)
             {
                 return new Dictionary<string, object>
                 {
@@ -266,8 +266,8 @@ public sealed class SelectorHealingService : ISelectorHealingService
                 };
             }
 
-            // Calculate success rate by strategy
-            var strategyStats = history
+            // Calculate success rate by strategy using database-side aggregation
+            var strategyStats = await query
                 .GroupBy(h => h.HealingStrategy)
                 .Select(g => new
                 {
@@ -278,16 +278,19 @@ public sealed class SelectorHealingService : ISelectorHealingService
                     AvgConfidence = g.Average(h => h.ConfidenceScore)
                 })
                 .OrderByDescending(s => s.SuccessRate)
-                .ToList();
+                .ToListAsync(cancellationToken);
 
             var bestStrategy = strategyStats.FirstOrDefault();
 
+            var successfulAttempts = await query.CountAsync(h => h.Success, cancellationToken);
+            var averageConfidence = await query.AverageAsync(h => h.ConfidenceScore, cancellationToken);
+
             var learningResults = new Dictionary<string, object>
             {
-                ["total_attempts"] = history.Count,
-                ["successful_attempts"] = history.Count(h => h.Success),
-                ["overall_success_rate"] = history.Count(h => h.Success) / (double)history.Count,
-                ["average_confidence"] = history.Average(h => h.ConfidenceScore),
+                ["total_attempts"] = totalAttempts,
+                ["successful_attempts"] = successfulAttempts,
+                ["overall_success_rate"] = successfulAttempts / (double)totalAttempts,
+                ["average_confidence"] = averageConfidence,
                 ["strategy_stats"] = strategyStats,
                 ["best_strategy"] = bestStrategy?.Strategy ?? "None",
                 ["best_strategy_success_rate"] = bestStrategy?.SuccessRate ?? 0.0
@@ -295,7 +298,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
 
             _logger.LogInformation(
                 "Learning analysis complete: {Total} attempts, {Success:P} success rate, best strategy: {Strategy}",
-                history.Count,
+                totalAttempts,
                 learningResults["overall_success_rate"],
                 learningResults["best_strategy"]);
 
@@ -316,10 +319,9 @@ public sealed class SelectorHealingService : ISelectorHealingService
     {
         try
         {
-            var allHistory = await _dbContext.SelectorHealingHistory
-                .ToListAsync(cancellationToken);
+            var totalCount = await _dbContext.SelectorHealingHistory.CountAsync(cancellationToken);
 
-            if (allHistory.Count == 0)
+            if (totalCount == 0)
             {
                 return new Dictionary<string, object>
                 {
@@ -328,26 +330,43 @@ public sealed class SelectorHealingService : ISelectorHealingService
                 };
             }
 
-            var recentHistory = allHistory
-                .Where(h => h.HealedAt >= DateTimeOffset.UtcNow.AddDays(-7))
-                .ToList();
+            var sevenDaysAgo = DateTimeOffset.UtcNow.AddDays(-7);
+
+            var successCount = await _dbContext.SelectorHealingHistory
+                .CountAsync(h => h.Success, cancellationToken);
+
+            var avgConfidence = await _dbContext.SelectorHealingHistory
+                .AverageAsync(h => h.ConfidenceScore, cancellationToken);
+
+            var recentCount = await _dbContext.SelectorHealingHistory
+                .CountAsync(h => h.HealedAt >= sevenDaysAgo, cancellationToken);
+
+            var recentSuccessCount = await _dbContext.SelectorHealingHistory
+                .CountAsync(h => h.HealedAt >= sevenDaysAgo && h.Success, cancellationToken);
+
+            var uniquePages = await _dbContext.SelectorHealingHistory
+                .Select(h => h.PageUrl)
+                .Distinct()
+                .CountAsync(cancellationToken);
+
+            var mostCommonStrategy = await _dbContext.SelectorHealingHistory
+                .GroupBy(h => h.HealingStrategy)
+                .OrderByDescending(g => g.Count())
+                .Select(g => g.Key)
+                .FirstOrDefaultAsync(cancellationToken);
 
             var stats = new Dictionary<string, object>
             {
-                ["total_healings"] = allHistory.Count,
-                ["successful_healings"] = allHistory.Count(h => h.Success),
-                ["success_rate"] = allHistory.Count(h => h.Success) / (double)allHistory.Count,
-                ["average_confidence"] = allHistory.Average(h => h.ConfidenceScore),
-                ["recent_healings_7days"] = recentHistory.Count,
-                ["recent_success_rate"] = recentHistory.Count > 0 
-                    ? recentHistory.Count(h => h.Success) / (double)recentHistory.Count 
+                ["total_healings"] = totalCount,
+                ["successful_healings"] = successCount,
+                ["success_rate"] = successCount / (double)totalCount,
+                ["average_confidence"] = avgConfidence,
+                ["recent_healings_7days"] = recentCount,
+                ["recent_success_rate"] = recentCount > 0
+                    ? recentSuccessCount / (double)recentCount
                     : 0.0,
-                ["unique_pages_healed"] = allHistory.Select(h => h.PageUrl).Distinct().Count(),
-                ["most_common_strategy"] = allHistory
-                    .GroupBy(h => h.HealingStrategy)
-                    .OrderByDescending(g => g.Count())
-                    .First()
-                    .Key
+                ["unique_pages_healed"] = uniquePages,
+                ["most_common_strategy"] = mostCommonStrategy ?? "None"
             };
 
             _logger.LogInformation(
@@ -377,29 +396,25 @@ public sealed class SelectorHealingService : ISelectorHealingService
         if (string.IsNullOrWhiteSpace(context.ExpectedText))
             return Task.FromResult(new List<SelectorCandidate>());
 
-        var candidates = new List<SelectorCandidate>();
-
-        foreach (var element in context.PageState.InteractiveElements)
-        {
-            if (element.Text == null)
-                continue;
-
-            var similarity = CalculateTextSimilarity(context.ExpectedText, element.Text);
-            
-            if (similarity >= 0.7 && element.Selector != null)
+        var candidates = context.PageState.InteractiveElements
+            .Where(element => element.Text != null && element.Selector != null)
+            .Select(element =>
             {
-                candidates.Add(new SelectorCandidate
-                {
-                    Selector = element.Selector,
-                    Strategy = HealingStrategy.TextContent,
-                    BaseConfidence = similarity,
-                    ElementInfo = element,
-                    ElementText = element.Text,
-                    TextSimilarityScore = similarity,
-                    Reasoning = $"Text match: '{element.Text}' (similarity: {similarity:F2})"
-                });
-            }
-        }
+                var similarity = CalculateTextSimilarity(context.ExpectedText, element.Text!);
+                return new { element, similarity };
+            })
+            .Where(x => x.similarity >= 0.7)
+            .Select(x => new SelectorCandidate
+            {
+                Selector = x.element.Selector!,
+                Strategy = HealingStrategy.TextContent,
+                BaseConfidence = x.similarity,
+                ElementInfo = x.element,
+                ElementText = x.element.Text,
+                TextSimilarityScore = x.similarity,
+                Reasoning = $"Text match: '{x.element.Text}' (similarity: {x.similarity:F2})"
+            })
+            .ToList();
 
         return Task.FromResult(candidates);
     }
@@ -411,31 +426,29 @@ public sealed class SelectorHealingService : ISelectorHealingService
         HealingContext context,
         CancellationToken cancellationToken)
     {
-        var candidates = new List<SelectorCandidate>();
-
-        foreach (var element in context.PageState.InteractiveElements)
-        {
-            if (!element.Attributes.TryGetValue("aria-label", out var ariaLabel) || 
-                string.IsNullOrWhiteSpace(ariaLabel))
-                continue;
-
-            var similarity = !string.IsNullOrWhiteSpace(context.ExpectedText)
-                ? CalculateTextSimilarity(context.ExpectedText, ariaLabel)
-                : 0.8; // Default score if no expected text
-
-            if (element.Selector != null)
+        var candidates = context.PageState.InteractiveElements
+            .Where(element => element.Selector != null &&
+                            element.Attributes.TryGetValue("aria-label", out var ariaLabel) &&
+                            !string.IsNullOrWhiteSpace(ariaLabel))
+            .Select(element =>
             {
-                candidates.Add(new SelectorCandidate
-                {
-                    Selector = element.Selector,
-                    Strategy = HealingStrategy.AriaLabel,
-                    BaseConfidence = similarity,
-                    ElementInfo = element,
-                    AriaMatchScore = similarity,
-                    Reasoning = $"ARIA label match: '{ariaLabel}'"
-                });
-            }
-        }
+                var ariaLabel = element.Attributes["aria-label"];
+                var similarity = !string.IsNullOrWhiteSpace(context.ExpectedText)
+                    ? CalculateTextSimilarity(context.ExpectedText, ariaLabel)
+                    : 0.8; // Default score if no expected text
+                return new { element, ariaLabel, similarity };
+            })
+            .Where(x => x.similarity >= 0.7)
+            .Select(x => new SelectorCandidate
+            {
+                Selector = x.element.Selector!,
+                Strategy = HealingStrategy.AriaLabel,
+                BaseConfidence = x.similarity,
+                ElementInfo = x.element,
+                AriaMatchScore = x.similarity,
+                Reasoning = $"ARIA label match: '{x.ariaLabel}'"
+            })
+            .ToList();
 
         return Task.FromResult(candidates);
     }
@@ -455,7 +468,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
         foreach (var element in context.PageState.InteractiveElements)
         {
             var matchScore = CalculateAttributeMatchScore(context.ExpectedAttributes, element.Attributes);
-            
+
             if (matchScore >= 0.6 && element.Selector != null)
             {
                 candidates.Add(new SelectorCandidate
@@ -476,46 +489,39 @@ public sealed class SelectorHealingService : ISelectorHealingService
     /// <summary>
     /// Tries to find elements by visual similarity.
     /// </summary>
-    private async Task<List<SelectorCandidate>> TryVisualSimilarityStrategyAsync(
+    private Task<List<SelectorCandidate>> TryVisualSimilarityStrategyAsync(
         HealingContext context,
         CancellationToken cancellationToken)
     {
         if (context.ExpectedScreenshot == null)
-            return new List<SelectorCandidate>();
+            return Task.FromResult(new List<SelectorCandidate>());
 
-        var candidates = new List<SelectorCandidate>();
-
-        foreach (var element in context.PageState.InteractiveElements)
-        {
-            if (element.BoundingBox == null || element.Selector == null)
-                continue;
-
-            // Note: Would need actual element screenshot here
-            // For now, use position-based matching as proxy
-            if (context.ExpectedPosition != null)
+        var candidates = context.PageState.InteractiveElements
+            .Where(element => element.BoundingBox != null &&
+                            element.Selector != null &&
+                            context.ExpectedPosition != null)
+            .Select(element =>
             {
                 var distance = CalculateDistance(
-                    element.BoundingBox.X, element.BoundingBox.Y,
-                    context.ExpectedPosition.X, context.ExpectedPosition.Y);
+                    element.BoundingBox!.X, element.BoundingBox.Y,
+                    context.ExpectedPosition!.X, context.ExpectedPosition.Y);
 
                 var normalizedScore = Math.Max(0, 1.0 - (distance / 1000.0)); // Normalize to 0-1
+                return new { element, distance, normalizedScore };
+            })
+            .Where(x => x.normalizedScore >= 0.7)
+            .Select(x => new SelectorCandidate
+            {
+                Selector = x.element.Selector!,
+                Strategy = HealingStrategy.VisualSimilarity,
+                BaseConfidence = x.normalizedScore,
+                ElementInfo = x.element,
+                VisualSimilarityScore = x.normalizedScore,
+                Reasoning = $"Visual/position match (distance: {x.distance:F0}px)"
+            })
+            .ToList();
 
-                if (normalizedScore >= 0.7)
-                {
-                    candidates.Add(new SelectorCandidate
-                    {
-                        Selector = element.Selector,
-                        Strategy = HealingStrategy.VisualSimilarity,
-                        BaseConfidence = normalizedScore,
-                        ElementInfo = element,
-                        VisualSimilarityScore = normalizedScore,
-                        Reasoning = $"Visual/position match (distance: {distance:F0}px)"
-                    });
-                }
-            }
-        }
-
-        return candidates;
+        return Task.FromResult(candidates);
     }
 
     /// <summary>
@@ -528,33 +534,29 @@ public sealed class SelectorHealingService : ISelectorHealingService
         if (context.ExpectedPosition == null)
             return Task.FromResult(new List<SelectorCandidate>());
 
-        var candidates = new List<SelectorCandidate>();
-
-        foreach (var element in context.PageState.InteractiveElements)
-        {
-            if (element.BoundingBox == null || element.Selector == null)
-                continue;
-
-            var distance = CalculateDistance(
-                element.BoundingBox.X, element.BoundingBox.Y,
-                context.ExpectedPosition.X, context.ExpectedPosition.Y);
-
-            // Closer is better - normalize to 0-1 score
-            var normalizedScore = Math.Max(0, 1.0 - (distance / 500.0));
-            
-            if (normalizedScore >= 0.7)
+        var candidates = context.PageState.InteractiveElements
+            .Where(element => element.BoundingBox != null && element.Selector != null)
+            .Select(element =>
             {
-                candidates.Add(new SelectorCandidate
-                {
-                    Selector = element.Selector,
-                    Strategy = HealingStrategy.Position,
-                    BaseConfidence = normalizedScore,
-                    ElementInfo = element,
-                    PositionScore = normalizedScore,
-                    Reasoning = $"Position proximity (distance: {distance:F0}px)"
-                });
-            }
-        }
+                var distance = CalculateDistance(
+                    element.BoundingBox!.X, element.BoundingBox.Y,
+                    context.ExpectedPosition.X, context.ExpectedPosition.Y);
+
+                // Closer is better - normalize to 0-1 score
+                var normalizedScore = Math.Max(0, 1.0 - (distance / 500.0));
+                return new { element, distance, normalizedScore };
+            })
+            .Where(x => x.normalizedScore >= 0.7)
+            .Select(x => new SelectorCandidate
+            {
+                Selector = x.element.Selector!,
+                Strategy = HealingStrategy.Position,
+                BaseConfidence = x.normalizedScore,
+                ElementInfo = x.element,
+                PositionScore = x.normalizedScore,
+                Reasoning = $"Position proximity (distance: {x.distance:F0}px)"
+            })
+            .ToList();
 
         return Task.FromResult(candidates);
     }
@@ -575,7 +577,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
         try
         {
             _logger.LogInformation("Using LLM to generate selector candidates");
-            
+
             var candidates = await _selectorAgent.GenerateSelectorCandidatesAsync(
                 context.PageState,
                 context.FailedSelector,
@@ -583,7 +585,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
                 cancellationToken);
 
             _logger.LogInformation("LLM generated {Count} selector candidates", candidates.Count);
-            
+
             return candidates;
         }
         catch (Exception ex)
@@ -603,7 +605,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
 
         var maxLength = Math.Max(expected.Length, actual.Length);
         var distance = LevenshteinDistance(expected.ToLower(), actual.ToLower());
-        
+
         return 1.0 - ((double)distance / maxLength);
     }
 
@@ -614,7 +616,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
     {
         if (string.IsNullOrEmpty(source))
             return target?.Length ?? 0;
-        
+
         if (string.IsNullOrEmpty(target))
             return source.Length;
 
@@ -622,7 +624,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
 
         for (int i = 0; i <= source.Length; i++)
             distance[i, 0] = i;
-        
+
         for (int j = 0; j <= target.Length; j++)
             distance[0, j] = j;
 
@@ -651,7 +653,7 @@ public sealed class SelectorHealingService : ISelectorHealingService
         if (expected.Count == 0)
             return 0;
 
-        int matchCount = 0;
+        double matchScore = 0;
         int totalCount = expected.Count;
 
         foreach (var (key, expectedValue) in expected)
@@ -660,18 +662,18 @@ public sealed class SelectorHealingService : ISelectorHealingService
             {
                 if (expectedValue.Equals(actualValue, StringComparison.OrdinalIgnoreCase))
                 {
-                    matchCount++;
+                    matchScore += 1.0;
                 }
                 else
                 {
                     // Partial credit for similar values
                     var similarity = CalculateTextSimilarity(expectedValue, actualValue);
-                    matchCount += (int)(similarity * 0.5);
+                    matchScore += similarity * 0.5;
                 }
             }
         }
 
-        return (double)matchCount / totalCount;
+        return matchScore / totalCount;
     }
 
     /// <summary>
