@@ -6,8 +6,8 @@ namespace EvoAITest.Core.Options;
 /// <remarks>
 /// <para>
 /// This configuration class supports multiple LLM providers:
-/// - Azure OpenAI (GPT-5): Production deployment using Azure AI services with Key Vault for secrets
-/// - Ollama: Local development with open-source models
+/// - Azure OpenAI (gpt-4o-mini): Production deployment using Azure AI services with Key Vault for secrets
+/// - Ollama: Local development with open-source models (qwen2.5:32b)
 /// - Local: Custom HTTP LLM endpoints for specialized deployments
 /// </para>
 /// <para>
@@ -36,9 +36,9 @@ namespace EvoAITest.Core.Options;
 ///   "EvoAITest": {
 ///     "Core": {
 ///       "LLMProvider": "AzureOpenAI",
-///       "LLMModel": "gpt-5",
-///       "AzureOpenAIDeployment": "gpt-5",
-///       "AzureOpenAIApiVersion": "2025-01-01-preview"
+///       "LLMModel": "gpt-4o-mini",
+///       "AzureOpenAIDeployment": "gpt-4o-mini",
+///       "AzureOpenAIApiVersion": "2024-10-21"
 ///     }
 ///   }
 /// }
@@ -59,8 +59,8 @@ public sealed class EvoAITestCoreOptions
     /// <remarks>
     /// <para>
     /// Valid values:
-    /// - "AzureOpenAI": Use Azure OpenAI Service with GPT-5 (production)
-    /// - "Ollama": Use local Ollama server (development)
+    /// - "AzureOpenAI": Use Azure OpenAI Service with gpt-4o-mini (production)
+    /// - "Ollama": Use local Ollama server with qwen2.5:32b (development)
     /// - "Local": Use custom local HTTP LLM endpoint
     /// </para>
     /// <para>
@@ -78,14 +78,14 @@ public sealed class EvoAITestCoreOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Default: "gpt-5"
+    /// Default: "gpt-4o-mini"
     /// </para>
     /// <para>
     /// This setting is only used when LLMProvider is "AzureOpenAI".
     /// For Ollama and Local providers, the model is determined by the endpoint configuration.
     /// </para>
     /// </remarks>
-    public string LLMModel { get; set; } = "gpt-5";
+    public string LLMModel { get; set; } = "gpt-4o-mini";
 
     // ============================================================
     // Azure OpenAI Configuration
@@ -116,7 +116,7 @@ public sealed class EvoAITestCoreOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Default: "gpt-5"
+    /// Default: "gpt-4o-mini"
     /// </para>
     /// <para>
     /// This is the name of your deployment in the Azure OpenAI resource.
@@ -126,7 +126,7 @@ public sealed class EvoAITestCoreOptions
     /// Required when LLMProvider is "AzureOpenAI".
     /// </para>
     /// </remarks>
-    public string AzureOpenAIDeployment { get; set; } = "gpt-5";
+    public string AzureOpenAIDeployment { get; set; } = "gpt-4o-mini";
 
     /// <summary>
     /// Gets or sets the Azure OpenAI API key.
@@ -167,7 +167,7 @@ public sealed class EvoAITestCoreOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Default: "2025-01-01-preview"
+    /// Default: "2024-10-21"
     /// </para>
     /// <para>
     /// This specifies which version of the Azure OpenAI REST API to use.
@@ -178,7 +178,7 @@ public sealed class EvoAITestCoreOptions
     /// https://learn.microsoft.com/en-us/azure/ai-services/openai/reference
     /// </para>
     /// </remarks>
-    public string AzureOpenAIApiVersion { get; set; } = "2025-01-01-preview";
+    public string AzureOpenAIApiVersion { get; set; } = "2024-10-21";
 
     // ============================================================
     // Ollama Configuration (Local Development)
