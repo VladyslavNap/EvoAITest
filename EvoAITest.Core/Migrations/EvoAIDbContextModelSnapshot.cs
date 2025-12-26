@@ -166,19 +166,22 @@ namespace EvoAITest.Core.Migrations
 
                     b.Property<string>("Action")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("ActualWaitMs")
                         .HasColumnType("int");
 
                     b.Property<string>("PageUrl")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<DateTimeOffset>("RecordedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Selector")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<bool>("Success")
                         .HasColumnType("bit");
@@ -191,13 +194,20 @@ namespace EvoAITest.Core.Migrations
 
                     b.Property<string>("WaitCondition")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Action");
+
+                    b.HasIndex("RecordedAt");
+
+                    b.HasIndex("Success");
+
                     b.HasIndex("TaskId");
 
-                    b.ToTable("WaitHistory");
+                    b.ToTable("WaitHistory", (string)null);
                 });
 
             modelBuilder.Entity("EvoAITest.Core.Models.AutomationTask", b =>
