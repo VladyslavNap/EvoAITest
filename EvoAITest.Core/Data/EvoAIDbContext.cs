@@ -59,6 +59,11 @@ public sealed class EvoAIDbContext : DbContext
     public DbSet<SelectorHealingHistory> SelectorHealingHistory => Set<SelectorHealingHistory>();
 
     /// <summary>
+    /// Gets or sets the RecoveryHistory DbSet.
+    /// </summary>
+    public DbSet<RecoveryHistory> RecoveryHistory => Set<RecoveryHistory>();
+
+    /// <summary>
     /// Configures the database model using the specified model builder.
     /// </summary>
     /// <param name="modelBuilder">The model builder to use.</param>
@@ -304,6 +309,78 @@ public sealed class EvoAIDbContext : DbContext
             entity.HasIndex(e => e.HealingStrategy);
 
             // Relationships
+            entity.HasOne(e => e.Task)
+                .WithMany()
+                .HasForeignKey(e => e.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure RecoveryHistory entity
+        modelBuilder.Entity<RecoveryHistory>(entity =>
+        {
+            entity.ToTable("RecoveryHistory");
+            entity.HasKey(e => e.Id);
+            
+            // Required string properties
+            entity.Property(e => e.ErrorType)
+                .HasMaxLength(100)
+                .IsRequired();
+            
+            entity.Property(e => e.ErrorMessage)
+                .IsRequired();
+            
+            entity.Property(e => e.ExceptionType)
+                .HasMaxLength(200)
+                .IsRequired();
+            
+            entity.Property(e => e.RecoveryStrategy)
+                .HasMaxLength(50)
+                .IsRequired();
+            
+            entity.Property(e => e.RecoveryActions)
+                .IsRequired();
+            
+            // Required value properties
+            entity.Property(e => e.Success)
+                .IsRequired();
+            
+            entity.Property(e => e.AttemptNumber)
+                .IsRequired();
+            
+            entity.Property(e => e.DurationMs)
+                .IsRequired();
+            
+            entity.Property(e => e.RecoveredAt)
+                .IsRequired();
+            
+            // Optional string properties
+            entity.Property(e => e.PageUrl)
+                .HasMaxLength(2000);
+            
+            entity.Property(e => e.Action)
+                .HasMaxLength(200);
+            
+            entity.Property(e => e.Selector)
+                .HasMaxLength(500);
+            
+            // Indexes for performance
+            entity.HasIndex(e => e.TaskId)
+                .HasDatabaseName("IX_RecoveryHistory_TaskId");
+            
+            entity.HasIndex(e => e.ErrorType)
+                .HasDatabaseName("IX_RecoveryHistory_ErrorType");
+            
+            entity.HasIndex(e => e.Success)
+                .HasDatabaseName("IX_RecoveryHistory_Success");
+            
+            entity.HasIndex(e => e.RecoveredAt)
+                .HasDatabaseName("IX_RecoveryHistory_RecoveredAt");
+            
+            // Composite index for learning queries
+            entity.HasIndex(e => new { e.ErrorType, e.Success })
+                .HasDatabaseName("IX_RecoveryHistory_ErrorType_Success");
+            
+            // Relationship to AutomationTask
             entity.HasOne(e => e.Task)
                 .WithMany()
                 .HasForeignKey(e => e.TaskId)
