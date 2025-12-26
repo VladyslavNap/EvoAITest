@@ -5,6 +5,7 @@ using EvoAITest.Core.Models;
 using EvoAITest.Core.Options;
 using EvoAITest.Core.Repositories;
 using EvoAITest.Core.Services;
+using EvoAITest.Core.Services.ErrorRecovery;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,6 +60,11 @@ public static class ServiceCollectionExtensions
         // Register configuration options
         services.Configure<EvoAITestCoreOptions>(configuration.GetSection("EvoAITest:Core"));
         services.Configure<ToolExecutorOptions>(configuration.GetSection("EvoAITest:ToolExecutor"));
+        services.Configure<ErrorRecoveryOptions>(configuration.GetSection("EvoAITest:Core:ErrorRecovery"));
+
+        // Register Error Recovery services
+        services.TryAddScoped<IErrorClassifier, ErrorClassifier>();
+        services.TryAddScoped<IErrorRecoveryService, ErrorRecoveryService>();
 
         // Register browser services
         services.TryAddScoped<IBrowserAgent, PlaywrightBrowserAgent>();
