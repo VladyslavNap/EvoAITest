@@ -315,6 +315,41 @@ public sealed class EvoAIDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // Configure WaitHistory entity
+        modelBuilder.Entity<WaitHistory>(entity =>
+        {
+            // Primary key
+            entity.HasKey(e => e.Id);
+
+            // Table name
+            entity.ToTable("WaitHistory");
+
+            // Required fields
+            entity.Property(e => e.TaskId).IsRequired();
+            entity.Property(e => e.Action).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.WaitCondition).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.TimeoutMs).IsRequired();
+            entity.Property(e => e.ActualWaitMs).IsRequired();
+            entity.Property(e => e.Success).IsRequired();
+            entity.Property(e => e.RecordedAt).IsRequired();
+
+            // Optional fields
+            entity.Property(e => e.Selector).HasMaxLength(500);
+            entity.Property(e => e.PageUrl).HasMaxLength(2000);
+
+            // Indexes
+            entity.HasIndex(e => e.TaskId);
+            entity.HasIndex(e => e.Action);
+            entity.HasIndex(e => e.Success);
+            entity.HasIndex(e => e.RecordedAt);
+
+            // Relationships
+            entity.HasOne(e => e.Task)
+                .WithMany()
+                .HasForeignKey(e => e.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // Configure RecoveryHistory entity
         modelBuilder.Entity<RecoveryHistory>(entity =>
         {
