@@ -6,6 +6,7 @@ using EvoAITest.Core.Abstractions;
 using EvoAITest.Core.Browser;
 using EvoAITest.Core.Models;
 using EvoAITest.Core.Options;
+using EvoAITest.Core.Services.ErrorRecovery;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -42,6 +43,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
     private readonly ILogger<DefaultToolExecutor> _logger;
     private readonly IVisualComparisonService? _visualComparisonService;
     private readonly ISelectorHealingService? _selectorHealingService;
+    private readonly IErrorRecoveryService? _errorRecoveryService;
     
     // OpenTelemetry tracing
     private static readonly ActivitySource ActivitySource = new("EvoAITest.ToolExecutor", "1.0.0");
@@ -103,13 +105,15 @@ public sealed class DefaultToolExecutor : IToolExecutor
     /// <param name="logger">Logger for structured telemetry.</param>
     /// <param name="visualComparisonService">Optional service for visual regression testing.</param>
     /// <param name="selectorHealingService">Optional service for automatic selector healing.</param>
+    /// <param name="errorRecoveryService">Optional service for intelligent error recovery.</param>
     public DefaultToolExecutor(
         IBrowserAgent browserAgent,
         IBrowserToolRegistry toolRegistry,
         IOptions<ToolExecutorOptions> options,
         ILogger<DefaultToolExecutor> logger,
         IVisualComparisonService? visualComparisonService = null,
-        ISelectorHealingService? selectorHealingService = null)
+        ISelectorHealingService? selectorHealingService = null,
+        IErrorRecoveryService? errorRecoveryService = null)
     {
         _browserAgent = browserAgent ?? throw new ArgumentNullException(nameof(browserAgent));
         _toolRegistry = toolRegistry ?? throw new ArgumentNullException(nameof(toolRegistry));
@@ -117,6 +121,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _visualComparisonService = visualComparisonService; // Optional for backwards compatibility
         _selectorHealingService = selectorHealingService; // Optional for self-healing capability
+        _errorRecoveryService = errorRecoveryService; // Optional for intelligent error recovery
         
         // Validate options on construction
         _options.Validate();
@@ -304,6 +309,67 @@ public sealed class DefaultToolExecutor : IToolExecutor
                     if (_options.EnableDetailedLogging)
                     {
                         _logger.TransientErrorDetected(toolCall.ToolName, errorType, ex.Message);
+                    }
+
+                    // Try intelligent error recovery if service is available
+                    if (_errorRecoveryService != null)
+                    {
+                        try
+                        {
+                            var pageState = await _browserAgent.GetPageStateAsync(cancellationToken);
+                            var executionContext = new Models.ExecutionContext
+                            {
+                                Action = toolCall.ToolName,
+                                Selector = toolCall.Parameters.TryGetValue("selector", out var sel) 
+                                    ? sel?.ToString() : null,
+                                PageUrl = pageState.Url,
+                                ExpectedText = toolCall.Parameters.TryGetValue("text", out var txt) 
+                                    ? txt?.ToString() : null
+                            };
+
+                            var recoveryStrategy = new Models.ErrorRecovery.RetryStrategy
+                            {
+                                MaxRetries = maxAttempts - attemptCount,
+                                InitialDelay = TimeSpan.FromMilliseconds(_options.InitialRetryDelayMs),
+                                MaxDelay = TimeSpan.FromMilliseconds(_options.MaxRetryDelayMs),
+                                UseExponentialBackoff = _options.UseExponentialBackoff,
+                                UseJitter = true
+                            };
+
+                            var recoveryResult = await _errorRecoveryService.RecoverAsync(
+                                ex,
+                                executionContext,
+                                recoveryStrategy,
+                                cancellationToken);
+
+                            if (recoveryResult.Success)
+                            {
+                                _logger.LogInformation(
+                                    "Error recovery successful for {Tool} using actions: {Actions}",
+                                    toolCall.ToolName,
+                                    string.Join(", ", recoveryResult.ActionsAttempted));
+
+                                // Update metadata with recovery info
+                                retryReasons.Add($"Recovery: {string.Join(", ", recoveryResult.ActionsAttempted)}");
+                                
+                                // Recovery handled the error, continue to retry
+                                continue;
+                            }
+                            else
+                            {
+                                _logger.LogWarning(
+                                    "Error recovery failed for {Tool} after {Attempts} attempts",
+                                    toolCall.ToolName,
+                                    recoveryResult.AttemptNumber);
+                            }
+                        }
+                        catch (Exception recoveryEx)
+                        {
+                            _logger.LogWarning(
+                                recoveryEx,
+                                "Error recovery service failed for {Tool}",
+                                toolCall.ToolName);
+                        }
                     }
 
                     // Calculate backoff delay with jitter
