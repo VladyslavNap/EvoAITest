@@ -1,0 +1,549 @@
+@using EvoAITest.Core.Models.Recording
+@using EvoAITest.Core.Abstractions
+@inject IJSRuntime JSRuntime
+
+<div class="test-preview-container">
+    <div class="preview-header">
+        <h3>Generated Test Preview</h3>
+        <div class="preview-actions">
+            @if (GeneratedTest != null)
+            {
+                <button class="btn btn-secondary" @onclick="CopyToClipboard">
+                    <span class="icon">??</span> Copy
+                </button>
+                <button class="btn btn-primary" @onclick="DownloadTest">
+                    <span class="icon">??</span> Download
+                </button>
+                @if (OnEditRequested.HasDelegate)
+                {
+                    <button class="btn btn-info" @onclick="() => OnEditRequested.InvokeAsync(GeneratedTest)">
+                        <span class="icon">??</span> Edit
+                    </button>
+                }
+            }
+        </div>
+    </div>
+
+    @if (GeneratedTest == null)
+    {
+        <div class="no-test-message">
+            <p>No test has been generated yet.</p>
+            <p class="hint">Complete a recording and generate a test to see the preview here.</p>
+        </div>
+    }
+    else
+    {
+        <!-- Test Metadata -->
+        <div class="test-metadata">
+            <div class="metadata-row">
+                <div class="metadata-item">
+                    <span class="label">Class:</span>
+                    <span class="value">@GeneratedTest.ClassName</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="label">Framework:</span>
+                    <span class="value">@Session?.TestFramework</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="label">Methods:</span>
+                    <span class="value">@GeneratedTest.Methods.Count</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="label">Assertions:</span>
+                    <span class="value">@GeneratedTest.Metrics.AssertionCount</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quality Metrics -->
+        <div class="quality-metrics">
+            <h4>Quality Metrics</h4>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">@GeneratedTest.Metrics.LinesOfCode</div>
+                    <div class="metric-label">Lines of Code</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">@GeneratedTest.Metrics.MaintainabilityScore.ToString("F0")</div>
+                    <div class="metric-label">Maintainability</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">@GeneratedTest.Metrics.EstimatedCoverage.ToString("F0")%</div>
+                    <div class="metric-label">Coverage Est.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Tabs -->
+        <div class="code-tabs">
+            <div class="tab-buttons">
+                <button class="tab-button @(activeTab == "test" ? "active" : "")" 
+                        @onclick='() => activeTab = "test"'>
+                    Test Code
+                </button>
+                <button class="tab-button @(activeTab == "methods" ? "active" : "")" 
+                        @onclick='() => activeTab = "methods"'>
+                    Methods (@GeneratedTest.Methods.Count)
+                </button>
+                @if (GeneratedTest.PageObjects.Any())
+                {
+                    <button class="tab-button @(activeTab == "pageobjects" ? "active" : "")" 
+                            @onclick='() => activeTab = "pageobjects"'>
+                        Page Objects (@GeneratedTest.PageObjects.Count)
+                    </button>
+                }
+                <button class="tab-button @(activeTab == "actions" ? "active" : "")" 
+                        @onclick='() => activeTab = "actions"'>
+                    Action Mapping
+                </button>
+            </div>
+
+            <div class="tab-content">
+                @if (activeTab == "test")
+                {
+                    <div class="code-viewer">
+                        <pre><code class="language-csharp">@GeneratedTest.Code</code></pre>
+                    </div>
+                }
+                else if (activeTab == "methods")
+                {
+                    <div class="methods-list">
+                        @foreach (var method in GeneratedTest.Methods)
+                        {
+                            <div class="method-item">
+                                <div class="method-header">
+                                    <h5>@method.Name</h5>
+                                    @if (!string.IsNullOrEmpty(method.Description))
+                                    {
+                                        <p class="method-description">@method.Description</p>
+                                    }
+                                </div>
+                                <div class="code-viewer">
+                                    <pre><code class="language-csharp">@method.Code</code></pre>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (activeTab == "pageobjects")
+                {
+                    <div class="pageobjects-list">
+                        @foreach (var po in GeneratedTest.PageObjects)
+                        {
+                            <div class="pageobject-item">
+                                <div class="pageobject-header">
+                                    <h5>@po.ClassName</h5>
+                                    @if (!string.IsNullOrEmpty(po.UrlPattern))
+                                    {
+                                        <p class="pageobject-url">@po.UrlPattern</p>
+                                    }
+                                </div>
+                                <div class="code-viewer">
+                                    <pre><code class="language-csharp">@po.Code</code></pre>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (activeTab == "actions")
+                {
+                    <div class="action-mapping">
+                        @if (Session != null)
+                        {
+                            @foreach (var interaction in Session.Interactions)
+                            {
+                                <div class="mapping-item">
+                                    <div class="mapping-header">
+                                        <span class="sequence">#@interaction.SequenceNumber</span>
+                                        <span class="action-type">@interaction.ActionType</span>
+                                        @if (!string.IsNullOrEmpty(interaction.Description))
+                                        {
+                                            <span class="description">@interaction.Description</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(interaction.GeneratedCode))
+                                    {
+                                        <div class="mapping-code">
+                                            <pre><code>@interaction.GeneratedCode</code></pre>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert alert-info mt-3">
+            @statusMessage
+        </div>
+    }
+</div>
+
+@code {
+    private string activeTab = "test";
+    private string statusMessage = string.Empty;
+
+    [Parameter]
+    public GeneratedTest? GeneratedTest { get; set; }
+
+    [Parameter]
+    public RecordingSession? Session { get; set; }
+
+    [Parameter]
+    public EventCallback<GeneratedTest> OnEditRequested { get; set; }
+
+    private async Task CopyToClipboard()
+    {
+        if (GeneratedTest != null)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", GeneratedTest.Code);
+                statusMessage = "Code copied to clipboard!";
+                StateHasChanged();
+                
+                // Clear message after 3 seconds
+                await Task.Delay(3000);
+                statusMessage = string.Empty;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                statusMessage = $"Failed to copy: {ex.Message}";
+            }
+        }
+    }
+
+    private async Task DownloadTest()
+    {
+        if (GeneratedTest != null)
+        {
+            try
+            {
+                var fileName = $"{GeneratedTest.ClassName}.cs";
+                var fileContent = GeneratedTest.Code;
+                
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, fileContent);
+                statusMessage = $"Downloaded {fileName}";
+                StateHasChanged();
+                
+                await Task.Delay(3000);
+                statusMessage = string.Empty;
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                statusMessage = $"Failed to download: {ex.Message}";
+            }
+        }
+    }
+}
+
+<style>
+    .test-preview-container {
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .preview-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .preview-header h3 {
+        margin: 0;
+        color: #333;
+    }
+
+    .preview-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #007bff;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-info {
+        background: #17a2b8;
+        color: white;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+    }
+
+    .no-test-message {
+        padding: 60px 20px;
+        text-align: center;
+        color: #666;
+    }
+
+    .no-test-message p {
+        margin: 10px 0;
+    }
+
+    .hint {
+        font-size: 14px;
+        color: #999;
+    }
+
+    .test-metadata {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .metadata-row {
+        display: flex;
+        gap: 30px;
+        flex-wrap: wrap;
+    }
+
+    .metadata-item {
+        display: flex;
+        gap: 8px;
+    }
+
+    .metadata-item .label {
+        font-weight: 600;
+        color: #666;
+    }
+
+    .metadata-item .value {
+        color: #333;
+    }
+
+    .quality-metrics {
+        margin-bottom: 20px;
+    }
+
+    .quality-metrics h4 {
+        margin: 0 0 15px;
+        color: #333;
+        font-size: 16px;
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+    }
+
+    .metric-card {
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 8px;
+        text-align: center;
+        color: white;
+    }
+
+    .metric-value {
+        font-size: 32px;
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+
+    .metric-label {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+
+    .code-tabs {
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .tab-buttons {
+        display: flex;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .tab-button {
+        padding: 12px 20px;
+        border: none;
+        background: transparent;
+        color: #666;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-bottom: 3px solid transparent;
+    }
+
+    .tab-button:hover {
+        background: rgba(0,0,0,0.05);
+    }
+
+    .tab-button.active {
+        color: #007bff;
+        border-bottom-color: #007bff;
+        background: white;
+    }
+
+    .tab-content {
+        padding: 20px;
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .code-viewer {
+        background: #282c34;
+        border-radius: 4px;
+        overflow-x: auto;
+    }
+
+    .code-viewer pre {
+        margin: 0;
+        padding: 20px;
+    }
+
+    .code-viewer code {
+        color: #abb2bf;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .methods-list, .pageobjects-list {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .method-item, .pageobject-item {
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .method-header, .pageobject-header {
+        padding: 15px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .method-header h5, .pageobject-header h5 {
+        margin: 0 0 8px;
+        color: #333;
+    }
+
+    .method-description, .pageobject-url {
+        margin: 0;
+        font-size: 13px;
+        color: #666;
+    }
+
+    .action-mapping {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .mapping-item {
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .mapping-header {
+        padding: 12px 15px;
+        background: #f8f9fa;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .sequence {
+        padding: 4px 8px;
+        background: #007bff;
+        color: white;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+    .action-type {
+        padding: 4px 8px;
+        background: #6c757d;
+        color: white;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .description {
+        color: #666;
+        font-size: 13px;
+    }
+
+    .mapping-code {
+        padding: 15px;
+        background: #282c34;
+    }
+
+    .mapping-code pre {
+        margin: 0;
+    }
+
+    .mapping-code code {
+        color: #abb2bf;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 12px;
+    }
+
+    .alert-info {
+        padding: 12px;
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+        border-radius: 4px;
+    }
+</style>
+
+<script>
+    window.downloadFile = function (filename, content) {
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    };
+</script>

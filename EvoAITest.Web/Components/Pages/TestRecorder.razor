@@ -1,0 +1,476 @@
+@page "/test-recorder"
+@using EvoAITest.Core.Models.Recording
+@using EvoAITest.Core.Abstractions
+@inject IRecordingService RecordingService
+@inject ITestGenerator TestGenerator
+@rendermode InteractiveServer
+
+<PageTitle>Test Recorder - EvoAITest</PageTitle>
+
+<div class="test-recorder-page">
+    <div class="page-header">
+        <h1>?? Test Recorder</h1>
+        <p class="subtitle">Record your interactions and generate automated tests with AI</p>
+    </div>
+
+    <div class="recorder-layout">
+        <!-- Left Panel: Recording Control -->
+        <div class="recorder-panel">
+            <RecordingControl 
+                OnRecordingStarted="HandleRecordingStarted"
+                OnRecordingStopped="HandleRecordingStopped" />
+            
+            @if (currentSession != null && currentSession.Status == RecordingStatus.Stopped)
+            {
+                <div class="generation-panel">
+                    <h3>Generate Test</h3>
+                    <p>Recording complete with @currentSession.Interactions.Count actions.</p>
+                    
+                    <div class="generation-options">
+                        <div class="form-group">
+                            <label>Test Framework</label>
+                            <select @bind="selectedFramework" class="form-control">
+                                <option value="xUnit">xUnit</option>
+                                <option value="NUnit">NUnit</option>
+                                <option value="MSTest">MSTest</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Options</label>
+                            <div class="checkbox-group">
+                                <label>
+                                    <input type="checkbox" @bind="includeComments" />
+                                    Include Comments
+                                </label>
+                                <label>
+                                    <input type="checkbox" @bind="generatePageObjects" />
+                                    Generate Page Objects
+                                </label>
+                                <label>
+                                    <input type="checkbox" @bind="autoGenerateAssertions" />
+                                    Auto-Generate Assertions
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success btn-lg" 
+                            @onclick="GenerateTest" 
+                            disabled="@isGenerating">
+                        @if (isGenerating)
+                        {
+                            <span class="spinner">?</span>
+                            <span>Generating...</span>
+                        }
+                        else
+                        {
+                            <span class="icon">??</span>
+                            <span>Generate Test with AI</span>
+                        }
+                    </button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">
+                    @errorMessage
+                </div>
+            }
+        </div>
+
+        <!-- Right Panel: Test Preview -->
+        <div class="preview-panel">
+            <TestPreview 
+                GeneratedTest="generatedTest"
+                Session="currentSession"
+                OnEditRequested="HandleEditRequested" />
+        </div>
+    </div>
+
+    <!-- Recording Sessions List -->
+    <div class="sessions-section">
+        <h2>Recent Recording Sessions</h2>
+        <div class="sessions-list">
+            @if (!recentSessions.Any())
+            {
+                <div class="no-sessions">
+                    <p>No recording sessions yet. Start your first recording above!</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var session in recentSessions)
+                {
+                    <div class="session-card" @onclick="() => LoadSession(session.Id)">
+                        <div class="session-header">
+                            <h4>@session.Name</h4>
+                            <span class="session-status status-@session.Status.ToString().ToLower()">
+                                @session.Status
+                            </span>
+                        </div>
+                        <div class="session-details">
+                            <span class="detail">@session.Interactions.Count actions</span>
+                            <span class="detail">@FormatDate(session.StartedAt)</span>
+                            <span class="detail">@FormatDuration(session.DurationMs)</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(session.Description))
+                        {
+                            <p class="session-description">@session.Description</p>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private RecordingSession? currentSession;
+    private GeneratedTest? generatedTest;
+    private List<RecordingSession> recentSessions = new();
+    
+    private string selectedFramework = "xUnit";
+    private bool includeComments = true;
+    private bool generatePageObjects = false;
+    private bool autoGenerateAssertions = true;
+    private bool isGenerating = false;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRecentSessions();
+    }
+
+    private async Task LoadRecentSessions()
+    {
+        try
+        {
+            recentSessions = await RecordingService.GetAllRecordingSessionsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load sessions: {ex.Message}";
+        }
+    }
+
+    private void HandleRecordingStarted(RecordingSession session)
+    {
+        currentSession = session;
+        generatedTest = null;
+        errorMessage = string.Empty;
+    }
+
+    private async Task HandleRecordingStopped(RecordingSession session)
+    {
+        currentSession = session;
+        await LoadRecentSessions();
+    }
+
+    private async Task GenerateTest()
+    {
+        if (currentSession == null)
+            return;
+
+        try
+        {
+            isGenerating = true;
+            errorMessage = string.Empty;
+
+            var options = new TestGenerationOptions
+            {
+                TestFramework = selectedFramework,
+                IncludeComments = includeComments,
+                GeneratePageObjects = generatePageObjects,
+                AutoGenerateAssertions = autoGenerateAssertions,
+                ClassName = SanitizeClassName(currentSession.Name),
+                Namespace = "EvoAITest.Generated"
+            };
+
+            generatedTest = await TestGenerator.GenerateTestAsync(currentSession, options);
+            
+            // Update session with generated code
+            currentSession.GeneratedTestCode = generatedTest.Code;
+            currentSession.Status = RecordingStatus.Generated;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to generate test: {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private async Task LoadSession(Guid sessionId)
+    {
+        try
+        {
+            var session = await RecordingService.GetRecordingSessionAsync(sessionId);
+            if (session != null)
+            {
+                currentSession = session;
+                
+                // If test was already generated, parse it
+                if (!string.IsNullOrEmpty(session.GeneratedTestCode))
+                {
+                    // TODO: Parse generated test from code
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load session: {ex.Message}";
+        }
+    }
+
+    private void HandleEditRequested(GeneratedTest test)
+    {
+        // TODO: Implement test editing functionality
+        errorMessage = "Test editing coming soon!";
+    }
+
+    private string SanitizeClassName(string name)
+    {
+        return System.Text.RegularExpressions.Regex.Replace(name, @"[^a-zA-Z0-9_]", "") + "Tests";
+    }
+
+    private string FormatDate(DateTimeOffset date)
+    {
+        return date.ToString("MMM d, yyyy h:mm tt");
+    }
+
+    private string FormatDuration(long durationMs)
+    {
+        var ts = TimeSpan.FromMilliseconds(durationMs);
+        if (ts.TotalHours >= 1)
+            return $"{ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
+        return $"{ts.Minutes:D2}:{ts.Seconds:D2}";
+    }
+}
+
+<style>
+    .test-recorder-page {
+        padding: 20px;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .page-header h1 {
+        font-size: 48px;
+        margin: 0 0 10px;
+        color: #333;
+    }
+
+    .subtitle {
+        font-size: 18px;
+        color: #666;
+        margin: 0;
+    }
+
+    .recorder-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    @@media (max-width: 1200px) {
+        .recorder-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .recorder-panel, .preview-panel {
+        min-height: 400px;
+    }
+
+    .generation-panel {
+        margin-top: 20px;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .generation-panel h3 {
+        margin: 0 0 15px;
+        color: #333;
+    }
+
+    .generation-options {
+        margin: 20px 0;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #555;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .checkbox-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .checkbox-group label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: normal;
+        cursor: pointer;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-lg {
+        width: 100%;
+        padding: 14px 24px;
+        font-size: 16px;
+        justify-content: center;
+    }
+
+    .spinner {
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .sessions-section {
+        margin-top: 40px;
+    }
+
+    .sessions-section h2 {
+        margin-bottom: 20px;
+        color: #333;
+    }
+
+    .sessions-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 15px;
+    }
+
+    .session-card {
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .session-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .session-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 10px;
+    }
+
+    .session-header h4 {
+        margin: 0;
+        color: #333;
+        font-size: 18px;
+    }
+
+    .session-status {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: bold;
+    }
+
+    .status-recording {
+        background: #ff4444;
+        color: white;
+    }
+
+    .status-stopped {
+        background: #888;
+        color: white;
+    }
+
+    .status-generated {
+        background: #28a745;
+        color: white;
+    }
+
+    .session-details {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 10px;
+        font-size: 13px;
+        color: #666;
+    }
+
+    .session-description {
+        font-size: 14px;
+        color: #777;
+        margin: 10px 0 0;
+    }
+
+    .no-sessions {
+        padding: 60px 20px;
+        text-align: center;
+        color: #999;
+        grid-column: 1 / -1;
+    }
+
+    .alert-danger {
+        padding: 12px;
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        margin-top: 15px;
+    }
+</style>
