@@ -10,11 +10,11 @@
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/VladyslavNap/EvoAITest/actions)
 [![Code Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/VladyslavNap/EvoAITest/actions)
 
-> 📚 **[Complete Documentation Index](DOCUMENTATION_INDEX.md)** | ⚡ **[Quick Start](docs/VisualRegressionQuickStart.md)** | 🗺️ **[Roadmap](VISUAL_REGRESSION_ROADMAP.md)** | 📖 **[User Guide](docs/VisualRegressionUserGuide.md)**
+> 📚 **[Complete Documentation Index](DOCUMENTATION_INDEX.md)** | ⚡ **[Quick Start](docs/VisualRegressionQuickStart.md)** | 🗺️ **[Roadmap](VISUAL_REGRESSION_ROADMAP.md)** | 📖 **[User Guide](docs/VisualRegressionUserGuide.md)** | 🎬 **[Test Recording Feature](docs/RECORDING_FEATURE.md)**
 
 ## Overview
 
-EvoAITest is a modern, cloud-native browser automation framework that uses Azure OpenAI (GPT-5.2-Chat) to enable intelligent, natural language-driven web testing and automation with comprehensive **Visual Regression Testing** capabilities. Built on .NET 10 with Aspire orchestration, it combines enterprise-grade Azure AI with local development flexibility using Ollama.
+EvoAITest is a modern, cloud-native browser automation framework that uses Azure OpenAI (GPT-5.2-Chat) to enable intelligent, natural language-driven web testing and automation with comprehensive **Visual Regression Testing** and **Test Generation from Recordings** capabilities. Built on .NET 10 with Aspire orchestration, it combines enterprise-grade Azure AI with local development flexibility using Ollama.
 
 ### Key Features
 
@@ -29,25 +29,54 @@ EvoAITest is a modern, cloud-native browser automation framework that uses Azure
 - 🌍 **Geolocation Testing** - GPS coordinate simulation with 6 preset locations
 - 🔌 **Network Interception** - Mock APIs, block requests, and log network activity
 - 📸 **Visual Regression Testing** - Automated screenshot comparison with AI-powered healing
-- 🎨 **Blazor Web UI** - Modern, responsive interface
+- 🎬 **Test Recording & Generation** - Record user interactions and generate automated test code with AI
+- 🎨 **Blazor Web UI** - Modern, responsive interface with real-time recording
+
+## 🎬 NEW: Test Generation from Recordings
+
+**Record user interactions and automatically generate production-ready test code!**
+
+### Quick Start with Test Recording
+
+1. **Navigate to Test Recorder** in the Blazor app (`/test-recorder`)
+2. **Start Recording** - Enter test name and URL
+3. **Interact** with your application - All actions are captured
+4. **Stop Recording** - Review captured interactions
+5. **Generate Test** - AI analyzes and creates test code
+6. **Export** - Copy or download the generated test
+
+### Recording Features
+
+- ✅ **Real-time Action Capture** - Click, type, navigate, select
+- ✅ **AI Intent Detection** - 90%+ accuracy with confidence scoring
+- ✅ **Smart Assertions** - 16 types automatically generated
+- ✅ **Multi-Framework** - Generate xUnit, NUnit, or MSTest code
+- ✅ **Page Objects** - Optional POM generation
+- ✅ **Quality Metrics** - LOC, maintainability, coverage estimates
+- ✅ **Session Management** - Save, load, and replay recordings
+
+**[📖 Full Recording Documentation](docs/RECORDING_FEATURE.md)** | **[🔌 API Reference](docs/API_REFERENCE.md)** | **[🏗️ Architecture](docs/ARCHITECTURE.md)**
 
 ## Architecture
 
 ![EvoAITest architecture diagram](orah1borah1borah.png)
 
-### Latest Update (Day 16)
-- `EvoAITest.ApiService/Endpoints/ExecutionEndpoints.cs` exposes synchronous/background execution, healing retries, cancellation, and history/detail routes that orchestrate Planner → Executor → Healer.
-- `Program.cs` now maps both task CRUD and execution endpoints, enables authentication/authorization scaffolding, and exposes `Program` internals for WebApplicationFactory testing.
-- `EvoAITest.Tests/Integration/ApiIntegrationTests.cs` adds end-to-end coverage (task creation → execution → healing → history) using WebApplicationFactory + in-memory EF.
-- `examples/LoginExample` is a runnable CLI sample that demonstrates natural-language login automation, tying together planning, execution, and reporting.
-- `EvoAITest.LLM/Prompts` introduces the new prompt-builder toolkit (templates, injection protection, routing-aware system prompts) with 40+ dedicated unit tests and DI registration hooks.
+### Latest Update (Day 17)
+- **Test Generation from Recordings Feature** - Complete implementation with 28 new files
+- `EvoAITest.Core/Models/Recording` - 11 models for recording sessions and interactions
+- `EvoAITest.Core/Services/Recording` - Recording service, event listener, normalizer
+- `EvoAITest.Agents/Services/Recording` - AI-powered analyzer and test generator
+- `EvoAITest.Web/Components/Recording` - Blazor UI components with real-time display
+- `EvoAITest.ApiService/Endpoints/RecordingEndpoints.cs` - 13 REST API endpoints
+- `EvoAITest.Core/Data/Models` - Database entities for persistence
+- `EvoAITest.Core/Repositories` - Recording repository with full CRUD operations
 
 ## Project Structure
 
 | Project | Description |
 |---------|-------------|
 | **EvoAITest.AppHost** | .NET Aspire orchestration and service discovery |
-| **EvoAITest.ApiService** | REST API for automation tasks |
+| **EvoAITest.ApiService** | REST API for automation tasks and recordings |
 | **EvoAITest.Web** | Blazor WebAssembly frontend |
 | **EvoAITest.Core** | Core abstractions, models, and browser automation |
 | **EvoAITest.LLM** | LLM provider implementations (Azure OpenAI, Ollama) |

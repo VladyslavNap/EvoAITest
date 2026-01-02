@@ -6,6 +6,7 @@ using EvoAITest.Core.Options;
 using EvoAITest.Core.Repositories;
 using EvoAITest.Core.Services;
 using EvoAITest.Core.Services.ErrorRecovery;
+using EvoAITest.Core.Services.Recording;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,6 +62,7 @@ public static class ServiceCollectionExtensions
         services.Configure<EvoAITestCoreOptions>(configuration.GetSection("EvoAITest:Core"));
         services.Configure<ToolExecutorOptions>(configuration.GetSection("EvoAITest:ToolExecutor"));
         services.Configure<ErrorRecoveryOptions>(configuration.GetSection("EvoAITest:Core:ErrorRecovery"));
+        services.Configure<RecordingOptions>(configuration.GetSection("Recording"));
 
         // Register Error Recovery services
         services.TryAddScoped<IErrorClassifier, ErrorClassifier>();
@@ -100,7 +102,13 @@ public static class ServiceCollectionExtensions
 
             // Register repositories
             services.TryAddScoped<IAutomationTaskRepository, AutomationTaskRepository>();
+            services.TryAddScoped<IRecordingRepository, RecordingRepository>();
         }
+
+        // Register recording services (no DB dependency)
+        services.TryAddScoped<IRecordingService, BrowserRecordingService>();
+        services.TryAddScoped<InteractionNormalizer>();
+
         // Add OpenTelemetry instrumentation for EvoAITest.Core
         services.AddOpenTelemetry()
             .WithMetrics(metrics =>

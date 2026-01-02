@@ -1,6 +1,8 @@
 using EvoAITest.Core.Extensions;
 using EvoAITest.Core.Data;
 using EvoAITest.ApiService.Endpoints;
+using EvoAITest.Agents.Extensions;
+using EvoAITest.LLM.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +12,12 @@ builder.AddServiceDefaults();
 
 // Add EvoAITest.Core services (Browser Agent, Tool Registry, Tool Executor, DbContext, Repositories)
 builder.Services.AddEvoAITestCore(builder.Configuration);
+
+// Add LLM services (required for AI-powered recording analysis)
+builder.Services.AddLLMServices(builder.Configuration);
+
+// Add Agent services (includes ActionAnalyzer, TestGenerator, RecordingAgent)
+builder.Services.AddAgentServices();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
@@ -56,6 +64,7 @@ app.MapControllers();
 
 // Map API endpoints
 app.MapTaskEndpoints();
+app.MapRecordingEndpoints();
 
 string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
 
