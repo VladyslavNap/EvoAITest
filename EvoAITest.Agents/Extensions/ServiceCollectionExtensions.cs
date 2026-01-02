@@ -22,6 +22,11 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<IExecutor, ExecutorAgent>();
         services.TryAddScoped<IHealer, HealerAgent>();
         
+        // Register recording agent and services
+        services.TryAddScoped<EvoAITest.Core.Abstractions.IActionAnalyzer, EvoAITest.Agents.Services.Recording.ActionAnalyzerService>();
+        services.TryAddScoped<EvoAITest.Core.Abstractions.ITestGenerator, EvoAITest.Agents.Services.Recording.TestGeneratorService>();
+        services.TryAddScoped<RecordingAgent>();
+
         // Other agent implementations will be registered as they are implemented
         // services.TryAddScoped<IAgent, BrowserAutomationAgent>();
 

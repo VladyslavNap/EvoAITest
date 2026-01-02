@@ -64,6 +64,16 @@ public sealed class EvoAIDbContext : DbContext
     public DbSet<RecoveryHistory> RecoveryHistory => Set<RecoveryHistory>();
 
     /// <summary>
+    /// Gets or sets the RecordingSessions DbSet.
+    /// </summary>
+    public DbSet<RecordingSessionEntity> RecordingSessions => Set<RecordingSessionEntity>();
+
+    /// <summary>
+    /// Gets or sets the RecordedInteractions DbSet.
+    /// </summary>
+    public DbSet<RecordedInteractionEntity> RecordedInteractions => Set<RecordedInteractionEntity>();
+
+    /// <summary>
     /// Configures the database model using the specified model builder.
     /// </summary>
     /// <param name="modelBuilder">The model builder to use.</param>
@@ -419,6 +429,167 @@ public sealed class EvoAIDbContext : DbContext
             entity.HasOne(e => e.Task)
                 .WithMany()
                 .HasForeignKey(e => e.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure RecordingSession entity
+        modelBuilder.Entity<RecordingSessionEntity>(entity =>
+        {
+            entity.ToTable("RecordingSessions");
+            entity.HasKey(e => e.Id);
+
+            // Required string properties
+            entity.Property(e => e.Name)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(2000);
+
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.StartUrl)
+                .HasMaxLength(2000)
+                .IsRequired();
+
+            entity.Property(e => e.Browser)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.TestFramework)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.Language)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            // Required value properties
+            entity.Property(e => e.StartedAt)
+                .IsRequired();
+
+            entity.Property(e => e.ViewportWidth)
+                .IsRequired();
+
+            entity.Property(e => e.ViewportHeight)
+                .IsRequired();
+
+            // JSON properties
+            entity.Property(e => e.ConfigurationJson)
+                .HasColumnType("nvarchar(max)")
+                .IsRequired();
+
+            entity.Property(e => e.MetricsJson)
+                .HasColumnType("nvarchar(max)")
+                .IsRequired();
+
+            entity.Property(e => e.TagsJson)
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(e => e.GeneratedTestCode)
+                .HasColumnType("nvarchar(max)");
+
+            // Optional properties
+            entity.Property(e => e.EndedAt);
+
+            entity.Property(e => e.CreatedBy)
+                .HasMaxLength(256);
+
+            // Indexes for performance
+            entity.HasIndex(e => e.Status)
+                .HasDatabaseName("IX_RecordingSessions_Status");
+
+            entity.HasIndex(e => e.StartedAt)
+                .HasDatabaseName("IX_RecordingSessions_StartedAt");
+
+            entity.HasIndex(e => e.CreatedBy)
+                .HasDatabaseName("IX_RecordingSessions_CreatedBy");
+
+            entity.HasIndex(e => new { e.Status, e.StartedAt })
+                .HasDatabaseName("IX_RecordingSessions_Status_StartedAt");
+
+            // Relationship to interactions
+            entity.HasMany(e => e.Interactions)
+                .WithOne(i => i.Session)
+                .HasForeignKey(i => i.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure RecordedInteraction entity
+        modelBuilder.Entity<RecordedInteractionEntity>(entity =>
+        {
+            entity.ToTable("RecordedInteractions");
+            entity.HasKey(e => e.Id);
+
+            // Required properties
+            entity.Property(e => e.SessionId)
+                .IsRequired();
+
+            entity.Property(e => e.SequenceNumber)
+                .IsRequired();
+
+            entity.Property(e => e.ActionType)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.Intent)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.Timestamp)
+                .IsRequired();
+
+            entity.Property(e => e.IntentConfidence)
+                .IsRequired();
+
+            entity.Property(e => e.IncludeInTest)
+                .IsRequired();
+
+            // JSON properties
+            entity.Property(e => e.ContextJson)
+                .HasColumnType("nvarchar(max)")
+                .IsRequired();
+
+            entity.Property(e => e.AssertionsJson)
+                .HasColumnType("nvarchar(max)");
+
+            // Optional string properties
+            entity.Property(e => e.Description)
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.InputValue)
+                .HasMaxLength(2000);
+
+            entity.Property(e => e.Key)
+                .HasMaxLength(50);
+
+            entity.Property(e => e.GeneratedCode)
+                .HasColumnType("nvarchar(max)");
+
+            // Optional value properties
+            entity.Property(e => e.DurationMs);
+            entity.Property(e => e.CoordinateX);
+            entity.Property(e => e.CoordinateY);
+
+            // Indexes for performance
+            entity.HasIndex(e => e.SessionId)
+                .HasDatabaseName("IX_RecordedInteractions_SessionId");
+
+            entity.HasIndex(e => new { e.SessionId, e.SequenceNumber })
+                .HasDatabaseName("IX_RecordedInteractions_SessionId_Sequence");
+
+            entity.HasIndex(e => e.ActionType)
+                .HasDatabaseName("IX_RecordedInteractions_ActionType");
+
+            entity.HasIndex(e => e.Timestamp)
+                .HasDatabaseName("IX_RecordedInteractions_Timestamp");
+
+            // Relationship to session
+            entity.HasOne(e => e.Session)
+                .WithMany(s => s.Interactions)
+                .HasForeignKey(e => e.SessionId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

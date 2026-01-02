@@ -14,6 +14,8 @@
   <ItemGroup>
     <ProjectReference Include="..\EvoAITest.ServiceDefaults\EvoAITest.ServiceDefaults.csproj" />
     <ProjectReference Include="..\EvoAITest.Core\EvoAITest.Core.csproj" />
+    <ProjectReference Include="..\EvoAITest.LLM\EvoAITest.LLM.csproj" />
+    <ProjectReference Include="..\EvoAITest.Agents\EvoAITest.Agents.csproj" />
   </ItemGroup>
 
   <ItemGroup>

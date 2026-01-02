@@ -1,0 +1,551 @@
+@using EvoAITest.Core.Models.Recording
+@using EvoAITest.Core.Abstractions
+@inject IRecordingService RecordingService
+@inject IJSRuntime JSRuntime
+
+<div class="recording-control-container">
+    <div class="recording-header">
+        <h3>Test Recording</h3>
+        @if (CurrentSession != null)
+        {
+            <span class="session-status status-@CurrentSession.Status.ToString().ToLower()">
+                @CurrentSession.Status
+            </span>
+        }
+    </div>
+
+    @if (CurrentSession == null)
+    {
+        <!-- Start Recording Form -->
+        <div class="recording-form">
+            <div class="form-group">
+                <label for="sessionName">Test Name</label>
+                <input type="text" 
+                       id="sessionName" 
+                       class="form-control" 
+                       @bind="sessionName" 
+                       placeholder="Enter test name" />
+            </div>
+
+            <div class="form-group">
+                <label for="startUrl">Starting URL</label>
+                <input type="url" 
+                       id="startUrl" 
+                       class="form-control" 
+                       @bind="startUrl" 
+                       placeholder="https://example.com" />
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description (Optional)</label>
+                <textarea id="description" 
+                          class="form-control" 
+                          @bind="description" 
+                          rows="3"
+                          placeholder="Describe what this test does"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-primary btn-lg" 
+                        @onclick="StartRecording" 
+                        disabled="@(!CanStartRecording)">
+                    <span class="icon">?</span> Start Recording
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Active Recording Controls -->
+        <div class="recording-active">
+            <div class="session-info">
+                <div class="info-item">
+                    <span class="label">Session:</span>
+                    <span class="value">@CurrentSession.Name</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Duration:</span>
+                    <span class="value">@FormatDuration(CurrentSession.DurationMs)</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Actions:</span>
+                    <span class="value">@CurrentSession.Interactions.Count</span>
+                </div>
+            </div>
+
+            <div class="recording-controls">
+                @if (CurrentSession.Status == RecordingStatus.Recording)
+                {
+                    <button class="btn btn-warning" @onclick="PauseRecording">
+                        <span class="icon">?</span> Pause
+                    </button>
+                }
+                else if (CurrentSession.Status == RecordingStatus.Paused)
+                {
+                    <button class="btn btn-success" @onclick="ResumeRecording">
+                        <span class="icon">?</span> Resume
+                    </button>
+                }
+
+                <button class="btn btn-danger" @onclick="StopRecording">
+                    <span class="icon">?</span> Stop Recording
+                </button>
+            </div>
+
+            <!-- Real-time Action Display -->
+            <div class="actions-display">
+                <h4>Recorded Actions (@CurrentSession.Interactions.Count)</h4>
+                <div class="actions-list">
+                    @if (!CurrentSession.Interactions.Any())
+                    {
+                        <div class="no-actions">
+                            <p>No actions recorded yet. Start interacting with your application...</p>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var interaction in CurrentSession.Interactions.OrderByDescending(i => i.SequenceNumber).Take(10))
+                        {
+                            <div class="action-item @GetActionClass(interaction)">
+                                <div class="action-header">
+                                    <span class="action-type">@interaction.ActionType</span>
+                                    <span class="action-time">@interaction.Timestamp.ToString("HH:mm:ss")</span>
+                                </div>
+                                <div class="action-details">
+                                    @if (!string.IsNullOrEmpty(interaction.Description))
+                                    {
+                                        <p class="action-description">@interaction.Description</p>
+                                    }
+                                    @if (!string.IsNullOrEmpty(interaction.Context.ElementText))
+                                    {
+                                        <p class="action-element">Element: @interaction.Context.ElementText</p>
+                                    }
+                                    @if (!string.IsNullOrEmpty(interaction.InputValue))
+                                    {
+                                        <p class="action-value">Value: @interaction.InputValue</p>
+                                    }
+                                </div>
+                                @if (interaction.Intent != ActionIntent.Unknown)
+                                {
+                                    <div class="action-intent">
+                                        <span class="intent-badge">@interaction.Intent</span>
+                                        <span class="confidence">@(interaction.IntentConfidence.ToString("P0"))</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        @if (CurrentSession.Interactions.Count > 10)
+                        {
+                            <div class="more-actions">
+                                <p>Showing latest 10 of @CurrentSession.Interactions.Count actions</p>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-3">
+            @errorMessage
+        </div>
+    }
+</div>
+
+@code {
+    private RecordingSession? CurrentSession { get; set; }
+    private System.Threading.Timer? updateTimer;
+
+    private string sessionName = string.Empty;
+    private string startUrl = string.Empty;
+    private string description = string.Empty;
+    private string errorMessage = string.Empty;
+
+    private bool CanStartRecording => 
+        !string.IsNullOrWhiteSpace(sessionName) && 
+        !string.IsNullOrWhiteSpace(startUrl) &&
+        Uri.TryCreate(startUrl, UriKind.Absolute, out _);
+
+    [Parameter]
+    public EventCallback<RecordingSession> OnRecordingStarted { get; set; }
+
+    [Parameter]
+    public EventCallback<RecordingSession> OnRecordingStopped { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // Set up a timer to refresh the UI every second while recording
+        updateTimer = new System.Threading.Timer(async _ =>
+        {
+            if (CurrentSession?.Status == RecordingStatus.Recording)
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+    }
+
+    private async Task StartRecording()
+    {
+        try
+        {
+            errorMessage = string.Empty;
+
+            var configuration = new RecordingConfiguration
+            {
+                CaptureScreenshots = true,
+                AutoGenerateAssertions = true,
+                UseAiIntentDetection = true
+            };
+
+            CurrentSession = await RecordingService.StartRecordingAsync(
+                sessionName, 
+                startUrl, 
+                configuration);
+
+            await OnRecordingStarted.InvokeAsync(CurrentSession);
+
+            // Clear form
+            sessionName = string.Empty;
+            startUrl = string.Empty;
+            description = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to start recording: {ex.Message}";
+        }
+    }
+
+    private async Task PauseRecording()
+    {
+        try
+        {
+            if (CurrentSession != null)
+            {
+                await RecordingService.PauseRecordingAsync(CurrentSession.Id);
+                CurrentSession.Status = RecordingStatus.Paused;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to pause recording: {ex.Message}";
+        }
+    }
+
+    private async Task ResumeRecording()
+    {
+        try
+        {
+            if (CurrentSession != null)
+            {
+                await RecordingService.ResumeRecordingAsync(CurrentSession.Id);
+                CurrentSession.Status = RecordingStatus.Recording;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to resume recording: {ex.Message}";
+        }
+    }
+
+    private async Task StopRecording()
+    {
+        try
+        {
+            if (CurrentSession != null)
+            {
+                var stoppedSession = await RecordingService.StopRecordingAsync(CurrentSession.Id);
+                await OnRecordingStopped.InvokeAsync(stoppedSession);
+                CurrentSession = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to stop recording: {ex.Message}";
+        }
+    }
+
+    private string FormatDuration(long durationMs)
+    {
+        var ts = TimeSpan.FromMilliseconds(durationMs);
+        if (ts.TotalHours >= 1)
+            return $"{ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
+        return $"{ts.Minutes:D2}:{ts.Seconds:D2}";
+    }
+
+    private string GetActionClass(UserInteraction interaction)
+    {
+        var classes = new List<string> { "action" };
+        
+        if (interaction.IntentConfidence >= 0.9)
+            classes.Add("high-confidence");
+        else if (interaction.IntentConfidence >= 0.7)
+            classes.Add("medium-confidence");
+        else
+            classes.Add("low-confidence");
+
+        return string.Join(" ", classes);
+    }
+
+    public void Dispose()
+    {
+        updateTimer?.Dispose();
+    }
+}
+
+<style>
+    .recording-control-container {
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .recording-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .recording-header h3 {
+        margin: 0;
+        color: #333;
+    }
+
+    .session-status {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    .status-recording {
+        background: #ff4444;
+        color: white;
+        animation: pulse 2s infinite;
+    }
+
+    .status-paused {
+        background: #ffaa00;
+        color: white;
+    }
+
+    .status-stopped {
+        background: #888;
+        color: white;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    .recording-form .form-group {
+        margin-bottom: 15px;
+    }
+
+    .recording-form label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #555;
+    }
+
+    .recording-form .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .form-actions {
+        margin-top: 20px;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background: #007bff;
+        color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background: #0056b3;
+    }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-warning {
+        background: #ffc107;
+        color: #212529;
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-lg {
+        padding: 12px 24px;
+        font-size: 16px;
+    }
+
+    .session-info {
+        display: flex;
+        gap: 30px;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .info-item .label {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 4px;
+    }
+
+    .info-item .value {
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .recording-controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .actions-display h4 {
+        margin: 20px 0 10px;
+        color: #333;
+    }
+
+    .actions-list {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 10px;
+    }
+
+    .action-item {
+        padding: 12px;
+        margin-bottom: 10px;
+        background: #f8f9fa;
+        border-left: 4px solid #007bff;
+        border-radius: 4px;
+    }
+
+    .action-item.high-confidence {
+        border-left-color: #28a745;
+    }
+
+    .action-item.medium-confidence {
+        border-left-color: #ffc107;
+    }
+
+    .action-item.low-confidence {
+        border-left-color: #dc3545;
+    }
+
+    .action-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+
+    .action-type {
+        font-weight: bold;
+        color: #333;
+    }
+
+    .action-time {
+        font-size: 12px;
+        color: #666;
+    }
+
+    .action-details p {
+        margin: 4px 0;
+        font-size: 13px;
+        color: #555;
+    }
+
+    .action-intent {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+        align-items: center;
+    }
+
+    .intent-badge {
+        padding: 4px 8px;
+        background: #007bff;
+        color: white;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .confidence {
+        font-size: 12px;
+        color: #666;
+    }
+
+    .no-actions {
+        padding: 40px;
+        text-align: center;
+        color: #888;
+    }
+
+    .more-actions {
+        padding: 10px;
+        text-align: center;
+        color: #666;
+        font-size: 13px;
+        font-style: italic;
+    }
+
+    .alert {
+        padding: 12px;
+        border-radius: 4px;
+        margin-top: 15px;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+</style>
