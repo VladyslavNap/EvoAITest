@@ -122,16 +122,17 @@ public sealed class InteractionNormalizer
     public bool IsDuplicate(UserInteraction interaction)
     {
         // Check against recent interactions
-        foreach (var recent in _recentInteractions)
+        var similarInteraction = _recentInteractions
+            .Where(recent => AreSimilarInteractions(recent, interaction))
+            .FirstOrDefault();
+
+        if (similarInteraction != null)
         {
-            if (AreSimilarInteractions(recent, interaction))
-            {
-                _logger.LogTrace(
-                    "Duplicate interaction detected: {ActionType} on {Selector}",
-                    interaction.ActionType,
-                    interaction.Context.TargetSelector);
-                return true;
-            }
+            _logger.LogTrace(
+                "Duplicate interaction detected: {ActionType} on {Selector}",
+                interaction.ActionType,
+                interaction.Context.TargetSelector);
+            return true;
         }
 
         // Add to recent buffer

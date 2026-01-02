@@ -196,21 +196,22 @@ public sealed class RecordingAgent : IAgent
         var session = await _repository.GetSessionByIdAsync(sessionId, cancellationToken)
             ?? throw new InvalidOperationException($"Session {sessionId} not found");
 
-        foreach (var interaction in session.Interactions)
+        var unknownInteractions = session.Interactions
+            .Where(i => i.Intent == ActionIntent.Unknown)
+            .ToList();
+
+        foreach (var interaction in unknownInteractions)
         {
-            if (interaction.Intent == ActionIntent.Unknown)
-            {
-                var analyzed = await _actionAnalyzer.AnalyzeInteractionAsync(
-                    interaction,
-                    session,
-                    cancellationToken);
+            var analyzed = await _actionAnalyzer.AnalyzeInteractionAsync(
+                interaction,
+                session,
+                cancellationToken);
 
-                interaction.Intent = analyzed.Intent;
-                interaction.IntentConfidence = analyzed.IntentConfidence;
-                interaction.Description = analyzed.Description;
+            interaction.Intent = analyzed.Intent;
+            interaction.IntentConfidence = analyzed.IntentConfidence;
+            interaction.Description = analyzed.Description;
 
-                await _repository.UpdateInteractionAsync(interaction, cancellationToken);
-            }
+            await _repository.UpdateInteractionAsync(interaction, cancellationToken);
         }
 
         session.Metrics.AverageIntentConfidence = session.Interactions.Any()
@@ -227,7 +228,7 @@ public sealed class RecordingAgent : IAgent
         CancellationToken cancellationToken)
     {
         var sessionId = Guid.Parse(task.Parameters.GetValueOrDefault("sessionId", Guid.Empty)?.ToString() ?? Guid.Empty.ToString());
-        var framework = task.Parameters.GetValueOrDefault("framework", _options.DefaultTestFramework)?.ToString() 
+        var framework = task.Parameters.GetValueOrDefault("framework", _options.DefaultTestFramework)?.ToString()
             ?? _options.DefaultTestFramework;
 
         _logger.LogInformation("Generating test for session: {SessionId}", sessionId);
