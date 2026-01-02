@@ -401,7 +401,7 @@ public sealed class TestGeneratorService : ITestGenerator
     private string SanitizeClassName(string name)
     {
         var sanitized = Regex.Replace(name, @"[^a-zA-Z0-9_]", "");
-        if (char.IsDigit(sanitized[0]))
+        if (string.IsNullOrEmpty(sanitized) || char.IsDigit(sanitized[0]))
         {
             sanitized = "_" + sanitized;
         }
