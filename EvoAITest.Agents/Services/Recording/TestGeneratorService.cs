@@ -158,7 +158,7 @@ public sealed class TestGeneratorService : ITestGenerator
                         Target = interaction.Context.TargetSelector,
                         ExpectedValue = interaction.InputValue,
                         Description = $"Verify input value is '{interaction.InputValue}'",
-                        Code = $"await Expect(_page!.Locator(\"{interaction.Context.TargetSelector}\")).ToHaveValueAsync(\"{EscapeString(interaction.InputValue)}\");"
+                        Code = $"await Expect(_page!.Locator(\"{EscapeString(interaction.Context.TargetSelector)}\")).ToHaveValueAsync(\"{EscapeString(interaction.InputValue)}\");"
                     });
                 }
                 break;
@@ -180,12 +180,13 @@ public sealed class TestGeneratorService : ITestGenerator
             errors.Add("No test methods generated");
         }
 
-        foreach (var method in generatedTest.Methods)
+        var methodsWithoutAssertions = generatedTest.Methods
+            .Where(m => !m.Code.Contains("Assert") && !m.Code.Contains("Expect"))
+            .ToList();
+
+        foreach (var method in methodsWithoutAssertions)
         {
-            if (!method.Code.Contains("Assert") && !method.Code.Contains("Expect"))
-            {
-                warnings.Add($"Method '{method.Name}' has no assertions");
-            }
+            warnings.Add($"Method '{method.Name}' has no assertions");
         }
 
         return await Task.FromResult(new TestValidationResult
@@ -216,7 +217,7 @@ public sealed class TestGeneratorService : ITestGenerator
         foreach (var interaction in interactions)
         {
             var code = await GenerateCodeForInteractionAsync(interaction, options, cancellationToken);
-            
+
             foreach (var line in code.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 actCode.AppendLine($"        {line.TrimStart()}");
@@ -225,12 +226,13 @@ public sealed class TestGeneratorService : ITestGenerator
             if (options.AutoGenerateAssertions)
             {
                 var assertions = await CreateAssertionsAsync(interaction, cancellationToken);
-                foreach (var assertion in assertions)
+                var validAssertions = assertions
+                    .Where(a => !string.IsNullOrEmpty(a.Code))
+                    .ToList();
+
+                foreach (var assertion in validAssertions)
                 {
-                    if (!string.IsNullOrEmpty(assertion.Code))
-                    {
-                        assertCode.AppendLine($"        {assertion.Code}");
-                    }
+                    assertCode.AppendLine($"        {assertion.Code}");
                 }
             }
         }
@@ -242,7 +244,7 @@ public sealed class TestGeneratorService : ITestGenerator
 
         var description = interactions.First().Description ?? methodName;
         var methodTemplate = GetMethodTemplate(options.TestFramework);
-        
+
         var methodCode = methodTemplate
             .Replace("{methodName}", sanitizedName)
             .Replace("{description}", description)
@@ -281,44 +283,44 @@ public sealed class TestGeneratorService : ITestGenerator
 
     private string GenerateClickCode(UserInteraction interaction)
     {
-        var selector = interaction.Context.TargetSelector ?? interaction.Context.TargetXPath!;
+        var selector = EscapeString(interaction.Context.TargetSelector ?? interaction.Context.TargetXPath!);
         return $"await _page!.Locator(\"{selector}\").ClickAsync();";
     }
 
     private string GenerateDoubleClickCode(UserInteraction interaction)
     {
-        var selector = interaction.Context.TargetSelector ?? interaction.Context.TargetXPath!;
+        var selector = EscapeString(interaction.Context.TargetSelector ?? interaction.Context.TargetXPath!);
         return $"await _page!.Locator(\"{selector}\").DblClickAsync();";
     }
 
     private string GenerateInputCode(UserInteraction interaction)
     {
-        var selector = interaction.Context.TargetSelector ?? interaction.Context.TargetXPath!;
+        var selector = EscapeString(interaction.Context.TargetSelector ?? interaction.Context.TargetXPath!);
         var value = EscapeString(interaction.InputValue ?? string.Empty);
         return $"await _page!.Locator(\"{selector}\").FillAsync(\"{value}\");";
     }
 
     private string GenerateNavigationCode(UserInteraction interaction)
     {
-        return $"await _page!.GotoAsync(\"{interaction.Context.Url}\");";
+        return $"await _page!.GotoAsync(\"{EscapeString(interaction.Context.Url)}\");";
     }
 
     private string GenerateSelectCode(UserInteraction interaction)
     {
-        var selector = interaction.Context.TargetSelector ?? interaction.Context.TargetXPath!;
+        var selector = EscapeString(interaction.Context.TargetSelector ?? interaction.Context.TargetXPath!);
         var value = EscapeString(interaction.InputValue ?? string.Empty);
         return $"await _page!.Locator(\"{selector}\").SelectOptionAsync(\"{value}\");";
     }
 
     private string GenerateToggleCode(UserInteraction interaction)
     {
-        var selector = interaction.Context.TargetSelector ?? interaction.Context.TargetXPath!;
+        var selector = EscapeString(interaction.Context.TargetSelector ?? interaction.Context.TargetXPath!);
         return $"await _page!.Locator(\"{selector}\").CheckAsync();";
     }
 
     private string GenerateSubmitCode(UserInteraction interaction)
     {
-        var selector = interaction.Context.TargetSelector ?? "form";
+        var selector = EscapeString(interaction.Context.TargetSelector ?? "form");
         return $"await _page!.Locator(\"{selector}\").PressAsync(\"Enter\");";
     }
 
@@ -371,7 +373,7 @@ public sealed class TestGeneratorService : ITestGenerator
     {
         var lines = code.Split('\n').Where(l => !string.IsNullOrWhiteSpace(l)).Count();
         var assertionCount = Regex.Matches(code, @"Assert\.|Expect\(").Count;
-        
+
         var maintainabilityScore = 100.0;
         maintainabilityScore -= Math.Max(0, (lines - 200) * 0.1);
         maintainabilityScore += Math.Min(20, assertionCount * 2);

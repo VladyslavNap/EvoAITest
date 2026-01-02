@@ -250,7 +250,7 @@ public static class RecordingEndpoints
         logger.LogInformation("Getting recording: {SessionId}", id);
 
         var session = await repository.GetSessionByIdAsync(id, cancellationToken);
-        
+
         return session != null
             ? Results.Ok(session)
             : Results.NotFound();
@@ -286,21 +286,22 @@ public static class RecordingEndpoints
             }
 
             // Analyze each interaction
-            foreach (var interaction in session.Interactions)
+            var unknownInteractions = session.Interactions
+                .Where(i => i.Intent == ActionIntent.Unknown)
+                .ToList();
+
+            foreach (var interaction in unknownInteractions)
             {
-                if (interaction.Intent == ActionIntent.Unknown)
-                {
-                    var analyzed = await actionAnalyzer.AnalyzeInteractionAsync(
-                        interaction,
-                        session,
-                        cancellationToken);
+                var analyzed = await actionAnalyzer.AnalyzeInteractionAsync(
+                    interaction,
+                    session,
+                    cancellationToken);
 
-                    interaction.Intent = analyzed.Intent;
-                    interaction.IntentConfidence = analyzed.IntentConfidence;
-                    interaction.Description = analyzed.Description;
+                interaction.Intent = analyzed.Intent;
+                interaction.IntentConfidence = analyzed.IntentConfidence;
+                interaction.Description = analyzed.Description;
 
-                    await repository.UpdateInteractionAsync(interaction, cancellationToken);
-                }
+                await repository.UpdateInteractionAsync(interaction, cancellationToken);
             }
 
             // Update session metrics
