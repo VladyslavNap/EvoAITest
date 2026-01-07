@@ -101,20 +101,21 @@ public static class RecordingEndpoints
             .Produces<ActionRecognitionMetrics>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
-        // DELETE /api/recordings/{id} - Delete recording
-        group.MapDelete("/{id:guid}", DeleteRecording)
-            .WithName("DeleteRecording")
-            .WithSummary("Delete a recording session")
-            .WithDescription("Deletes a recording session and all its interactions")
-            .Produces(StatusCodes.Status204NoContent)
+        // GET /api/recordings/{id}/generate-stream - Stream test generation
+        group.MapGet("/{id:guid}/generate-stream", StreamGenerateTest)
+            .WithName("StreamGenerateTest")
+            .WithSummary("Stream test generation in real-time")
+            .WithDescription("Generates test code and streams the result token-by-token using Server-Sent Events (SSE)")
+            .Produces(StatusCodes.Status200OK, contentType: "text/event-stream")
             .Produces(StatusCodes.Status404NotFound);
 
-        // GET /api/recordings/recent - Get recent recordings
-        group.MapGet("/recent", GetRecentRecordings)
-            .WithName("GetRecentRecordings")
-            .WithSummary("Get recent recording sessions")
-            .WithDescription("Retrieves the most recent recording sessions")
-            .Produces<List<RecordingSession>>(StatusCodes.Status200OK);
+        // GET /api/recordings/{id}/analyze-stream - Stream analysis
+        group.MapGet("/{id:guid}/analyze-stream", StreamAnalyzeRecording)
+            .WithName("StreamAnalyzeRecording")
+            .WithSummary("Stream recording analysis in real-time")
+            .WithDescription("Analyzes interactions and streams intent detection results using Server-Sent Events (SSE)")
+            .Produces(StatusCodes.Status200OK, contentType: "text/event-stream")
+            .Produces(StatusCodes.Status404NotFound);
 
         return app;
     }
@@ -432,6 +433,165 @@ public static class RecordingEndpoints
 
         var sessions = await repository.GetRecentSessionsAsync(count, cancellationToken);
         return Results.Ok(sessions);
+    }
+
+    /// <summary>
+    /// Streams test generation in real-time using Server-Sent Events (SSE).
+    /// </summary>
+    private static async Task StreamGenerateTest(
+        Guid id,
+        HttpContext context,
+        ITestGenerator testGenerator,
+        IRecordingRepository repository,
+        ILogger<Program> logger,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            logger.LogInformation("Starting streaming test generation for recording: {SessionId}", id);
+
+            var session = await repository.GetSessionByIdAsync(id, cancellationToken);
+            if (session == null)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                await context.Response.WriteAsJsonAsync(new { error = "Recording not found" }, cancellationToken);
+                return;
+            }
+
+            // Set SSE headers
+            context.Response.ContentType = "text/event-stream";
+            context.Response.Headers.CacheControl = "no-cache";
+            context.Response.Headers.Connection = "keep-alive";
+
+            var options = new TestGenerationOptions
+            {
+                TestFramework = "Playwright",
+                Language = "C#",
+                IncludeComments = true,
+                GeneratePageObjects = false,
+                AutoGenerateAssertions = true
+            };
+
+            // Send start event
+            await context.Response.WriteAsync("data: {\"status\": \"started\"}\n\n", cancellationToken);
+            await context.Response.Body.FlushAsync(cancellationToken);
+
+            // Generate test (non-streaming version)
+            var generatedTest = await testGenerator.GenerateTestAsync(session, options, cancellationToken);
+
+            // Stream the generated code in chunks for demonstration
+            var codeLines = generatedTest.Code.Split('\n');
+            foreach (var line in codeLines)
+            {
+                var chunk = new { type = "code", content = line + "\n" };
+                await context.Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(chunk)}\n\n", cancellationToken);
+                await context.Response.Body.FlushAsync(cancellationToken);
+                await Task.Delay(50, cancellationToken); // Simulate streaming delay
+            }
+
+            // Send completion event
+            await context.Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+            await context.Response.Body.FlushAsync(cancellationToken);
+
+            logger.LogInformation("Completed streaming test generation for recording: {SessionId}", id);
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("Streaming test generation cancelled for recording: {SessionId}", id);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error during streaming test generation for recording: {SessionId}", id);
+            
+            // Send error event
+            await context.Response.WriteAsync($"data: {{\"error\": \"{ex.Message}\"}}\n\n", cancellationToken);
+            await context.Response.Body.FlushAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Streams recording analysis in real-time using Server-Sent Events (SSE).
+    /// </summary>
+    private static async Task StreamAnalyzeRecording(
+        Guid id,
+        HttpContext context,
+        IActionAnalyzer actionAnalyzer,
+        IRecordingRepository repository,
+        ILogger<Program> logger,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            logger.LogInformation("Starting streaming analysis for recording: {SessionId}", id);
+
+            var session = await repository.GetSessionByIdAsync(id, cancellationToken);
+            if (session == null)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                await context.Response.WriteAsJsonAsync(new { error = "Recording not found" }, cancellationToken);
+                return;
+            }
+
+            // Set SSE headers
+            context.Response.ContentType = "text/event-stream";
+            context.Response.Headers.CacheControl = "no-cache";
+            context.Response.Headers.Connection = "keep-alive";
+
+            var unknownInteractions = session.Interactions
+                .Where(i => i.Intent == ActionIntent.Unknown)
+                .ToList();
+
+            foreach (var interaction in unknownInteractions)
+            {
+                // Send progress event
+                await context.Response.WriteAsync(
+                    $"data: {{\"status\": \"analyzing\", \"interactionId\": \"{interaction.Id}\"}}\n\n",
+                    cancellationToken);
+                await context.Response.Body.FlushAsync(cancellationToken);
+
+                var analyzed = await actionAnalyzer.AnalyzeInteractionAsync(
+                    interaction,
+                    session,
+                    cancellationToken);
+
+                // Send result event
+                var result = new
+                {
+                    interactionId = interaction.Id,
+                    intent = analyzed.Intent.ToString(),
+                    confidence = analyzed.IntentConfidence,
+                    description = analyzed.Description
+                };
+
+                await context.Response.WriteAsJsonAsync(result, cancellationToken);
+                await context.Response.WriteAsync("\n\n", cancellationToken);
+                await context.Response.Body.FlushAsync(cancellationToken);
+
+                // Update in database
+                interaction.Intent = analyzed.Intent;
+                interaction.IntentConfidence = analyzed.IntentConfidence;
+                interaction.Description = analyzed.Description;
+                await repository.UpdateInteractionAsync(interaction, cancellationToken);
+            }
+
+            // Send completion event
+            await context.Response.WriteAsync("data: [DONE]\n\n", cancellationToken);
+            await context.Response.Body.FlushAsync(cancellationToken);
+
+            logger.LogInformation("Completed streaming analysis for recording: {SessionId}", id);
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("Streaming analysis cancelled for recording: {SessionId}", id);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error during streaming analysis for recording: {SessionId}", id);
+            
+            // Send error event
+            await context.Response.WriteAsync($"data: {{\"error\": \"{ex.Message}\"}}\n\n", cancellationToken);
+            await context.Response.Body.FlushAsync(cancellationToken);
+        }
     }
 
     #endregion

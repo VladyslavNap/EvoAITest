@@ -1,10 +1,79 @@
 @using EvoAITest.Core.Models.Recording
 @using EvoAITest.Core.Abstractions
+@using Microsoft.AspNetCore.SignalR.Client
 @inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<style>
+    .test-preview-container {
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .streaming-indicator {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        background: #e3f2fd;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+
+    .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid #1976d2;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .streaming-text {
+        color: #1976d2;
+        font-weight: 500;
+    }
+
+    .streaming-output {
+        margin: 20px 0;
+        padding: 15px;
+        background: #f5f5f5;
+        border-left: 4px solid #4caf50;
+        border-radius: 4px;
+    }
+
+    .streaming-output h4 {
+        margin: 0 0 10px 0;
+        color: #4caf50;
+    }
+
+    .streaming-output pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+</style>
 
 <div class="test-preview-container">
     <div class="preview-header">
         <h3>Generated Test Preview</h3>
+        
+        @* Streaming progress indicator *@
+        @if (isStreaming)
+        {
+            <div class="streaming-indicator">
+                <span class="spinner"></span>
+                <span class="streaming-text">Generating test in real-time...</span>
+            </div>
+        }
+        
         <div class="preview-actions">
             @if (GeneratedTest != null)
             {
@@ -21,8 +90,34 @@
                     </button>
                 }
             }
+            
+            @* Streaming control buttons *@
+            @if (Session != null)
+            {
+                @if (!isStreaming && streamingSupported)
+                {
+                    <button class="btn btn-success" @onclick="StartStreamingGeneration">
+                        <span class="icon">??</span> Stream Generate
+                    </button>
+                }
+                else if (isStreaming)
+                {
+                    <button class="btn btn-danger" @onclick="StopStreaming">
+                        <span class="icon">??</span> Stop
+                    </button>
+                }
+            }
         </div>
     </div>
+    
+    @* Streaming output area *@
+    @if (isStreaming && !string.IsNullOrEmpty(streamingContent))
+    {
+        <div class="streaming-output">
+            <h4>Live Generation:</h4>
+            <pre><code>@streamingContent</code></pre>
+        </div>
+    }
 
     @if (GeneratedTest == null)
     {
@@ -186,7 +281,11 @@
 
 @code {
     private string activeTab = "test";
-    private string statusMessage = string.Empty;
+    private string? statusMessage;
+    private HubConnection? hubConnection;
+    private bool isStreaming = false;
+    private bool streamingSupported = true;
+    private string streamingContent = string.Empty;
 
     [Parameter]
     public GeneratedTest? GeneratedTest { get; set; }
@@ -196,6 +295,114 @@
 
     [Parameter]
     public EventCallback<GeneratedTest> OnEditRequested { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await InitializeSignalRConnection();
+    }
+
+    private async Task InitializeSignalRConnection()
+    {
+        try
+        {
+            // Build SignalR connection to API service
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/hubs/llm-streaming"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            // Register handlers for streaming events
+            hubConnection.On<EvoAITest.LLM.Models.LLMStreamChunk>("ReceiveToken", (chunk) =>
+            {
+                streamingContent += chunk.Delta;
+                InvokeAsync(StateHasChanged);
+            });
+
+            hubConnection.On("StreamComplete", () =>
+            {
+                isStreaming = false;
+                statusMessage = "Generation complete!";
+                InvokeAsync(StateHasChanged);
+            });
+
+            hubConnection.On<object>("ReceiveError", (error) =>
+            {
+                isStreaming = false;
+                statusMessage = $"Error: {error}";
+                InvokeAsync(StateHasChanged);
+            });
+
+            // Start connection
+            await hubConnection.StartAsync();
+            streamingSupported = true;
+        }
+        catch (Exception ex)
+        {
+            streamingSupported = false;
+            statusMessage = $"SignalR connection failed: {ex.Message}";
+        }
+    }
+
+    private async Task StartStreamingGeneration()
+    {
+        if (Session == null || hubConnection == null || hubConnection.State != HubConnectionState.Connected)
+        {
+            return;
+        }
+
+        try
+        {
+            isStreaming = true;
+            streamingContent = string.Empty;
+            statusMessage = null;
+
+            // Create LLM request for test generation
+            var request = new EvoAITest.LLM.Models.LLMRequest
+            {
+                Model = "gpt-4",
+                Messages = new List<EvoAITest.LLM.Models.Message>
+                {
+                    new() 
+                    { 
+                        Role = EvoAITest.LLM.Models.MessageRole.System, 
+                        Content = "You are a test code generator." 
+                    },
+                    new() 
+                    { 
+                        Role = EvoAITest.LLM.Models.MessageRole.User, 
+                        Content = $"Generate test code for recording: {Session.Name}" 
+                    }
+                }
+            };
+
+            // Invoke streaming method on hub
+            await hubConnection.InvokeAsync("StreamCompletion", request);
+        }
+        catch (Exception ex)
+        {
+            isStreaming = false;
+            statusMessage = $"Streaming failed: {ex.Message}";
+        }
+    }
+
+    private async Task StopStreaming()
+    {
+        if (hubConnection != null && hubConnection.State == HubConnectionState.Connected)
+        {
+            await hubConnection.StopAsync();
+            await InitializeSignalRConnection(); // Reconnect for next use
+        }
+        
+        isStreaming = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
 
     private async Task CopyToClipboard()
     {
@@ -243,307 +450,3 @@
         }
     }
 }
-
-<style>
-    .test-preview-container {
-        padding: 20px;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .preview-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        padding-bottom: 15px;
-        border-bottom: 2px solid #e0e0e0;
-    }
-
-    .preview-header h3 {
-        margin: 0;
-        color: #333;
-    }
-
-    .preview-actions {
-        display: flex;
-        gap: 10px;
-    }
-
-    .btn {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        transition: all 0.2s;
-    }
-
-    .btn-primary {
-        background: #007bff;
-        color: white;
-    }
-
-    .btn-secondary {
-        background: #6c757d;
-        color: white;
-    }
-
-    .btn-info {
-        background: #17a2b8;
-        color: white;
-    }
-
-    .btn:hover {
-        opacity: 0.9;
-        transform: translateY(-1px);
-    }
-
-    .no-test-message {
-        padding: 60px 20px;
-        text-align: center;
-        color: #666;
-    }
-
-    .no-test-message p {
-        margin: 10px 0;
-    }
-
-    .hint {
-        font-size: 14px;
-        color: #999;
-    }
-
-    .test-metadata {
-        margin-bottom: 20px;
-        padding: 15px;
-        background: #f8f9fa;
-        border-radius: 4px;
-    }
-
-    .metadata-row {
-        display: flex;
-        gap: 30px;
-        flex-wrap: wrap;
-    }
-
-    .metadata-item {
-        display: flex;
-        gap: 8px;
-    }
-
-    .metadata-item .label {
-        font-weight: 600;
-        color: #666;
-    }
-
-    .metadata-item .value {
-        color: #333;
-    }
-
-    .quality-metrics {
-        margin-bottom: 20px;
-    }
-
-    .quality-metrics h4 {
-        margin: 0 0 15px;
-        color: #333;
-        font-size: 16px;
-    }
-
-    .metrics-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 15px;
-    }
-
-    .metric-card {
-        padding: 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 8px;
-        text-align: center;
-        color: white;
-    }
-
-    .metric-value {
-        font-size: 32px;
-        font-weight: bold;
-        margin-bottom: 8px;
-    }
-
-    .metric-label {
-        font-size: 14px;
-        opacity: 0.9;
-    }
-
-    .code-tabs {
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        overflow: hidden;
-    }
-
-    .tab-buttons {
-        display: flex;
-        background: #f8f9fa;
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    .tab-button {
-        padding: 12px 20px;
-        border: none;
-        background: transparent;
-        color: #666;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-        border-bottom: 3px solid transparent;
-    }
-
-    .tab-button:hover {
-        background: rgba(0,0,0,0.05);
-    }
-
-    .tab-button.active {
-        color: #007bff;
-        border-bottom-color: #007bff;
-        background: white;
-    }
-
-    .tab-content {
-        padding: 20px;
-        max-height: 600px;
-        overflow-y: auto;
-    }
-
-    .code-viewer {
-        background: #282c34;
-        border-radius: 4px;
-        overflow-x: auto;
-    }
-
-    .code-viewer pre {
-        margin: 0;
-        padding: 20px;
-    }
-
-    .code-viewer code {
-        color: #abb2bf;
-        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        font-size: 13px;
-        line-height: 1.5;
-    }
-
-    .methods-list, .pageobjects-list {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-    }
-
-    .method-item, .pageobject-item {
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        overflow: hidden;
-    }
-
-    .method-header, .pageobject-header {
-        padding: 15px;
-        background: #f8f9fa;
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    .method-header h5, .pageobject-header h5 {
-        margin: 0 0 8px;
-        color: #333;
-    }
-
-    .method-description, .pageobject-url {
-        margin: 0;
-        font-size: 13px;
-        color: #666;
-    }
-
-    .action-mapping {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-    }
-
-    .mapping-item {
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
-        overflow: hidden;
-    }
-
-    .mapping-header {
-        padding: 12px 15px;
-        background: #f8f9fa;
-        display: flex;
-        gap: 12px;
-        align-items: center;
-    }
-
-    .sequence {
-        padding: 4px 8px;
-        background: #007bff;
-        color: white;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: bold;
-    }
-
-    .action-type {
-        padding: 4px 8px;
-        background: #6c757d;
-        color: white;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-
-    .description {
-        color: #666;
-        font-size: 13px;
-    }
-
-    .mapping-code {
-        padding: 15px;
-        background: #282c34;
-    }
-
-    .mapping-code pre {
-        margin: 0;
-    }
-
-    .mapping-code code {
-        color: #abb2bf;
-        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        font-size: 12px;
-    }
-
-    .alert-info {
-        padding: 12px;
-        background: #d1ecf1;
-        color: #0c5460;
-        border: 1px solid #bee5eb;
-        border-radius: 4px;
-    }
-</style>
-
-<script>
-    window.downloadFile = function (filename, content) {
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-    };
-</script>

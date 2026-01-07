@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
@@ -30,8 +31,8 @@ public static class ServiceCollectionExtensions
     /// <remarks>
     /// <para>
     /// This method registers core services including browser automation, tool execution,
-    /// and database persistence. The <see cref="EvoAIDbContext"/> is registered only when
-    /// the "EvoAIDatabase" connection string is configured and not empty.
+    /// database persistence, and Azure Key Vault integration. The <see cref="EvoAIDbContext"/> 
+    /// is registered only when the "EvoAIDatabase" connection string is configured and not empty.
     /// </para>
     /// <para>
     /// <strong>Important:</strong> If the "EvoAIDatabase" connection string is missing or empty,
@@ -63,6 +64,19 @@ public static class ServiceCollectionExtensions
         services.Configure<ToolExecutorOptions>(configuration.GetSection("EvoAITest:ToolExecutor"));
         services.Configure<ErrorRecoveryOptions>(configuration.GetSection("EvoAITest:Core:ErrorRecovery"));
         services.Configure<RecordingOptions>(configuration.GetSection("Recording"));
+        services.Configure<KeyVaultOptions>(configuration.GetSection("KeyVault"));
+
+        // Register Azure Key Vault secret provider (if enabled)
+        var keyVaultOptions = configuration.GetSection("KeyVault").Get<KeyVaultOptions>();
+        if (keyVaultOptions?.Enabled == true && !string.IsNullOrWhiteSpace(keyVaultOptions.VaultUri))
+        {
+            services.TryAddSingleton<ISecretProvider, KeyVaultSecretProvider>();
+        }
+        else
+        {
+            // Register a no-op provider for development without Key Vault
+            services.TryAddSingleton<ISecretProvider, NoOpSecretProvider>();
+        }
 
         // Register Error Recovery services
         services.TryAddScoped<IErrorClassifier, ErrorClassifier>();

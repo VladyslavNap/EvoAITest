@@ -3,10 +3,9 @@ using Azure.Security.KeyVault.Secrets;
 using EvoAITest.Core.Options;
 using EvoAITest.LLM.Abstractions;
 using EvoAITest.LLM.Providers;
-using EvoAITest.LLM.Resilience;
-using EvoAITest.LLM.Routing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System;
 
 namespace EvoAITest.LLM.Factory;
 
@@ -32,21 +31,26 @@ public sealed class LLMProviderFactory
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<LLMProviderFactory> _logger;
     private readonly SecretClient? _keyVaultClient;
+    private readonly IServiceProvider _serviceProvider;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LLMProviderFactory"/> class.
     /// </summary>
     /// <param name="options">Configuration options for EvoAITest.Core.</param>
     /// <param name="loggerFactory">Logger factory for creating provider-specific loggers.</param>
+    /// <param name="serviceProvider">Service provider for dependency resolution.</param>
     public LLMProviderFactory(
         IOptions<EvoAITestCoreOptions> options,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNull(options, nameof(options));
         ArgumentNullException.ThrowIfNull(loggerFactory, nameof(loggerFactory));
+        ArgumentNullException.ThrowIfNull(serviceProvider, nameof(serviceProvider));
 
         _options = options.Value;
         _loggerFactory = loggerFactory;
+        _serviceProvider = serviceProvider;
         _logger = loggerFactory.CreateLogger<LLMProviderFactory>();
 
         // Validate configuration on initialization
@@ -125,21 +129,27 @@ public sealed class LLMProviderFactory
             "Creating routing provider with multi-model routing: {Enabled}, fallback: {Fallback}",
             _options.EnableMultiModelRouting, _options.EnableProviderFallback);
 
-        var providers = new List<ILLMProvider>();
-
-        // Always try to create primary provider
+        // Create primary provider
+        ILLMProvider primaryProvider;
         try
         {
-            var primaryProvider = await CreateSingleProviderAsync(_options.LLMProvider, cancellationToken);
-            providers.Add(primaryProvider);
-            _logger.LogInformation("Added primary provider: {Provider}", _options.LLMProvider);
+            primaryProvider = await CreateSingleProviderAsync(_options.LLMProvider, cancellationToken);
+            _logger.LogInformation("Created primary provider: {Provider}", _options.LLMProvider);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to create primary provider {Provider}", _options.LLMProvider);
+            _logger.LogError(ex, "Failed to create primary provider {Provider}", _options.LLMProvider);
+            throw new InvalidOperationException(
+                $"Failed to create primary provider '{_options.LLMProvider}'", ex);
         }
 
-        // Add fallback provider if enabled
+        // If multi-model routing is enabled, wrap in RoutingLLMProvider
+        if (_options.EnableMultiModelRouting)
+        {
+            primaryProvider = CreateRoutingProvider(primaryProvider);
+        }
+
+        // If fallback is enabled, wrap in CircuitBreakerLLMProvider
         if (_options.EnableProviderFallback)
         {
             var fallbackProviderType = _options.LLMProvider == "AzureOpenAI" ? "Ollama" : "AzureOpenAI";
@@ -147,57 +157,102 @@ public sealed class LLMProviderFactory
             try
             {
                 var fallbackProvider = await CreateSingleProviderAsync(fallbackProviderType, cancellationToken);
-                providers.Add(fallbackProvider);
-                _logger.LogInformation("Added fallback provider: {Provider}", fallbackProviderType);
+                _logger.LogInformation("Created fallback provider: {Provider}", fallbackProviderType);
+
+                primaryProvider = CreateCircuitBreakerProvider(primaryProvider, fallbackProvider);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to create fallback provider {Provider}", fallbackProviderType);
+                _logger.LogWarning(ex, "Failed to create fallback provider {Provider}, continuing without fallback", fallbackProviderType);
             }
         }
 
-        if (providers.Count == 0)
+        return primaryProvider;
+    }
+
+    /// <summary>
+    /// Wraps a provider with RoutingLLMProvider for intelligent task-based routing.
+    /// </summary>
+    private ILLMProvider CreateRoutingProvider(ILLMProvider baseProvider)
+    {
+        // Create routing options
+        var routingOptions = new LLMRoutingOptions
         {
-            throw new InvalidOperationException(
-                "Failed to create any LLM providers. Check configuration and provider availability.");
+            RoutingStrategy = _options.RoutingStrategy,
+            EnableMultiModelRouting = true,
+            EnableProviderFallback = _options.EnableProviderFallback,
+            CircuitBreakerFailureThreshold = _options.CircuitBreakerFailureThreshold,
+            CircuitBreakerOpenDurationSeconds = _options.CircuitBreakerOpenDurationSeconds,
+            DefaultRoute = new Core.Options.RouteConfiguration
+            {
+                PrimaryProvider = _options.LLMProvider,
+                PrimaryModel = _options.LLMModel
+            },
+            Routes = new Dictionary<string, Core.Options.RouteConfiguration>()
+        };
+
+        // Add default routes based on provider
+        if (_options.LLMProvider == "AzureOpenAI")
+        {
+            // Route planning to GPT-4, code generation to local model
+            routingOptions.Routes["Planning"] = new Core.Options.RouteConfiguration
+            {
+                PrimaryProvider = "AzureOpenAI",
+                PrimaryModel = "gpt-4",
+                CostPer1KTokens = 0.03
+            };
+            
+            if (_options.EnableProviderFallback)
+            {
+                routingOptions.Routes["CodeGeneration"] = new Core.Options.RouteConfiguration
+                {
+                    PrimaryProvider = "Ollama",
+                    PrimaryModel = _options.OllamaModel,
+                    FallbackProvider = "AzureOpenAI",
+                    FallbackModel = _options.LLMModel,
+                    CostPer1KTokens = 0.0
+                };
+            }
         }
 
-        // Create routing strategy
-        IRoutingStrategy strategy = _options.RoutingStrategy switch
+        // Create routing strategies
+        var strategies = new List<Routing.IRoutingStrategy>
         {
-            "TaskBased" => new TaskBasedRoutingStrategy(),
-            "CostOptimized" => new CostOptimizedRoutingStrategy(),
-            _ => new TaskBasedRoutingStrategy()
-        };
-
-        _logger.LogInformation("Using routing strategy: {Strategy}", strategy.Name);
-
-        // Create circuit breaker registry
-        var circuitBreakerOptions = new CircuitBreakerOptions
-        {
-            FailureThreshold = _options.CircuitBreakerFailureThreshold,
-            OpenDuration = TimeSpan.FromSeconds(_options.CircuitBreakerOpenDurationSeconds),
-            RequestTimeout = TimeSpan.FromSeconds(_options.LLMRequestTimeoutSeconds)
-        };
-
-        var circuitBreakers = new CircuitBreakerRegistry(
-            circuitBreakerOptions,
-            _loggerFactory.CreateLogger<CircuitBreaker>());
-
-        // Create routing provider options
-        var routingOptions = new RoutingProviderOptions
-        {
-            EnableFallback = _options.EnableProviderFallback,
-            RequestTimeout = TimeSpan.FromSeconds(_options.LLMRequestTimeoutSeconds),
-            MaxRetries = 3
+            new Routing.TaskBasedRoutingStrategy(_loggerFactory.CreateLogger<Routing.TaskBasedRoutingStrategy>()),
+            new Routing.CostOptimizedRoutingStrategy(_loggerFactory.CreateLogger<Routing.CostOptimizedRoutingStrategy>())
         };
 
         return new RoutingLLMProvider(
-            providers,
-            strategy,
-            circuitBreakers,
-            routingOptions,
+            _serviceProvider,
+            Microsoft.Extensions.Options.Options.Create(routingOptions),
+            strategies,
             _loggerFactory.CreateLogger<RoutingLLMProvider>());
+    }
+
+    /// <summary>
+    /// Wraps providers with CircuitBreakerLLMProvider for automatic failover.
+    /// </summary>
+    private ILLMProvider CreateCircuitBreakerProvider(ILLMProvider primary, ILLMProvider fallback)
+    {
+        var circuitBreakerOptions = new Core.Options.CircuitBreakerOptions
+        {
+            FailureThreshold = _options.CircuitBreakerFailureThreshold,
+            OpenDuration = TimeSpan.FromSeconds(_options.CircuitBreakerOpenDurationSeconds),
+            RequestTimeout = TimeSpan.FromSeconds(_options.LLMRequestTimeoutSeconds),
+            CountTimeoutsAsFailures = true,
+            CountRateLimitsAsFailures = false,
+            MinimumStateDuration = TimeSpan.FromSeconds(5),
+            SuccessThresholdInHalfOpen = 1,
+            EmitTelemetryEvents = true,
+            ResetCounterOnSuccess = true,
+            MaxConcurrentRequestsInHalfOpen = 1
+        };
+
+        return new CircuitBreakerLLMProvider(
+            primary,
+            fallback,
+            Microsoft.Extensions.Options.Options.Create(circuitBreakerOptions),
+            _loggerFactory.CreateLogger<CircuitBreakerLLMProvider>());
     }
 
     /// <summary>
