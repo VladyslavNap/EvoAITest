@@ -480,10 +480,11 @@ public static class RecordingEndpoints
             var generatedTest = await testGenerator.GenerateTestAsync(session, options, cancellationToken);
 
             // Stream the generated code in chunks for demonstration
-            var codeLines = generatedTest.Code.Split('\n');
-            foreach (var line in codeLines)
+            var codeChunks = generatedTest.Code.Split('\n')
+                .Select(line => new { type = "code", content = line + "\n" });
+            
+            foreach (var chunk in codeChunks)
             {
-                var chunk = new { type = "code", content = line + "\n" };
                 await context.Response.WriteAsync($"data: {System.Text.Json.JsonSerializer.Serialize(chunk)}\n\n", cancellationToken);
                 await context.Response.Body.FlushAsync(cancellationToken);
                 await Task.Delay(50, cancellationToken); // Simulate streaming delay
