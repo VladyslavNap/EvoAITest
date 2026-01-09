@@ -2,9 +2,44 @@
 
 AI agent orchestration for intelligent browser automation.
 
+> ?? **[Main Documentation](../DOCUMENTATION_INDEX.md)** | ?? **[Quick Start](#quick-start)** | ?? **[Examples](../examples/LoginExample/README.md)**
+
+---
+
 ## Overview
 
 EvoAITest.Agents provides AI-powered agents that can plan, execute, and heal browser automation tasks. Agents use LLMs to understand tasks, create execution plans, and recover from failures.
+
+## Quick Start
+
+### Basic Usage
+
+```csharp
+// Inject agent via DI
+public class MyService
+{
+    private readonly IAgent _agent;
+
+    public MyService(IAgent agent)
+    {
+        _agent = agent;
+    }
+
+    public async Task AutomateTaskAsync()
+    {
+        var task = new AgentTask
+        {
+            Description = "Login and navigate to dashboard",
+            StartUrl = "https://app.example.com"
+        };
+
+        var result = await _agent.ExecuteTaskAsync(task);
+        Console.WriteLine($"Success: {result.Success}");
+    }
+}
+```
+
+---
 
 ## Key Components
 
@@ -56,9 +91,11 @@ if (healingResult.Success)
 
 `HealerAgent` is the default `IHealer`. It inspects failed `AgentStepResult` instances, captures page state via `IBrowserAgent`, runs LLM-based diagnostics to classify the failure, then applies adaptive strategies (alternative locators, extended waits, retries, or replanning) while enforcing per-step attempt limits.
 
-### Models
+---
 
-#### AgentTask
+## Models
+
+### AgentTask
 Define high-level automation tasks:
 
 ```csharp
@@ -80,7 +117,7 @@ var task = new AgentTask
 };
 ```
 
-#### AgentStep
+### AgentStep
 Individual execution steps:
 
 ```csharp
@@ -99,258 +136,163 @@ var step = new AgentStep
     {
         new()
         {
-            Type = ValidationType.ElementText,
-            ExpectedValue = "user@example.com"
+            Type = ValidationType.ElementValue,
+            Target = ElementLocator.Css("#username"),
+            Expected = "user@example.com"
         }
     }
 };
 ```
 
-#### HealingStrategy
-Define error recovery strategies:
+---
 
-```csharp
-var strategy = new HealingStrategy
-{
-    Name = "Alternative Locator",
-    Type = HealingStrategyType.AlternativeLocator,
-    Description = "Try finding the element using text content instead",
-    Confidence = 0.8,
-    Parameters = new Dictionary<string, object>
-    {
-        ["locator"] = ElementLocator.Text("Submit")
-    }
-};
+## Architecture
+
+```
+???????????????????
+?   AgentTask     ?
+?  (High-level)   ?
+???????????????????
+         ?
+         ?
+???????????????????
+?    IPlanner     ?  ???? LLM-powered planning
+?  (Task ? Steps) ?
+???????????????????
+         ?
+         ?
+???????????????????
+?   IExecutor     ?  ???? Executes steps
+?  (Steps ? Res)  ?       Validates results
+???????????????????
+         ?
+         ?
+  ????????????????
+  ?              ?
+Success      Failure
+  ?              ?
+  ?              ?
+Done      ???????????????
+          ?   IHealer   ?  ???? Self-healing
+          ? (Diagnose)  ?       Alternative approaches
+          ???????????????
 ```
 
-## Installation
+---
 
-Add to your project:
+## Features
 
-```bash
-dotnet add reference ../EvoAITest.Agents/EvoAITest.Agents.csproj
-```
+### ?? AI-Powered Planning
+- Natural language task understanding
+- Multi-step plan generation
+- Context-aware reasoning
+- Adaptive re-planning
 
-Register services:
+### ?? Self-Healing
+- Automatic error recovery
+- Alternative selector discovery
+- Dynamic wait optimization
+- Learning from failures
 
-```csharp
-builder.Services.AddAgentServices();
-builder.Services.AddPlanner<PlannerAgent>();   // optional override
-builder.Services.AddExecutor<ExecutorAgent>(); // optional override
-builder.Services.AddHealer<HealerAgent>();     // optional override
-```
+### ?? Intelligent Execution
+- Screenshot capture
+- Result validation
+- Progress tracking
+- Pause/resume/cancel support
 
-`AddAgentServices()` wires up the PlannerAgent + ExecutorAgent + HealerAgent trio out of the box, so applications immediately benefit from planning, execution, and self-healing orchestration.
+### ?? Observability
+- Detailed execution logs
+- Performance metrics
+- Success/failure tracking
+- OpenTelemetry integration
 
-### Chain-of-Thought & Visualization
-
-- Planner emits `ExecutionPlan.ThoughtProcess` (list of reasoning strings) plus optional `PlanVisualization` metadata (`dot`, `json`, etc.).
-- `PlanVisualizationService` (in `EvoAITest.Agents/Services`) can render Graphviz/Mermaid/JSON graphs for dashboards or docs.
-- Chain-of-thought includes goals, requirements, ordered reasoning steps, risks, and dependencies so operators understand why each action exists.
-
-```json
-{
-  "thought_process": [
-    "Identify goal: authenticate user and confirm dashboard.",
-    "Need to navigate, wait for login form, submit credentials, verify KPI widgets."
-  ],
-  "plan": [
-    { "order": 1, "action": "navigate", "value": "https://example.com/login" },
-    { "order": 2, "action": "wait_for_element", "selector": "#username" }
-  ],
-  "visualization": {
-    "format": "dot",
-    "content": "digraph Plan { 1 -> 2; }"
-  }
-}
-```
-
-Plan consumers (Executor, UI, docs) can persist both the structured steps and the reasoning to give engineers full traceability.
+---
 
 ## Usage Examples
 
-### Execute a Task
+### Simple Navigation
 
 ```csharp
-var agent = serviceProvider.GetRequiredService<IAgent>();
-
 var task = new AgentTask
 {
-    Description = "Search for 'AI automation' and extract first 5 results",
-    StartUrl = "https://www.google.com",
-    Type = TaskType.Search,
+    Description = "Navigate to the homepage and click the login button",
+    StartUrl = "https://example.com"
+};
+
+var result = await agent.ExecuteTaskAsync(task);
+```
+
+### Authentication Flow
+
+```csharp
+var task = new AgentTask
+{
+    Description = "Login with provided credentials",
+    StartUrl = "https://app.example.com/login",
+    Type = TaskType.Authentication,
     Parameters = new Dictionary<string, object>
     {
-        ["query"] = "AI automation",
-        ["maxResults"] = 5
+        ["username"] = "user@example.com",
+        ["password"] = "password123"
     }
 };
 
 var result = await agent.ExecuteTaskAsync(task);
+```
 
-if (result.Success)
+### Custom Planning
+
+```csharp
+var plan = await planner.CreatePlanAsync(task, context);
+
+// Modify plan if needed
+plan.Steps.Insert(0, new AgentStep
 {
-    Console.WriteLine("Task completed successfully!");
-    foreach (var (key, value) in result.ExtractedData)
+    StepNumber = 0,
+    Action = new BrowserAction
     {
-        Console.WriteLine($"{key}: {value}");
+        Type = ActionType.Navigate,
+        Target = ElementLocator.Url("https://example.com")
     }
-}
-else
-{
-    Console.WriteLine($"Task failed: {result.ErrorMessage}");
-}
+});
+
+var result = await executor.ExecutePlanAsync(plan, context);
 ```
 
-### Plan Without Execution
+---
+
+## Service Registration
 
 ```csharp
-var steps = await agent.PlanTaskAsync(task);
+// In Program.cs or Startup.cs
+builder.Services.AddAgentServices();
 
-Console.WriteLine("Execution Plan:");
-foreach (var step in steps)
-{
-    Console.WriteLine($"{step.StepNumber}. {step.Action?.Type}");
-    Console.WriteLine($"   Reasoning: {step.Reasoning}");
-}
+// Register implementations
+builder.Services.AddSingleton<IAgent, DefaultAgent>();
+builder.Services.AddSingleton<IPlanner, PlannerAgent>();
+builder.Services.AddSingleton<IExecutor, ExecutorAgent>();
+builder.Services.AddSingleton<IHealer, HealerAgent>();
 ```
 
-### Manual Step Execution with Healing
+---
 
-```csharp
-var executor = serviceProvider.GetRequiredService<IExecutor>();
-var healer = serviceProvider.GetRequiredService<IHealer>();
+## Documentation
 
-foreach (var step in plan.Steps)
-{
-    var result = await executor.ExecuteStepAsync(step, context);
-    
-    if (!result.Success && result.Error != null)
-    {
-        var analysis = await healer.AnalyzeErrorAsync(result.Error, context);
-        
-        if (analysis.IsHealable)
-        {
-            var healingResult = await healer.HealStepAsync(step, result.Error, context);
-            
-            if (healingResult.Success)
-            {
-                result = await executor.ExecuteStepAsync(healingResult.HealedStep!, context);
-            }
-        }
-    }
-}
-```
+| Document | Description |
+|----------|-------------|
+| [Main Documentation](../DOCUMENTATION_INDEX.md) | Central documentation hub |
+| [Examples](../examples/LoginExample/README.md) | Working examples |
+| [Core Library](../EvoAITest.Core/README.md) | Core services and models |
 
-### Learn from Feedback
+---
 
-```csharp
-var feedback = new AgentFeedback
-{
-    TaskId = result.TaskId,
-    Success = false,
-    Error = "Element selector became stale",
-    Suggestions = new List<string>
-    {
-        "Use more resilient selectors",
-        "Add explicit waits before interaction"
-    }
-};
+## Dependencies
 
-await agent.LearnFromFeedbackAsync(feedback);
-```
+- **EvoAITest.Core** - Core models and services
+- **EvoAITest.LLM** - LLM provider abstraction
+- **Microsoft.Playwright** - Browser automation
 
-## Healing Strategies
+---
 
-Built-in healing strategies:
-
-1. **RetryWithDelay** - Simple retry with exponential backoff
-2. **AlternativeLocator** - Try different element selection strategies
-3. **ExtendedWait** - Wait longer for dynamic content
-4. **ScrollToElement** - Make elements visible before interaction
-5. **PageRefresh** - Reload the page and retry
-6. **AIElementDiscovery** - Use LLM to find alternative elements
-7. **InteractionMethodChange** - Try JavaScript click instead of native click
-8. **PopupHandling** - Detect and dismiss unexpected popups
-9. **TaskReplanning** - Create a new plan with LLM
-10. **SimpleFallback** - Use simpler, more reliable approach
-
-## Agent Capabilities
-
-Configure what your agent can do:
-
-```csharp
-var capabilities = new AgentCapabilities
-{
-    CanFillForms = true,
-    CanNavigate = true,
-    CanExtractData = true,
-    CanAuthenticate = true,
-    CanSelfHeal = true,
-    MaxComplexity = TaskComplexity.Advanced,
-    SupportedBrowsers = new List<string> { "chromium", "firefox" }
-};
-```
-
-## Task Constraints
-
-Control task execution:
-
-```csharp
-var constraints = new TaskConstraints
-{
-    MaxRetries = 3,
-    MaxSteps = 50,
-    AllowedDomains = new List<string> { "example.com", "api.example.com" },
-    BlockedDomains = new List<string> { "ads.example.com" },
-    AllowExternalLinks = false,
-    EnableHealing = true
-};
-```
-
-## Statistics and Monitoring
-
-Track execution metrics:
-
-```csharp
-var stats = result.Statistics;
-Console.WriteLine($"Total steps: {stats.TotalSteps}");
-Console.WriteLine($"Successful: {stats.SuccessfulSteps}");
-Console.WriteLine($"Failed: {stats.FailedSteps}");
-Console.WriteLine($"Healed: {stats.HealedSteps}");
-Console.WriteLine($"Success rate: {stats.SuccessRate:P}");
-Console.WriteLine($"Avg step duration: {stats.AverageStepDurationMs}ms");
-```
-
-## Features
-
-- ? AI-powered task planning
-- ? Multi-step execution
-- ? Self-healing on errors
-- ? Learning from feedback
-- ? Validation rules
-- ? Retry with backoff
-- ? Rich execution statistics
-- ? Screenshot capture
-- ? Comprehensive error handling
-
-### ExecutorAgent Highlights
-- Pause/resume/cancel APIs with thread-safe task state tracking.
-- Automatic translation from planner actions to registry-backed tool calls (navigate, click, type, wait, verify, extract).
-- Evidence collection on every failure plus a final screenshot for the task summary.
-- Built-in validation runners (element exists, text, page title, data extracted) with per-rule telemetry.
-- Execution statistics surfaced via `ExecutionStatistics` for dashboards and health checks.
-
-### HealerAgent Highlights
-- LLM-powered diagnostics classify failure types (selectors, timeouts, navigation, authentication, structure changes) with severity and recommended strategies.
-- Captures real-time page state before proposing fixes, enabling accurate locator suggestions or scroll/refresh adjustments.
-- Adaptive strategy engine supports retries with backoff, alternative locators, extended waits, replanning hooks, and manual escalation guidance.
-- Max-healing-attempt enforcement (default 3 per step) prevents infinite loops while surfacing actionable telemetry.
-- 25 unit tests validate error analysis, cancellation, malformed LLM output handling, and alternative strategy suggestions.
-
-## Next Steps
-
-- Implement agents for your specific use cases
-- Create custom healing strategies
-- Build domain-specific planners
-- Integrate with monitoring systems
+**Version:** 1.0  
+**Last Updated:** January 2026

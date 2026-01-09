@@ -2,9 +2,13 @@
 
 Production-ready browser automation abstractions for the BrowserAI framework.
 
+> 📚 **[Main Documentation](../DOCUMENTATION_INDEX.md)** | 🎬 **[Recording Feature](../docs/RECORDING_FEATURE.md)** | 🤖 **[Agents](../EvoAITest.Agents/README.md)**
+
+---
+
 ## Overview
 
-EvoAITest.Core provides browser-agnostic interfaces and models for web automation. It serves as the foundation layer for AI-powered browser automation.
+EvoAITest.Core provides browser-agnostic interfaces and models for web automation. It serves as the foundation layer for AI-powered browser automation, including the test recording and generation feature.
 
 ## Key Components
 
@@ -84,6 +88,33 @@ var locator = await pageAnalyzer.FindElementByDescriptionAsync(
 );
 ```
 
+---
+
+## Features
+
+### 🎬 Test Recording & Generation
+
+The Core library provides foundational models and services for test recording:
+
+**Models** (`EvoAITest.Core/Models/Recording`):
+- `RecordingSession` - Recording session management
+- `UserInteraction` - Captured user actions
+- `GeneratedTest` - AI-generated test code
+- `RecordingConfiguration` - Recording settings
+- `TestGenerationOptions` - Code generation options
+
+**Services** (`EvoAITest.Core/Services/Recording`):
+- `BrowserRecordingService` - Orchestrates recording lifecycle
+- `InteractionNormalizer` - Cleans and standardizes interactions
+- `PlaywrightEventListener` - Captures browser events
+
+**Repository** (`EvoAITest.Core/Repositories`):
+- `RecordingRepository` - Database persistence with EF Core
+
+📖 **[Complete Recording Documentation](../docs/RECORDING_FEATURE.md)**
+
+---
+
 ## Installation
 
 Add to your project:
@@ -98,212 +129,47 @@ Register services:
 builder.Services.AddEvoAITestCore(builder.Configuration);
 ```
 
-> `AddEvoAITestCore` binds both `EvoAITest:Core` (Playwright agent + browser knobs) and `EvoAITest:ToolExecutor` (retry/backoff/options) so `IBrowserAgent`, `IBrowserToolRegistry`, and `IToolExecutor` are available via DI.
+---
 
-## Usage Examples
+## Database
 
-### Basic Page Navigation
+The Core library includes Entity Framework Core configuration for:
 
-```csharp
-await using var driver = serviceProvider.GetRequiredService<IBrowserDriver>();
-await driver.LaunchAsync(new BrowserOptions { Headless = true });
+- **Recording Sessions** - Store and manage test recordings
+- **Recorded Interactions** - Captured user actions
+- **Error Recovery History** - Self-healing tracking
+- **Visual Regression Baselines** - Screenshot comparisons
 
-var context = await driver.CreateContextAsync();
-var page = await context.NewPageAsync();
+### Migrations
 
-await page.NavigateAsync("https://example.com");
+```bash
+# Add migration
+dotnet ef migrations add MigrationName --project EvoAITest.Core
+
+# Update database
+dotnet ef database update --project EvoAITest.Core
 ```
 
-### Element Interaction
+---
 
-```csharp
-var searchBox = await page.LocateAsync(ElementLocator.Css("input[type='search']"));
-await searchBox.FillAsync("BrowserAI");
+## Documentation
 
-var searchButton = await page.LocateAsync(ElementLocator.Role("button"));
-await searchButton.ClickAsync();
-```
+| Document | Description |
+|----------|-------------|
+| [Main Documentation](../DOCUMENTATION_INDEX.md) | Central documentation hub |
+| [Recording Feature](../docs/RECORDING_FEATURE.md) | Test recording and generation |
+| [Architecture](../docs/ARCHITECTURE.md) | Technical architecture details |
+| [API Reference](../docs/API_REFERENCE.md) | REST API documentation |
 
-### State Capture
+---
 
-```csharp
-var state = await page.GetStateAsync();
-Console.WriteLine($"URL: {state.Url}");
-Console.WriteLine($"Title: {state.Title}");
-Console.WriteLine($"Interactive elements: {state.InteractiveElements.Count}");
-Console.WriteLine($"Console errors: {state.ConsoleMessages.Count(m => m.Type == ConsoleMessageType.Error)}");
-```
+## Dependencies
 
-## Playwright Browser Agent
+- **Entity Framework Core** - Database access
+- **Microsoft.Playwright** - Browser automation
+- **System.Text.Json** - JSON serialization
 
-Day 6 introduced a production-ready implementation of `IBrowserAgent` powered by Playwright 1.48.0.
+---
 
-- **File**: `EvoAITest.Core/Browser/PlaywrightBrowserAgent.cs`
-- **Capabilities**: headless Chromium launch, resilient navigation (retry-on-fail), accessibility tree capture, interactive element harvesting, HTML snapshot, and base64 screenshots.
-- **DI Registration**: `AddEvoAITestCore` now registers `IBrowserAgent` → `PlaywrightBrowserAgent`, so any consumer resolving `IBrowserAgent` receives the Playwright-backed instance automatically.
-
-### Usage
-
-```csharp
-// In Program.cs
-builder.Services.AddEvoAITestCore(builder.Configuration);
-
-// In a component/service
-public class BrowserAutomationService
-{
-    private readonly IBrowserAgent _browser;
-
-    public BrowserAutomationService(IBrowserAgent browser)
-    {
-        _browser = browser;
-    }
-
-    public async Task<PageState> CaptureAsync(string url)
-    {
-        await _browser.InitializeAsync();
-        await _browser.NavigateAsync(url);
-        var state = await _browser.GetPageStateAsync();
-        await _browser.DisposeAsync();
-        return state;
-    }
-}
-```
-
-## Tool Executor (Day 8)
-
-Day 8 introduced a first-party tool executor that bridges the `BrowserToolRegistry` with `IBrowserAgent`, adding production-grade resiliency around every automation step.
-
-- **Interfaces & Options**: `EvoAITest.Core/Abstractions/IToolExecutor.cs`, `EvoAITest.Core/Options/ToolExecutorOptions.cs`
-- **Implementation**: `EvoAITest.Core/Services/DefaultToolExecutor.cs` + `ToolExecutorLog.cs`
-- **Features**: registry validation, parameter checking, exponential backoff with jitter, transient vs terminal error classification, per-attempt timeouts, in-memory execution history, and OpenTelemetry-friendly tracing/meters.
-
-### Usage
-
-```csharp
-public class ToolRunner
-{
-    private readonly IToolExecutor _toolExecutor;
-
-    public ToolRunner(IToolExecutor toolExecutor)
-    {
-        _toolExecutor = toolExecutor;
-    }
-
-    public async Task<ToolExecutionResult> NavigateAsync(string url, string correlationId, CancellationToken ct)
-    {
-        var toolCall = new ToolCall(
-            ToolName: "navigate",
-            Parameters: new Dictionary<string, object> { ["url"] = url },
-            Reasoning: "Open target page",
-            CorrelationId: correlationId);
-
-        return await _toolExecutor.ExecuteToolAsync(toolCall, ct);
-    }
-}
-```
-
-## Data Persistence (Day 12)
-
-The core library now ships with an EF Core-backed persistence layer that stores automation tasks and their execution history for observability, auditing, and resume scenarios.
-
-- **DbContext**: `EvoAITest.Core/Data/EvoAIDbContext.cs`
-- **Entities**:
-  - `AutomationTask` – includes user metadata, natural language prompt, serialized execution plan, correlation IDs, timestamps, and navigation property to executions.
-  - `ExecutionHistory` – captures per-run status, duration, serialized step results, screenshots, metadata, and links back to the originating task.
-- **Indexes & JSON columns**: Both entities configure indexes for high-frequency queries and store plan/step data as JSON (`nvarchar(max)`).
-- **Automatic timestamps**: `SaveChangesAsync` updates `UpdatedAt` for any modified `AutomationTask`.
-
-### Configuration
-
-Add a connection string named `EvoAIDatabase` to your host application. `AddEvoAITestCore` detects the connection string and registers `EvoAIDbContext` (with SQL Server retries suitable for Azure SQL and LocalDB).
-
-```json
-{
-  "ConnectionStrings": {
-    "EvoAIDatabase": "Server=(localdb)\\mssqllocaldb;Database=EvoAITest;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True"
-  }
-}
-```
-
-### Usage
-
-```csharp
-// Program.cs
-builder.Services.AddEvoAITestCore(builder.Configuration);
-
-// In an application service
-public sealed class TaskRepository
-{
-    private readonly EvoAIDbContext _db;
-
-    public TaskRepository(EvoAIDbContext db) => _db = db;
-
-    public async Task<IReadOnlyList<AutomationTask>> GetPendingTasksAsync(CancellationToken ct)
-        => await _db.AutomationTasks
-            .Include(t => t.Executions)
-            .Where(t => t.Status == TaskStatus.Pending)
-            .OrderByDescending(t => t.CreatedAt)
-            .ToListAsync(ct);
-}
-```
-
-### Testing
-
-`EvoAITest.Tests/Data/EvoAIDbContextTests.cs` contains 12 in-memory EF tests that verify entity configuration, cascade deletes, JSON column persistence, composite indexes, and automatic timestamp updates.
-
-### Migrations & Tooling
-
-- Generate migrations from the Core project while targeting the ApiService as the startup host:
-  ```bash
-  dotnet ef migrations add InitialCreate -p EvoAITest.Core -s EvoAITest.ApiService
-  ```
-- Apply migrations (local/CI/prod):
-  ```bash
-  dotnet ef database update -p EvoAITest.Core -s EvoAITest.ApiService
-  ```
-- ApiService automatically runs `Database.Migrate()` in Development so LocalDB/Aspire SQL instances stay current without manual commands.
-
-## Repositories (Day 14)
-
-To keep data access consistent, the core library now exposes an `IAutomationTaskRepository` abstraction backed by `AutomationTaskRepository`. Consumers (API, agents, background services) can request the repository via DI and receive the DbContext + logger-enabled implementation automatically.
-
-- **Interfaces/Implementation**: `EvoAITest.Core/Repositories/IAutomationTaskRepository.cs` + `AutomationTaskRepository.cs`
-- **Registration**: `AddEvoAITestCore` always registers `IAutomationTaskRepository`; ensure DbContext is configured for repository functionality.
-- **Capabilities**:
-  - Get tasks by id/user/status/composite index (UserId + Status)
-  - CRUD operations with timestamp management + concurrency handling
-  - Execution history queries + inserts (cascade delete preserved)
-  - Telemetry-friendly logging, argument validation, and meaningful exception messages
-- **Unit Tests**: `EvoAITest.Tests/Repositories/AutomationTaskRepositoryTests.cs` (30 specs) cover constructor guards, query behaviors, CRUD flows, cascade deletes, and concurrency handling.
-
-### Usage Example
-
-```csharp
-public sealed class TaskService
-{
-    private readonly IAutomationTaskRepository _tasks;
-
-    public TaskService(IAutomationTaskRepository tasks) => _tasks = tasks;
-
-    public async Task<IReadOnlyList<AutomationTask>> GetPendingAsync(string userId, CancellationToken ct)
-        => await _tasks.GetByUserIdAndStatusAsync(userId, TaskStatus.Pending, ct);
-}
-```
-
-## Features
-
-- ? Browser-agnostic design
-- ? Multiple element locator strategies
-- ? Rich execution diagnostics
-- ? Screenshot capture
-- ? DOM state extraction
-- ? Console message monitoring
-- ? Network request tracking
-- ? Cookie management
-- ? OpenTelemetry ready
-
-## Next Steps
-
-- Implement `IBrowserDriver` for your browser automation library (Playwright, Selenium, etc.)
-- Implement `IPageAnalyzer` for intelligent page analysis
-- Use with EvoAITest.Agents for AI-powered automation
+**Version:** 1.0  
+**Last Updated:** January 2026

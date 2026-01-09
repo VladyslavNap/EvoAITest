@@ -5,6 +5,10 @@
 
 LLM provider abstractions for AI-powered browser automation with intelligent multi-model routing, circuit breaker pattern, and secure secret management.
 
+> 📚 **[Complete Documentation](../docs/LLM_INTEGRATION_GUIDE.md)** | 🚀 **[Quick Start](#quick-start)** | 🏗️ **[Architecture](../docs/LLM_ROUTING_ARCHITECTURE.md)**
+
+---
+
 ## 🌟 What's New in v2.0
 
 - **✅ Intelligent LLM Routing** - Automatically route requests to optimal models based on task type or cost
@@ -14,9 +18,71 @@ LLM provider abstractions for AI-powered browser automation with intelligent mul
 - **✅ Real-time Streaming** - Bidirectional streaming via SignalR for responsive UIs
 - **✅ Cost Optimization** - Smart routing to minimize LLM costs while maintaining quality
 
+---
+
 ## Overview
 
 EvoAITest.LLM provides a production-ready, enterprise-grade abstraction layer for integrating Large Language Models into browser automation workflows. The library features intelligent routing that automatically selects the best model for each task, circuit breaker resilience for automatic failover, and comprehensive observability.
+
+## Quick Start
+
+### 1. Add Package Reference
+
+```bash
+dotnet add reference ../EvoAITest.LLM/EvoAITest.LLM.csproj
+```
+
+### 2. Register Services
+
+```csharp
+// In Program.cs
+builder.Services.AddLLMServices(builder.Configuration);
+```
+
+### 3. Basic Configuration
+
+```json
+{
+  "EvoAITest": {
+    "Core": {
+      "LLMProvider": "AzureOpenAI",
+      "AzureOpenAIEndpoint": "https://your-resource.openai.azure.com/",
+      "AzureOpenAIDeployment": "gpt-4",
+      "EnableMultiModelRouting": true
+    }
+  }
+}
+```
+
+### 4. Use the Provider
+
+```csharp
+public class MyService
+{
+    private readonly ILLMProvider _llmProvider;
+
+    public MyService(ILLMProvider llmProvider)
+    {
+        _llmProvider = llmProvider;
+    }
+
+    public async Task<string> GenerateCodeAsync(string prompt)
+    {
+        var request = new LLMRequest
+        {
+            Messages = new List<Message>
+            {
+                new() { Role = MessageRole.User, Content = prompt }
+            }
+        };
+
+        var response = await _llmProvider.CompleteAsync(request);
+        return response.Content;
+    }
+}
+```
+
+---
 
 ## Key Features
 
@@ -43,6 +109,8 @@ EvoAITest.LLM provides a production-ready, enterprise-grade abstraction layer fo
 - **Structured Logging**: Comprehensive diagnostic information
 - **Cost Tracking**: Token usage and cost estimation
 - **Performance Metrics**: Latency, success rates, circuit breaker states
+
+---
 
 ## Architecture
 
@@ -74,6 +142,8 @@ EvoAITest.LLM provides a production-ready, enterprise-grade abstraction layer fo
   Azure         Ollama
   OpenAI       (Local)
 ```
+
+---
 
 ## Key Components
 
