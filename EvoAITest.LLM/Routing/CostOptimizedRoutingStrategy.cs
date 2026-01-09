@@ -166,13 +166,11 @@ public sealed class CostOptimizedRoutingStrategy : IRoutingStrategy
                 route.Enabled &&
                 route.MinimumQuality >= minQuality &&
                 route.CostPer1KTokens.HasValue &&
-                !applicable.ContainsKey(routeName))
+                !applicable.ContainsKey(routeName) &&
+                IsReasonableAlternative(taskType, routeName))
             {
                 // Only add if it's a reasonable alternative
-                if (IsReasonableAlternative(taskType, routeName))
-                {
-                    applicable[routeName] = route;
-                }
+                applicable[routeName] = route;
             }
         }
 
