@@ -360,13 +360,11 @@ public sealed class CircuitBreakerLLMProvider : ILLMProvider
             _status = _status.WithSuccess();
 
             // Handle state transitions
-            if (oldState == CircuitBreaker.CircuitBreakerState.HalfOpen)
+            if (oldState == CircuitBreaker.CircuitBreakerState.HalfOpen &&
+                _status.SuccessCount >= _options.SuccessThresholdInHalfOpen)
             {
                 // Successful request in Half-Open state
-                if (_status.SuccessCount >= _options.SuccessThresholdInHalfOpen)
-                {
-                    TransitionToClosed();
-                }
+                TransitionToClosed();
             }
         }
     }
