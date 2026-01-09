@@ -103,6 +103,10 @@ public sealed class RoutingLLMProvider : ILLMProvider
         }
 
         // Execute the request
+        if (provider == null)
+        {
+            throw new InvalidOperationException("Resolved LLM provider instance is null after routing logic.");
+        }
         try
         {
             var response = await provider.GenerateAsync(
