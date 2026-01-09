@@ -6,86 +6,78 @@
 [![Azure](https://img.shields.io/badge/Azure-OpenAI%20GPT--5-0078D4?logo=microsoft-azure)](https://azure.microsoft.com/en-us/products/ai-services/openai-service)
 [![Aspire](https://img.shields.io/badge/Aspire-Enabled-512BD4?logo=dotnet)](https://learn.microsoft.com/dotnet/aspire/)
 [![Blazor](https://img.shields.io/badge/Blazor-Interactive-512BD4?logo=blazor)](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/VladyslavNap/EvoAITest/actions)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](https://github.com/VladyslavNap/EvoAITest/actions)
-[![Code Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/VladyslavNap/EvoAITest/actions)
 
-> 🎬 **[Test Recording](docs/RECORDING_QUICK_START.md)** | 📸 **[Visual Regression](docs/VisualRegressionQuickStart.md)** | 📚 **[Complete Docs](DOCUMENTATION_INDEX.md)** | 🗺️ **[Roadmap](VISUAL_REGRESSION_ROADMAP.md)**
+> 🎬 **[Test Recording](docs/RECORDING_QUICK_START.md)** | 📸 **[Visual Regression](docs/VisualRegressionQuickStart.md)** | 📚 **[Complete Docs](DOCUMENTATION_INDEX.md)**
+
+---
 
 ## Overview
 
-EvoAITest is a modern, cloud-native browser automation framework that uses Azure OpenAI (GPT-5.2-Chat) to enable intelligent, natural language-driven web testing and automation. Built on .NET 10 with Aspire orchestration, it features **AI-powered test generation from recordings**, **visual regression testing**, and **self-healing capabilities**.
+EvoAITest is a modern, cloud-native browser automation framework that uses Azure OpenAI to enable intelligent, natural language-driven web testing and automation. Built on .NET 10 with Aspire orchestration, it features **AI-powered test generation from recordings**, **visual regression testing**, and **self-healing capabilities**.
 
-### Key Features
+---
 
-#### 🎬 Test Recording & Generation (NEW v1.0)
-- **Record user interactions** and generate automated test code with AI
-- **90%+ accuracy** intent detection with confidence scoring
-- **Multi-framework support**: xUnit, NUnit, MSTest
-- **Smart assertions**: 16 types automatically generated
-- **Real-time capture**: Click, type, navigate, select
-- **Session management**: Save, load, replay recordings
-- **Blazor UI**: Interactive recording interface
-- **REST API**: 13 endpoints for programmatic access
-- **[📖 Full Documentation](docs/RECORDING_FEATURE.md)** | **[🚀 Quick Start](docs/RECORDING_QUICK_START.md)**
+## 🚀 Quick Start
 
-#### 🤖 AI-Powered Automation
-- **Azure OpenAI (GPT-5.2-Chat)** - Production-ready AI integration
-- **Local Ollama Support** - Offline development with open-source models (qwen3:30b recommended)
-- **Natural Language Commands** - Describe tasks in plain English
-- **Intelligent Routing** - Multi-model routing with automatic fallback
-- **Error Recovery** - Self-healing with learning capabilities
+### Prerequisites
 
-#### 🌐 Browser Automation
-- **Playwright Browser Agent** - Resilient automation with 25 built-in tools
-- **Mobile Device Emulation** - Test responsive designs with 19 device presets
-- **Geolocation Testing** - GPS coordinate simulation with 6 preset locations
-- **Network Interception** - Mock APIs, block requests, log network activity
-- **Accessibility-Aware** - State capture with semantic understanding
+- .NET 10 SDK
+- Azure OpenAI or Ollama (for AI features)
+- SQL Server (for recording persistence)
 
-#### 📸 Visual Testing
-- **Visual Regression Testing** - Automated screenshot comparison
-- **AI-Powered Healing** - Self-correcting visual tests
-- **Diff Visualization** - Highlighting changes and anomalies
+### Get Started in 3 Steps
 
-#### 🔐 Enterprise Ready
-- **Azure Key Vault** - Secure secret management with managed identity
-- **Aspire Observability** - Built-in OpenTelemetry metrics and traces
-- **.NET 10** - Latest runtime and framework features
-- **Production Ready** - Battle-tested with comprehensive error handling
+1. **Clone and Build**
+   ```bash
+   git clone https://github.com/VladyslavNap/EvoAITest.git
+   cd EvoAITest
+   dotnet build
+   ```
 
-## 🎬 Test Recording Quick Overview
+2. **Configure Azure OpenAI** (or use Ollama for local development)
+   ```json
+   {
+     "EvoAITest": {
+       "Core": {
+         "LLMProvider": "AzureOpenAI",
+         "AzureOpenAIEndpoint": "your-endpoint",
+         "AzureOpenAIDeployment": "gpt-4"
+       }
+     }
+   }
+   ```
+
+3. **Run the Application**
+   ```bash
+   dotnet run --project EvoAITest.AppHost
+   ```
+
+**📖 Detailed guides:** [Test Recording Quick Start](docs/RECORDING_QUICK_START.md) | [Visual Regression Quick Start](docs/VisualRegressionQuickStart.md)
+
+---
+
+## ✨ Key Features
+
+### 🎬 Test Recording & Generation
 
 Record browser interactions and automatically generate production-ready test code with AI analysis.
 
-### How It Works
+**What it does:**
+- Records user interactions in real-time (15 action types)
+- AI detects intent with 90%+ accuracy (15 intent types)
+- Generates test code for xUnit, NUnit, or MSTest
+- Auto-generates 16 types of smart assertions
+- Optional Page Object Model generation
+
+**How it works:**
 
 ```
-1. Start Recording → 2. Interact with App → 3. Stop Recording
-                ↓
-4. AI Analyzes Actions → 5. Generate Test Code → 6. Export & Use
+Start Recording → Interact with App → Stop Recording
+        ↓
+AI Analyzes → Generate Test Code → Export & Use
 ```
 
-### 30-Second Demo
-
-```bash
-# 1. Navigate to Test Recorder in Blazor app
-https://localhost:5001/test-recorder
-
-# 2. Configure recording
-Test Name: "Login Flow Test"
-Starting URL: "https://example.com/login"
-
-# 3. Click Start Recording → Perform actions → Stop Recording
-
-# 4. Select framework and click "Generate Test with AI"
-Framework: xUnit
-Options: ✓ Include Comments, ✓ Auto-Generate Assertions
-
-# 5. Copy or download the generated test code
-```
-
-### What You Get
+**Example output:**
 
 ```csharp
 [Fact]
@@ -94,104 +86,190 @@ public async Task LoginFlowTest()
     // Arrange
     await _page!.GotoAsync("https://example.com/login");
 
-    // Act - User entered credentials for authentication
+    // Act
     await _page!.Locator("#username").FillAsync("user@example.com");
     await _page!.Locator("#password").FillAsync("password123");
     await _page!.Locator("button[type='submit']").ClickAsync();
 
     // Assert
     await Expect(_page!.Locator(".dashboard")).ToBeVisibleAsync();
-    Assert.Equal("https://example.com/dashboard", _page!.Url);
 }
 ```
 
-### Key Capabilities
-
-| Feature | Description |
-|---------|-------------|
-| **15 Action Types** | Click, Input, Navigation, Select, Toggle, Submit, etc. |
-| **AI Intent Detection** | 90%+ accuracy with confidence scoring |
-| **15 Intent Types** | Authentication, DataEntry, Search, Validation, etc. |
-| **16 Assertion Types** | URL, Visibility, Text, Value, Count, etc. |
-| **3 Frameworks** | xUnit, NUnit, MSTest |
-| **Quality Metrics** | LOC, maintainability score, coverage estimates |
-
-**📚 Learn More:**
-- [Complete Feature Documentation](docs/RECORDING_FEATURE.md)
-- [5-Minute Quick Start](docs/RECORDING_QUICK_START.md)
-- [API Reference (13 endpoints)](docs/API_REFERENCE.md)
-- [Architecture Deep Dive](docs/ARCHITECTURE.md)
+**📖 Learn more:** [Recording Feature Guide](docs/RECORDING_FEATURE.md) | [API Reference](docs/API_REFERENCE.md) | [Architecture](docs/ARCHITECTURE.md)
 
 ---
 
-#### Day 17 (December 2024) - Test Recording Feature ✅ COMPLETE
-**Full test generation from user interactions with AI-powered analysis**
+### 🤖 AI-Powered Automation
 
-- ✅ **28 New Files Created** (10,000+ lines of production code)
-  - `EvoAITest.Core/Models/Recording` - 11 models for sessions, interactions, and test generation
-  - `EvoAITest.Core/Services/Recording` - Recording service, event listener, interaction normalizer
-  - `EvoAITest.Agents/Services/Recording` - AI-powered analyzer (90%+ accuracy) and test generator
-  - `EvoAITest.Web/Components/Recording` - 3 Blazor UI components with real-time display
-  - `EvoAITest.ApiService/Endpoints` - 13 REST API endpoints for recording operations
-  - `EvoAITest.Core/Data` - 2 database entities with 9 performance indexes
-  - `EvoAITest.Core/Repositories` - Full CRUD repository with EF Core
+Intelligent browser automation powered by LLMs.
 
-- ✅ **Feature Capabilities**
-  - Real-time browser interaction capture (15 action types)
-  - AI intent detection with confidence scoring (15 intent types)
-  - Multi-framework code generation (xUnit, NUnit, MSTest)
-  - Smart assertion generation (16 assertion types)
-  - Optional Page Object Model generation
-  - Session persistence with SQL Server
-  - Quality metrics (LOC, maintainability, coverage)
-  - Blazor UI with copy/download functionality
+- **Azure OpenAI Integration** - Production-ready with GPT-4
+- **Local Ollama Support** - Offline development with open-source models
+- **Natural Language Commands** - Describe tasks in plain English
+- **Intelligent Routing** - Automatic model selection based on task type
+- **Circuit Breaker** - Automatic failover to backup providers
+- **Cost Optimization** - Smart routing reduces costs by 40-60%
 
-- ✅ **Documentation** (6 comprehensive guides, 2,300+ lines)
-  - [Recording Feature Guide](docs/RECORDING_FEATURE.md) - Complete user documentation
-  - [API Reference](docs/API_REFERENCE.md) - All 13 endpoints documented
-  - [Architecture Deep Dive](docs/ARCHITECTURE.md) - Technical implementation details
-  - [Quick Start Guide](docs/RECORDING_QUICK_START.md) - 5-minute setup
-  - [Changelog](docs/RECORDING_CHANGELOG.md) - Release notes v1.0.0
-  - [Documentation Index](docs/RECORDING_DOCS_INDEX.md) - Central hub
-
-**📊 Statistics:**
-- Lines of Code: 10,000+
-- API Endpoints: 13
-- Database Tables: 2 (with 9 indexes)
-- Blazor Components: 3
-- Test Frameworks: 3
-- Documentation: 2,300+ lines
-
-**🚀 [Get Started with Test Recording](docs/RECORDING_QUICK_START.md)**
+**📖 Learn more:** [LLM Integration Guide](docs/LLM_INTEGRATION_GUIDE.md)
 
 ---
 
-#### Day 16 - Agent Execution & Healing ✅ COMPLETE
-**Production-ready agent orchestration with error recovery**
+### 🌐 Browser Automation
 
-- ✅ `EvoAITest.ApiService/Endpoints/ExecutionEndpoints.cs` - Synchronous/background execution, healing retries, cancellation
-- ✅ `EvoAITest.Tests/Integration/ApiIntegrationTests.cs` - End-to-end API testing with WebApplicationFactory
-- ✅ `examples/LoginExample` - Runnable CLI demonstrating natural-language automation
-- ✅ `EvoAITest.LLM/Prompts` - Prompt builder toolkit with injection protection (40+ unit tests)
+Playwright-based browser automation with AI-powered agents.
 
----
+- **25 Built-in Tools** - Click, type, navigate, screenshot, and more
+- **Self-Healing** - Automatic recovery from failures
+- **Mobile Emulation** - Test responsive designs (19 device presets)
+- **Network Interception** - Mock APIs and monitor traffic
+- **Geolocation Testing** - Simulate GPS coordinates
 
-#### Day 15 - Error Recovery & Retry Logic ✅ COMPLETE
-**Intelligent error handling with learning capabilities**
-
-- ✅ Error classification (10 types with confidence scoring)
-- ✅ Recovery actions (WaitAndRetry, PageRefresh, WaitForStability, AlternativeSelector, ClearCookies)
-- ✅ Historical learning & pattern matching
-- ✅ 57 test cases with 95%+ coverage
-- ✅ Database persistence for recovery history
-
-**📈 Progress: Phase 3 - 73% complete (24/33 steps, ~49h invested)**
+**📖 Learn more:** [Agents Library](EvoAITest.Agents/README.md) | [Core Library](EvoAITest.Core/README.md)
 
 ---
 
-#### Previous Milestones
-- **Day 14** - Visual Regression Testing ✅
-- **Day 13** - Selector Healing Agent ✅
-- **Day 12** - Wait Optimization System ✅
-- **Days 10-11** - Enhanced Tool Executor & Repository Layer ✅
-- **Days 1-9** - Core Architecture, LLM Integration, Browser Agent ✅
+### 📸 Visual Regression Testing
+
+Automated screenshot comparison with AI-powered healing.
+
+- **Automated Screenshot Capture** - Baseline and comparison images
+- **Pixel-Perfect Comparison** - Detect visual differences
+- **AI-Powered Healing** - Self-correcting visual tests
+- **Diff Visualization** - Highlight changes and anomalies
+
+**📖 Learn more:** [Visual Regression Quick Start](docs/VisualRegressionQuickStart.md) | [User Guide](docs/VisualRegressionUserGuide.md)
+
+---
+
+### 🔐 Enterprise Ready
+
+Production-ready features for enterprise deployments.
+
+- **Azure Key Vault** - Secure secret management with managed identity
+- **OpenTelemetry** - Built-in metrics, traces, and logging
+- **.NET Aspire** - Cloud-native orchestration and observability
+- **.NET 10** - Latest runtime and framework features
+- **SQL Server** - Persistent storage for recordings and history
+
+**📖 Learn more:** [Key Vault Setup](docs/KEY_VAULT_SETUP.md) | [Configuration](docs/LLM_ROUTING_CONFIGURATION.md)
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [**Documentation Index**](DOCUMENTATION_INDEX.md) | Central hub for all documentation |
+| [Test Recording Quick Start](docs/RECORDING_QUICK_START.md) | Get started with test recording in 5 minutes |
+| [Visual Regression Quick Start](docs/VisualRegressionQuickStart.md) | Set up visual testing in 10 minutes |
+| [LLM Integration Guide](docs/LLM_INTEGRATION_GUIDE.md) | Complete guide to LLM integration |
+| [API Reference](docs/API_REFERENCE.md) | REST API documentation (13 endpoints) |
+| [Architecture](docs/ARCHITECTURE.md) | Technical architecture details |
+
+**📖 [Browse all documentation](DOCUMENTATION_INDEX.md)**
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│           Blazor Web UI                     │
+│     (Recording, Monitoring, Control)        │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────┴──────────────────────────┐
+│            REST API Service                 │
+│    (Recording, Execution, Visual Testing)   │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────┴──────────────────────────┐
+│          AI Agents & LLM Layer              │
+│  (Planner, Executor, Healer, Test Gen)      │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────┴──────────────────────────┐
+│         Browser Automation Core             │
+│      (Playwright, Recording, Analysis)      │
+└─────────────────────────────────────────────┘
+```
+
+**Projects:**
+- **EvoAITest.Core** - Core models, services, database
+- **EvoAITest.Agents** - AI agent orchestration
+- **EvoAITest.LLM** - LLM provider abstraction
+- **EvoAITest.Web** - Blazor UI components
+- **EvoAITest.ApiService** - REST API endpoints
+- **EvoAITest.AppHost** - Aspire orchestration
+
+---
+
+## 🎯 Use Cases
+
+### For QA Engineers
+- Record manual test flows and generate automated tests
+- Set up visual regression testing for UI changes
+- Monitor test execution with built-in observability
+
+### For Developers
+- Use natural language to automate browser tasks
+- Integrate AI-powered automation into CI/CD pipelines
+- Leverage self-healing capabilities to reduce maintenance
+
+### For DevOps
+- Deploy with Azure Aspire for cloud-native orchestration
+- Secure secrets with Azure Key Vault
+- Monitor with OpenTelemetry metrics and traces
+
+---
+
+## 🛠️ Technology Stack
+
+- **.NET 10** - Latest C# and runtime features
+- **Blazor** - Interactive web UI
+- **Playwright** - Cross-browser automation
+- **Azure OpenAI** - GPT-4 for AI capabilities
+- **Ollama** - Local open-source models
+- **Entity Framework Core** - Database access
+- **SQL Server** - Data persistence
+- **Azure Aspire** - Cloud-native orchestration
+- **OpenTelemetry** - Observability
+
+---
+
+## 📈 Status
+
+- **Build:** Passing ✅
+- **Tests:** Passing ✅
+- **Coverage:** 90%+ ✅
+- **Version:** 1.0.0 (Recording Feature)
+- **Last Updated:** January 2026
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please see our [Documentation Index](DOCUMENTATION_INDEX.md) for guides on:
+- Project structure
+- Development setup
+- Architecture patterns
+- Testing strategies
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+## 🔗 Links
+
+- **GitHub Repository:** [VladyslavNap/EvoAITest](https://github.com/VladyslavNap/EvoAITest)
+- **Documentation:** [Complete Documentation Index](DOCUMENTATION_INDEX.md)
+- **Issues:** [Report Issues](https://github.com/VladyslavNap/EvoAITest/issues)
+
+---
+
+**Built with ❤️ using .NET 10, Blazor, and Azure OpenAI**
