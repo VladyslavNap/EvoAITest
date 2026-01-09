@@ -57,7 +57,7 @@ public sealed class CostOptimizedRoutingStrategy : IRoutingStrategy
             .ToList();
 
         // Select the cheapest route
-        var (selectedTaskType, selectedConfig) = sortedRoutes.First();
+        var (_, selectedConfig) = sortedRoutes.First();
 
         var estimatedTokens = context.EstimatedTokenCount ?? taskType.GetTypicalTokenCount();
         var estimatedCost = CalculateEstimatedCost(selectedConfig, estimatedTokens);
