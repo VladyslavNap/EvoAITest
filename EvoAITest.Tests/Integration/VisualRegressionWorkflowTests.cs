@@ -53,13 +53,13 @@ public sealed class VisualRegressionWorkflowTests : IDisposable
 
         // Add file storage
         services.AddSingleton<IFileStorageService>(sp =>
-            new Core.Services.LocalFileStorageService(
-                sp.GetRequiredService<ILogger<Core.Services.LocalFileStorageService>>(),
+            new EvoAITest.Core.Services.LocalFileStorageService(
+                sp.GetRequiredService<ILogger<EvoAITest.Core.Services.LocalFileStorageService>>(),
                 _testDirectory));
 
         // Add visual comparison services
-        services.AddScoped<Core.Services.VisualComparisonEngine>();
-        services.AddScoped<IVisualComparisonService, Core.Services.VisualComparisonService>();
+        services.AddScoped<EvoAITest.Core.Services.VisualComparisonEngine>();
+        services.AddScoped<IVisualComparisonService, EvoAITest.Core.Services.VisualComparisonService>();
 
         _serviceProvider = services.BuildServiceProvider();
         _dbContext = _serviceProvider.GetRequiredService<EvoAIDbContext>();
@@ -373,7 +373,7 @@ public sealed class VisualRegressionWorkflowTests : IDisposable
             Name = "Workflow Test Task",
             Description = "Test task for workflow testing",
             UserId = "test-user",
-            Status = Core.Models.TaskStatus.Pending,
+            Status = EvoAITest.Core.Models.TaskStatus.Pending,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };

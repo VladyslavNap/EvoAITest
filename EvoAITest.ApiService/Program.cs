@@ -7,6 +7,11 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Note: Azure Key Vault configuration integration is handled via
+// ISecretProvider abstraction registered in AddEvoAITestCore().
+// Secrets are retrieved programmatically rather than added to configuration.
+// This provides better control over caching, retry logic, and error handling.
+
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
@@ -22,8 +27,23 @@ builder.Services.AddAgentServices();
 // Add services to the container.
 builder.Services.AddProblemDetails();
 
+// Add SignalR for real-time LLM streaming
+builder.Services.AddSignalR();
+
 // Add controllers for Visual Regression API
 builder.Services.AddControllers();
+
+// Add CORS for SignalR connections from Blazor Web
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowBlazorWeb", policy =>
+    {
+        policy.WithOrigins("https://localhost:7045", "http://localhost:5254") // Blazor Web URLs
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Required for SignalR
+    });
+});
 
 // Add authentication and authorization for API endpoints.
 // In production, configure a proper authentication scheme (e.g., JWT Bearer).
@@ -48,6 +68,9 @@ if (app.Environment.IsDevelopment())
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
 
+// Enable CORS
+app.UseCors("AllowBlazorWeb");
+
 // Enable authentication and authorization middleware.
 // Note: In development, requests without authentication will fall back to "anonymous-user".
 // In production, configure proper authentication (e.g., JWT Bearer) to secure endpoints.
@@ -61,6 +84,9 @@ if (app.Environment.IsDevelopment())
 
 // Map controllers (includes VisualRegressionController)
 app.MapControllers();
+
+// Map SignalR hub for LLM streaming
+app.MapHub<EvoAITest.ApiService.Hubs.LLMStreamingHub>("/hubs/llm-streaming");
 
 // Map API endpoints
 app.MapTaskEndpoints();

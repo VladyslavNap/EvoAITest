@@ -9,6 +9,8 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using AgentTaskType = EvoAITest.Agents.Models.TaskType;
+using LLMTaskType = EvoAITest.LLM.Models.TaskType;
 
 namespace EvoAITest.Tests.Agents;
 
@@ -98,7 +100,7 @@ public sealed class PlannerAgentTests
             Id = "task-1",
             Description = "Login to example.com with username test@example.com and password SecurePass123",
             StartUrl = "https://example.com/login",
-            Type = TaskType.Authentication
+            Type = AgentTaskType.Authentication
         };
 
         var context = new EvoAITest.Agents.Abstractions.ExecutionContext
@@ -212,7 +214,7 @@ public sealed class PlannerAgentTests
             Id = "task-complex",
             Description = "Complete a multi-step form with name, email, phone, address and submit",
             StartUrl = "https://example.com/form",
-            Type = TaskType.FormSubmission,
+            Type = AgentTaskType.FormSubmission,
             Parameters = new Dictionary<string, object>
             {
                 ["name"] = "John Doe",

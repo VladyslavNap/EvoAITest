@@ -306,7 +306,7 @@ public sealed class VisualRegressionApiTests : IDisposable
             Name = "Test Task",
             Description = "Test task for visual regression",
             UserId = "test-user",
-            Status = Core.Models.TaskStatus.Pending,
+            Status = EvoAITest.Core.Models.TaskStatus.Pending,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
             VisualCheckpoints = JsonSerializer.Serialize(checkpoints)

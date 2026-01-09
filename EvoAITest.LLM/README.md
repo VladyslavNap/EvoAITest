@@ -1,17 +1,86 @@
-# BrowserAI LLM Library
+# EvoAITest.LLM - Advanced LLM Integration Library
 
-LLM provider abstractions for AI-powered browser automation. Day 7 introduced production-ready `AzureOpenAIProvider` and developer-friendly `OllamaProvider`, both resolved through the configurable `LLMProviderFactory`.
+**Version:** 2.0 with Intelligent Routing & Resilience  
+**Status:** Production Ready ✅
+
+LLM provider abstractions for AI-powered browser automation with intelligent multi-model routing, circuit breaker pattern, and secure secret management.
+
+## 🌟 What's New in v2.0
+
+- **✅ Intelligent LLM Routing** - Automatically route requests to optimal models based on task type or cost
+- **✅ Circuit Breaker Pattern** - Automatic failover to backup providers when primary fails
+- **✅ Azure Key Vault Integration** - Secure API key and secret management
+- **✅ Multi-Model Support** - Seamlessly switch between Azure OpenAI, Ollama, and local models
+- **✅ Real-time Streaming** - Bidirectional streaming via SignalR for responsive UIs
+- **✅ Cost Optimization** - Smart routing to minimize LLM costs while maintaining quality
 
 ## Overview
 
-EvoAITest.LLM provides unified interfaces for integrating Large Language Models into browser automation workflows. The module now includes first-party providers (Azure OpenAI + Ollama) plus a factory that selects the correct implementation via the `EvoAITest:Core` configuration section.
+EvoAITest.LLM provides a production-ready, enterprise-grade abstraction layer for integrating Large Language Models into browser automation workflows. The library features intelligent routing that automatically selects the best model for each task, circuit breaker resilience for automatic failover, and comprehensive observability.
+
+## Key Features
+
+### 🎯 Intelligent Routing
+- **Task-Based Routing**: Routes code generation, planning, analysis tasks to specialized models
+- **Cost-Optimized Routing**: Minimizes costs by using cheaper models where appropriate
+- **Latency-Aware**: Considers response time requirements for route selection
+- **Custom Strategies**: Extensible routing strategy pattern
+
+### 🔄 Resilience & Reliability
+- **Circuit Breaker**: Automatic failover when providers become unhealthy
+- **Retry Logic**: Exponential backoff with jitter for transient failures
+- **Health Monitoring**: Tracks provider availability and performance
+- **Graceful Degradation**: Falls back to alternative providers seamlessly
+
+### 🔐 Security
+- **Azure Key Vault**: Secure storage for API keys and secrets
+- **Managed Identity**: Support for Azure managed identities
+- **Secret Rotation**: Hot-reload secrets without downtime
+- **No-Op Provider**: Development mode without cloud dependencies
+
+### 📊 Observability
+- **OpenTelemetry**: Built-in metrics and distributed tracing
+- **Structured Logging**: Comprehensive diagnostic information
+- **Cost Tracking**: Token usage and cost estimation
+- **Performance Metrics**: Latency, success rates, circuit breaker states
+
+## Architecture
+
+```
+┌─────────────────┐
+│ Client Request  │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│  RoutingLLMProvider     │  ◄─── Task Type Detection
+│  (Intelligent Router)   │  ◄─── Cost Optimization
+└──────────┬──────────────┘
+           │
+           ▼
+┌───────────────────────────┐
+│ CircuitBreakerLLMProvider │  ◄─── Health Monitoring
+│ (Resilience Layer)        │  ◄─── Automatic Failover
+└──────────┬────────────────┘
+           │
+     ┌─────┴─────┐
+     ▼           ▼
+┌─────────┐  ┌──────────┐
+│ Primary │  │ Fallback │
+│Provider │  │ Provider │
+└─────────┘  └──────────┘
+     │            │
+     ▼            ▼
+  Azure         Ollama
+  OpenAI       (Local)
+```
 
 ## Key Components
 
 ### Abstractions
 
 #### ILLMProvider
-Unified interface for LLM providers:
+Unified interface for all LLM providers:
 
 ```csharp
 public interface ILLMProvider
