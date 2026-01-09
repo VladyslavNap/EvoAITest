@@ -122,19 +122,18 @@ public sealed class TaskBasedRoutingStrategy : IRoutingStrategy
     {
         // If context prefers speed and we have a fallback, consider swapping
         // (This is a simple example - real implementation might be more sophisticated)
-        if (context.PreferSpeed && baseConfig.FallbackProvider != null)
+        if (context.PreferSpeed &&
+            baseConfig.FallbackProvider != null &&
+            IsLikelyFaster(baseConfig.FallbackProvider, baseConfig.PrimaryProvider))
         {
             // Check if fallback is likely faster (e.g., local Ollama vs cloud OpenAI)
-            if (IsLikelyFaster(baseConfig.FallbackProvider, baseConfig.PrimaryProvider))
-            {
-                _logger.LogDebug(
-                    "Context prefers speed, considering fallback {Fallback} over primary {Primary}",
-                    baseConfig.FallbackProvider,
-                    baseConfig.PrimaryProvider);
+            _logger.LogDebug(
+                "Context prefers speed, considering fallback {Fallback} over primary {Primary}",
+                baseConfig.FallbackProvider,
+                baseConfig.PrimaryProvider);
 
-                // Note: In a real implementation, we'd create a new RouteConfiguration
-                // For now, we'll just log the consideration
-            }
+            // Note: In a real implementation, we'd create a new RouteConfiguration
+            // For now, we'll just log the consideration
         }
 
         return baseConfig;
