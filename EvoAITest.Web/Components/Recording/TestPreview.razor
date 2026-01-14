@@ -1,4 +1,5 @@
 @using EvoAITest.Core.Models.Recording
+@using EvoAITest.Core.Models.Execution
 @using EvoAITest.Core.Abstractions
 @using Microsoft.AspNetCore.SignalR.Client
 @inject IJSRuntime JSRuntime
@@ -59,6 +60,70 @@
         white-space: pre-wrap;
         word-wrap: break-word;
     }
+
+    .execution-result {
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+
+    .result-summary {
+        padding: 15px;
+        border-radius: 4px;
+        border-left: 4px solid;
+    }
+
+    .result-summary.passed {
+        background: #d4edda;
+        border-color: #28a745;
+    }
+
+    .result-summary.failed {
+        background: #f8d7da;
+        border-color: #dc3545;
+    }
+
+    .result-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .result-icon {
+        font-size: 24px;
+    }
+
+    .result-status {
+        font-size: 18px;
+        text-transform: uppercase;
+    }
+
+    .result-duration {
+        margin-left: auto;
+        color: #666;
+    }
+
+    .result-details {
+        margin: 10px 0;
+    }
+
+    .error-message {
+        background: #fff;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+        color: #dc3545;
+        font-size: 12px;
+    }
+
+    .result-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
 </style>
 
 <div class="test-preview-container">
@@ -82,6 +147,9 @@
                 </button>
                 <button class="btn btn-primary" @onclick="DownloadTest">
                     <span class="icon">??</span> Download
+                </button>
+                <button class="btn btn-success" @onclick="RunTest" disabled="@isExecutingTest">
+                    <span class="icon">??</span> @(isExecutingTest ? "Running..." : "Run Test")
                 </button>
                 @if (OnEditRequested.HasDelegate)
                 {
@@ -277,6 +345,47 @@
             @statusMessage
         </div>
     }
+
+    @* Test execution result display *@
+    @if (executionResult != null)
+    {
+        <div class="execution-result mt-3">
+            <h4>Test Execution Result</h4>
+            <div class="result-summary @GetResultCssClass(executionResult.Status)">
+                <div class="result-header">
+                    <span class="result-icon">@GetResultIcon(executionResult.Status)</span>
+                    <span class="result-status">@executionResult.Status</span>
+                    <span class="result-duration">@executionResult.DurationMs ms</span>
+                </div>
+                
+                @if (executionResult.Status == TestExecutionStatus.Passed)
+                {
+                    <div class="result-details">
+                        <p>? All @executionResult.TotalSteps steps passed</p>
+                    </div>
+                }
+                else if (executionResult.Status == TestExecutionStatus.Failed)
+                {
+                    <div class="result-details">
+                        <p>? @executionResult.FailedSteps of @executionResult.TotalSteps steps failed</p>
+                        @if (!string.IsNullOrEmpty(executionResult.ErrorMessage))
+                        {
+                            <pre class="error-message">@executionResult.ErrorMessage</pre>
+                        }
+                    </div>
+                }
+                
+                <div class="result-actions">
+                    <button class="btn btn-sm btn-secondary" @onclick="ViewExecutionDetails">
+                        View Details
+                    </button>
+                    <button class="btn btn-sm btn-primary" @onclick="RunTest">
+                        Run Again
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
@@ -286,6 +395,8 @@
     private bool isStreaming = false;
     private bool streamingSupported = true;
     private string streamingContent = string.Empty;
+    private bool isExecutingTest = false;
+    private TestExecutionResult? executionResult = null;
 
     [Parameter]
     public GeneratedTest? GeneratedTest { get; set; }
@@ -295,6 +406,9 @@
 
     [Parameter]
     public EventCallback<GeneratedTest> OnEditRequested { get; set; }
+
+    [Inject]
+    private HttpClient HttpClient { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -394,6 +508,86 @@
         }
         
         isStreaming = false;
+    }
+
+    private async Task RunTest()
+    {
+        if (Session == null)
+        {
+            statusMessage = "No recording session available";
+            return;
+        }
+
+        try
+        {
+            isExecutingTest = true;
+            statusMessage = "Executing test...";
+            executionResult = null;
+            StateHasChanged();
+
+            // Call API to execute test from recording
+            var response = await HttpClient.PostAsJsonAsync(
+                $"/api/test-execution/recordings/{Session.Id}/execute",
+                new
+                {
+                    TestFramework = Session.TestFramework,
+                    Browser = Session.Browser,
+                    Headless = true,
+                    CaptureScreenshots = true
+                });
+
+            if (response.IsSuccessStatusCode)
+            {
+                executionResult = await response.Content.ReadFromJsonAsync<TestExecutionResult>();
+                statusMessage = $"Test execution completed: {executionResult?.Status}";
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                statusMessage = $"Test execution failed: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error executing test: {ex.Message}";
+        }
+        finally
+        {
+            isExecutingTest = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ViewExecutionDetails()
+    {
+        if (executionResult != null)
+        {
+            // Navigate to execution details page
+            Navigation.NavigateTo($"/test-execution/results/{executionResult.Id}");
+        }
+    }
+
+    private string GetResultCssClass(TestExecutionStatus status)
+    {
+        return status switch
+        {
+            TestExecutionStatus.Passed => "passed",
+            TestExecutionStatus.Failed => "failed",
+            TestExecutionStatus.CompilationError => "failed",
+            _ => "running"
+        };
+    }
+
+    private string GetResultIcon(TestExecutionStatus status)
+    {
+        return status switch
+        {
+            TestExecutionStatus.Passed => "?",
+            TestExecutionStatus.Failed => "?",
+            TestExecutionStatus.CompilationError => "??",
+            TestExecutionStatus.Running => "?",
+            _ => "?"
+        };
     }
 
     public async ValueTask DisposeAsync()

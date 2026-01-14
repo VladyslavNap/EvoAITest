@@ -1,0 +1,597 @@
+@page "/test-execution/results"
+@page "/test-execution/results/{ResultId:guid}"
+@using EvoAITest.Core.Models.Execution
+@inject HttpClient HttpClient
+@inject NavigationManager Navigation
+
+<PageTitle>Test Execution Results</PageTitle>
+
+<div class="execution-results-page">
+    <div class="page-header">
+        <h1>Test Execution Results</h1>
+        <div class="header-actions">
+            <button class="btn btn-primary" @onclick="RefreshResults">
+                <span class="icon">??</span> Refresh
+            </button>
+            <button class="btn btn-secondary" @onclick="NavigateToHistory">
+                <span class="icon">??</span> View History
+            </button>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Loading execution results...</p>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="alert alert-danger">
+            <h4>Error</h4>
+            <p>@error</p>
+        </div>
+    }
+    else if (ResultId.HasValue && currentResult != null)
+    {
+        <!-- Single Result Detail View -->
+        <div class="result-detail-view">
+            <div class="result-header">
+                <div class="header-left">
+                    <h2>@currentResult.TestName</h2>
+                    <span class="badge @GetStatusBadgeClass(currentResult.Status)">
+                        @currentResult.Status
+                    </span>
+                </div>
+                <div class="header-right">
+                    <span class="result-time">
+                        <strong>Duration:</strong> @currentResult.DurationMs ms
+                    </span>
+                    <span class="result-time">
+                        <strong>Started:</strong> @currentResult.StartedAt.ToString("g")
+                    </span>
+                </div>
+            </div>
+
+            <!-- Test Summary -->
+            <div class="test-summary">
+                <div class="summary-card">
+                    <div class="summary-value @(currentResult.Status == TestExecutionStatus.Passed ? "success" : "")">
+                        @currentResult.PassedSteps
+                    </div>
+                    <div class="summary-label">Passed Steps</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-value @(currentResult.FailedSteps > 0 ? "danger" : "")">
+                        @currentResult.FailedSteps
+                    </div>
+                    <div class="summary-label">Failed Steps</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-value">@currentResult.TotalSteps</div>
+                    <div class="summary-label">Total Steps</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-value">@currentResult.Artifacts.Count</div>
+                    <div class="summary-label">Artifacts</div>
+                </div>
+            </div>
+
+            <!-- Error Details -->
+            @if (!string.IsNullOrEmpty(currentResult.ErrorMessage))
+            {
+                <div class="error-section">
+                    <h3>Error Details</h3>
+                    <div class="error-box">
+                        <pre>@currentResult.ErrorMessage</pre>
+                    </div>
+                    @if (!string.IsNullOrEmpty(currentResult.StackTrace))
+                    {
+                        <details>
+                            <summary>Stack Trace</summary>
+                            <pre class="stack-trace">@currentResult.StackTrace</pre>
+                        </details>
+                    }
+                </div>
+            }
+
+            <!-- Step Results -->
+            @if (currentResult.StepResults.Any())
+            {
+                <div class="steps-section">
+                    <h3>Test Steps (@currentResult.StepResults.Count)</h3>
+                    <div class="steps-list">
+                        @foreach (var step in currentResult.StepResults)
+                        {
+                            <div class="step-item @GetStepStatusClass(step.Status)">
+                                <div class="step-header">
+                                    <span class="step-number">#@step.StepNumber</span>
+                                    <span class="step-icon">@GetStepIcon(step.Status)</span>
+                                    <span class="step-description">@step.Description</span>
+                                    <span class="step-duration">@step.DurationMs ms</span>
+                                </div>
+                                @if (!string.IsNullOrEmpty(step.ErrorMessage))
+                                {
+                                    <div class="step-error">
+                                        <strong>Error:</strong> @step.ErrorMessage
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(step.ScreenshotPath))
+                                {
+                                    <div class="step-screenshot">
+                                        <img src="/@step.ScreenshotPath" alt="Step screenshot" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Console Output -->
+            @if (!string.IsNullOrEmpty(currentResult.StandardOutput))
+            {
+                <div class="output-section">
+                    <h3>Console Output</h3>
+                    <pre class="console-output">@currentResult.StandardOutput</pre>
+                </div>
+            }
+
+            <!-- Error Output -->
+            @if (!string.IsNullOrEmpty(currentResult.ErrorOutput))
+            {
+                <div class="output-section">
+                    <h3>Error Output</h3>
+                    <pre class="error-output">@currentResult.ErrorOutput</pre>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <!-- Results List View -->
+        <div class="results-list-view">
+            @if (!results.Any())
+            {
+                <div class="no-results">
+                    <p>No test execution results found.</p>
+                    <p class="hint">Run a test from a recording to see results here.</p>
+                </div>
+            }
+            else
+            {
+                <div class="results-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Test Name</th>
+                                <th>Status</th>
+                                <th>Framework</th>
+                                <th>Duration</th>
+                                <th>Steps</th>
+                                <th>Started</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var result in results)
+                            {
+                                <tr class="result-row @GetStatusClass(result.Status)">
+                                    <td>@result.TestName</td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(result.Status)">
+                                            @result.Status
+                                        </span>
+                                    </td>
+                                    <td>@result.TestFramework</td>
+                                    <td>@result.DurationMs ms</td>
+                                    <td>
+                                        <span class="steps-badge">
+                                            @result.PassedSteps/@result.TotalSteps
+                                        </span>
+                                    </td>
+                                    <td>@result.StartedAt.ToString("g")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" 
+                                                @onclick="() => ViewResultDetails(result.Id)">
+                                            View Details
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination">
+                    <button class="btn btn-secondary" 
+                            @onclick="PreviousPage" 
+                            disabled="@(currentPage == 0)">
+                        Previous
+                    </button>
+                    <span class="page-info">
+                        Page @(currentPage + 1)
+                    </span>
+                    <button class="btn btn-secondary" 
+                            @onclick="NextPage"
+                            disabled="@(results.Count < pageSize)">
+                        Next
+                    </button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid? ResultId { get; set; }
+
+    private List<TestExecutionResult> results = new();
+    private TestExecutionResult? currentResult = null;
+    private bool loading = true;
+    private string? error = null;
+    private int currentPage = 0;
+    private int pageSize = 20;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadResults();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadResults();
+    }
+
+    private async Task LoadResults()
+    {
+        try
+        {
+            loading = true;
+            error = null;
+            StateHasChanged();
+
+            if (ResultId.HasValue)
+            {
+                // Load single result
+                currentResult = await HttpClient.GetFromJsonAsync<TestExecutionResult>(
+                    $"/api/test-execution/results/{ResultId.Value}");
+            }
+            else
+            {
+                // Load results list
+                var skip = currentPage * pageSize;
+                results = await HttpClient.GetFromJsonAsync<List<TestExecutionResult>>(
+                    $"/api/test-execution/history?skip={skip}&take={pageSize}") ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load results: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshResults()
+    {
+        await LoadResults();
+    }
+
+    private void ViewResultDetails(Guid id)
+    {
+        Navigation.NavigateTo($"/test-execution/results/{id}");
+    }
+
+    private void NavigateToHistory()
+    {
+        Navigation.NavigateTo("/test-execution/results");
+    }
+
+    private async Task NextPage()
+    {
+        currentPage++;
+        await LoadResults();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (currentPage > 0)
+        {
+            currentPage--;
+            await LoadResults();
+        }
+    }
+
+    private string GetStatusBadgeClass(TestExecutionStatus status)
+    {
+        return status switch
+        {
+            TestExecutionStatus.Passed => "badge-success",
+            TestExecutionStatus.Failed => "badge-danger",
+            TestExecutionStatus.Running => "badge-info",
+            TestExecutionStatus.CompilationError => "badge-warning",
+            _ => "badge-secondary"
+        };
+    }
+
+    private string GetStatusClass(TestExecutionStatus status)
+    {
+        return status switch
+        {
+            TestExecutionStatus.Passed => "status-passed",
+            TestExecutionStatus.Failed => "status-failed",
+            _ => ""
+        };
+    }
+
+    private string GetStepStatusClass(TestExecutionStatus status)
+    {
+        return status switch
+        {
+            TestExecutionStatus.Passed => "step-passed",
+            TestExecutionStatus.Failed => "step-failed",
+            _ => "step-pending"
+        };
+    }
+
+    private string GetStepIcon(TestExecutionStatus status)
+    {
+        return status switch
+        {
+            TestExecutionStatus.Passed => "?",
+            TestExecutionStatus.Failed => "?",
+            TestExecutionStatus.Running => "?",
+            _ => "??"
+        };
+    }
+}
+
+<style>
+    .execution-results-page {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .loading-container {
+        text-align: center;
+        padding: 40px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #007bff;
+        border-radius: 50%;
+        margin: 0 auto 20px;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .result-detail-view {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .result-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #e0e0e0;
+        margin-bottom: 20px;
+    }
+
+    .badge {
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .badge-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .badge-danger {
+        background: #dc3545;
+        color: white;
+    }
+
+    .badge-info {
+        background: #17a2b8;
+        color: white;
+    }
+
+    .badge-warning {
+        background: #ffc107;
+        color: #000;
+    }
+
+    .test-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin: 20px 0;
+    }
+
+    .summary-card {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .summary-value {
+        font-size: 32px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .summary-value.success {
+        color: #28a745;
+    }
+
+    .summary-value.danger {
+        color: #dc3545;
+    }
+
+    .summary-label {
+        font-size: 14px;
+        color: #666;
+        margin-top: 5px;
+    }
+
+    .error-section, .steps-section, .output-section {
+        margin: 30px 0;
+    }
+
+    .error-box {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        padding: 15px;
+        color: #721c24;
+    }
+
+    .error-box pre {
+        margin: 0;
+        white-space: pre-wrap;
+    }
+
+    .steps-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .step-item {
+        background: #f8f9fa;
+        border-left: 4px solid #dee2e6;
+        padding: 15px;
+        border-radius: 4px;
+    }
+
+    .step-item.step-passed {
+        border-left-color: #28a745;
+        background: #d4edda;
+    }
+
+    .step-item.step-failed {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+    }
+
+    .step-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .step-number {
+        font-weight: bold;
+        color: #666;
+    }
+
+    .step-description {
+        flex: 1;
+    }
+
+    .step-duration {
+        color: #666;
+        font-size: 14px;
+    }
+
+    .step-screenshot img {
+        max-width: 100%;
+        margin-top: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .console-output, .error-output {
+        background: #2d2d2d;
+        color: #f8f8f2;
+        padding: 15px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 13px;
+    }
+
+    .results-table table {
+        width: 100%;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .results-table th {
+        background: #f8f9fa;
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .results-table td {
+        padding: 12px;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .result-row.status-passed {
+        background: rgba(40, 167, 69, 0.05);
+    }
+
+    .result-row.status-failed {
+        background: rgba(220, 53, 69, 0.05);
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .no-results {
+        text-align: center;
+        padding: 60px 20px;
+        color: #666;
+    }
+
+    .no-results .hint {
+        color: #999;
+        font-size: 14px;
+    }
+</style>
