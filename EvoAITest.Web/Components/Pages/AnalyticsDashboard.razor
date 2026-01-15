@@ -263,8 +263,14 @@
                 <button class="btn btn-outline" @onclick="NavigateToExecutionHistory">
                     View Execution History
                 </button>
-                <button class="btn btn-outline" @onclick="ExportDashboard">
-                    Export Dashboard Data
+                <button class="btn btn-outline" @onclick='() => ExportDashboard("json")'>
+                    📥 Export JSON
+                </button>
+                <button class="btn btn-outline" @onclick='() => ExportDashboard("csv")'>
+                    📥 Export CSV
+                </button>
+                <button class="btn btn-outline" @onclick='() => ExportDashboard("html")'>
+                    📄 Export Report
                 </button>
             </div>
         </div>
@@ -442,10 +448,10 @@ public async ValueTask DisposeAsync()
         return name.Substring(0, maxLength - 3) + "...";
     }
 
-    private void ExportDashboard()
+    private void ExportDashboard(string format)
     {
-        // TODO: Implement export functionality
-        Console.WriteLine("Export dashboard data");
+        var url = $"/api/analytics/export/dashboard?format={format}";
+        Navigation.NavigateTo(url, forceLoad: true);
     }
 }
 

@@ -1,0 +1,1043 @@
+@page "/analytics/recordings/{RecordingId:guid}/insights"
+@using EvoAITest.Core.Models.Analytics
+@using EvoAITest.Core.Abstractions
+@using EvoAITest.Web.Services
+@using EvoAITest.Web.Components.Charts
+@inject HttpClient HttpClient
+@inject NavigationManager Navigation
+@inject AnalyticsHubClient HubClient
+@implements IAsyncDisposable
+
+<PageTitle>Recording Insights - EvoAITest</PageTitle>
+
+<div class="insights-page">
+    <div class="page-header">
+        <div class="header-left">
+            <button class="btn btn-back" @onclick="NavigateBack">
+                <span class="icon">←</span> Back
+            </button>
+            <div class="header-text">
+                <h1>🔍 Recording Insights</h1>
+                <p class="subtitle">@(insights?.TestName ?? "Loading...")</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" @onclick="RefreshInsights" disabled="@loading">
+                <span class="icon">🔄</span> @(loading ? "Loading..." : "Refresh")
+            </button>
+            @if (HubClient.IsConnected)
+            {
+                <span class="connection-status connected">🟢 Live</span>
+            }
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Loading insights...</p>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="alert alert-danger">
+            <h4>Error Loading Insights</h4>
+            <p>@error</p>
+            <button class="btn btn-sm btn-secondary" @onclick="RefreshInsights">Retry</button>
+        </div>
+    }
+    else if (insights != null)
+    {
+        <!-- Key Metrics Overview -->
+        <div class="metrics-grid">
+            <div class="metric-card @GetPassRateClass(insights.PassRate)">
+                <div class="metric-icon">@GetPassRateIcon(insights.PassRate)</div>
+                <div class="metric-content">
+                    <div class="metric-value">@insights.PassRate.ToString("F1")%</div>
+                    <div class="metric-label">Pass Rate</div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon">📊</div>
+                <div class="metric-content">
+                    <div class="metric-value">@insights.Statistics.TotalExecutions</div>
+                    <div class="metric-label">Total Executions</div>
+                    <div class="metric-detail">
+                        7d: @insights.Statistics.Last7DaysExecutions | 
+                        30d: @insights.Statistics.Last30DaysExecutions
+                    </div>
+                </div>
+            </div>
+
+            <div class="metric-card @(insights.PerformanceDegrading ? "metric-warning" : "")">
+                <div class="metric-icon">⏱️</div>
+                <div class="metric-content">
+                    <div class="metric-value">@FormatDuration(insights.BaselineDurationMs)</div>
+                    <div class="metric-label">Baseline Duration</div>
+                    @if (insights.PerformanceDegrading)
+                    {
+                        <div class="metric-alert">⚠️ Performance Degrading</div>
+                    }
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon">⚡</div>
+                <div class="metric-content">
+                    <div class="metric-value">@FormatDuration(insights.Statistics.FastestDurationMs)</div>
+                    <div class="metric-label">Fastest Run</div>
+                    <div class="metric-detail">Slowest: @FormatDuration(insights.Statistics.SlowestDurationMs)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Issues & Alerts -->
+        @if (insights.Issues.Any())
+        {
+            <div class="section issues-section">
+                <div class="section-header">
+                    <h2>⚠️ Identified Issues (@insights.Issues.Count)</h2>
+                </div>
+                <div class="issues-list">
+                    @foreach (var issue in insights.Issues)
+                    {
+                        <div class="issue-card">
+                            <span class="issue-icon">❌</span>
+                            <span class="issue-text">@issue</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Flaky Test Analysis -->
+        @if (insights.FlakyAnalysis != null && insights.FlakyAnalysis.IsFlaky)
+        {
+            <div class="section flaky-section">
+                <div class="section-header">
+                    <h2>🔀 Flaky Test Detected</h2>
+                    <span class="severity-badge @GetSeverityClass(insights.FlakyAnalysis.Severity)">
+                        @insights.FlakyAnalysis.Severity
+                    </span>
+                </div>
+                <div class="flaky-content">
+                    <div class="flaky-stats">
+                        <div class="stat-box">
+                            <span class="stat-label">Flakiness Score</span>
+                            <span class="stat-value danger">@insights.FlakyAnalysis.FlakinessScore.ToString("F1")</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">Flaky Failures</span>
+                            <span class="stat-value">@insights.FlakyAnalysis.FlakyFailureCount</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">Duration Variability</span>
+                            <span class="stat-value">@insights.FlakyAnalysis.DurationVariability.ToString("F2")</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">Analysis Confidence</span>
+                            <span class="stat-value">@insights.FlakyAnalysis.AnalysisConfidence.ToString("F0")%</span>
+                        </div>
+                    </div>
+
+                    @if (insights.FlakyAnalysis.Patterns.Any())
+                    {
+                        <div class="patterns-section">
+                            <h3>Detected Patterns</h3>
+                            <div class="patterns-grid">
+                                @foreach (var pattern in insights.FlakyAnalysis.Patterns.Take(3))
+                                {
+                                    <div class="pattern-card">
+                                        <div class="pattern-header">
+                                            <span class="pattern-type">@GetPatternIcon(pattern.Type) @pattern.Type</span>
+                                            <span class="pattern-confidence">@pattern.Confidence.ToString("F0")%</span>
+                                        </div>
+                                        <p class="pattern-description">@pattern.Description</p>
+                                        @if (!string.IsNullOrEmpty(pattern.SuggestedFix))
+                                        {
+                                            <div class="pattern-fix">💡 @pattern.SuggestedFix</div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Stability Metrics -->
+        @if (insights.StabilityMetrics != null)
+        {
+            <div class="section stability-section">
+                <div class="section-header">
+                    <h2>📈 Stability Metrics</h2>
+                    <span class="stability-badge @GetStabilityClass(insights.StabilityMetrics.StabilityClass)">
+                        @insights.StabilityMetrics.StabilityClass
+                    </span>
+                </div>
+                <div class="stability-grid">
+                    <div class="stability-card">
+                        <div class="card-header">
+                            <h4>Pass Streaks</h4>
+                        </div>
+                        <div class="card-content">
+                            <div class="streak-item">
+                                <span class="streak-label">Current:</span>
+                                <span class="streak-value">@insights.StabilityMetrics.ConsecutivePassStreak</span>
+                            </div>
+                            <div class="streak-item">
+                                <span class="streak-label">Longest:</span>
+                                <span class="streak-value">@insights.StabilityMetrics.LongestPassStreak</span>
+                            </div>
+                            <div class="streak-item">
+                                <span class="streak-label">Failure Streak:</span>
+                                <span class="streak-value danger">@insights.StabilityMetrics.ConsecutiveFailureStreak</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stability-card">
+                        <div class="card-header">
+                            <h4>Reliability Metrics</h4>
+                        </div>
+                        <div class="card-content">
+                            @if (insights.StabilityMetrics.MeanTimeBetweenFailures.HasValue)
+                            {
+                                <div class="reliability-item">
+                                    <span class="reliability-label">MTBF:</span>
+                                    <span class="reliability-value">@insights.StabilityMetrics.MeanTimeBetweenFailures.Value.ToString("F1")h</span>
+                                </div>
+                            }
+                            @if (insights.StabilityMetrics.MeanTimeToRecovery.HasValue)
+                            {
+                                <div class="reliability-item">
+                                    <span class="reliability-label">MTTR:</span>
+                                    <span class="reliability-value">@insights.StabilityMetrics.MeanTimeToRecovery.Value.ToString("F1")h</span>
+                                </div>
+                            }
+                            <div class="reliability-item">
+                                <span class="reliability-label">Trend:</span>
+                                <span class="reliability-value">@GetTrendEmoji(insights.StabilityMetrics.TrendDirection) @GetTrendText(insights.StabilityMetrics.TrendDirection)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stability-card">
+                        <div class="card-header">
+                            <h4>Pass Rate Analysis</h4>
+                        </div>
+                        <div class="card-content">
+                            <div class="pass-rate-item">
+                                <span class="pass-rate-label">Last 7 Days:</span>
+                                <span class="pass-rate-value @GetPassRateClass(insights.StabilityMetrics.PassRateLast7Days)">
+                                    @insights.StabilityMetrics.PassRateLast7Days.ToString("F1")%
+                                </span>
+                            </div>
+                            <div class="pass-rate-item">
+                                <span class="pass-rate-label">Last 30 Days:</span>
+                                <span class="pass-rate-value @GetPassRateClass(insights.StabilityMetrics.PassRateLast30Days)">
+                                    @insights.StabilityMetrics.PassRateLast30Days.ToString("F1")%
+                                </span>
+                            </div>
+                            <div class="pass-rate-item">
+                                <span class="pass-rate-label">Production Ready:</span>
+                                <span class="pass-rate-value">
+                                    @(insights.StabilityMetrics.IsProductionReady ? "✅ Yes" : "❌ No")
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Trend Chart -->
+        @if (insights.RecentTrends.Any())
+        {
+            <div class="section trends-section">
+                <TrendChart Title="Pass Rate Trend (Last 30 Days)"
+                           Subtitle="Daily pass rate analysis"
+                           Trends="insights.RecentTrends"
+                           MetricType="PassRate"
+                           ThresholdValue="90"
+                           ThresholdLabel="Target: 90%"
+                           LineColor="#007bff"
+                           DatasetLabel="Pass Rate"
+                           ShowLegend="true" />
+            </div>
+        }
+
+        <!-- Recommendations -->
+        @if (insights.Recommendations.Any())
+        {
+            <div class="section recommendations-section">
+                <div class="section-header">
+                    <h2>💡 Recommendations (@insights.Recommendations.Count)</h2>
+                </div>
+                <div class="recommendations-list">
+                    @foreach (var recommendation in insights.Recommendations)
+                    {
+                        <div class="recommendation-card">
+                            <span class="recommendation-icon">✓</span>
+                            <span class="recommendation-text">@recommendation</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Actions -->
+        <div class="actions-section">
+            <h3>Quick Actions</h3>
+            <div class="action-buttons">
+                <button class="btn btn-primary" @onclick="ViewExecutionHistory">
+                    <span class="icon">📋</span> View Execution History
+                </button>
+                <button class="btn btn-secondary" @onclick="AnalyzeFlakiness">
+                    <span class="icon">🔍</span> Re-analyze Flakiness
+                </button>
+                <button class="btn btn-secondary" @onclick="ViewRecordingDetails">
+                    <span class="icon">📝</span> View Recording Details
+                </button>
+                <button class="btn btn-outline" @onclick='() => ExportInsights("json")'>
+                    <span class="icon">📥</span> Export JSON
+                </button>
+                <button class="btn btn-outline" @onclick='() => ExportInsights("csv")'>
+                    <span class="icon">📥</span> Export CSV
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+[Parameter]
+public Guid RecordingId { get; set; }
+
+private EvoAITest.Core.Abstractions.RecordingInsights? insights;
+private bool loading = true;
+private string? error = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInsights();
+        await InitializeSignalR();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (RecordingId != Guid.Empty)
+        {
+            await LoadInsights();
+        }
+    }
+
+    private async Task InitializeSignalR()
+    {
+        try
+        {
+            if (!HubClient.IsConnected)
+            {
+                await HubClient.StartAsync();
+            }
+
+            await HubClient.SubscribeToRecordingAsync(RecordingId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR connection error: {ex.Message}");
+        }
+    }
+
+    private async Task LoadInsights()
+    {
+        try
+        {
+            loading = true;
+            error = null;
+            StateHasChanged();
+
+            insights = await HttpClient.GetFromJsonAsync<EvoAITest.Core.Abstractions.RecordingInsights>(
+                $"/api/analytics/recordings/{RecordingId}/insights");
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load insights: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshInsights()
+    {
+        await LoadInsights();
+    }
+
+    private void NavigateBack()
+    {
+        Navigation.NavigateTo("/analytics/dashboard");
+    }
+
+    private void ViewExecutionHistory()
+    {
+        Navigation.NavigateTo($"/test-execution/results?recordingId={RecordingId}");
+    }
+
+    private void ViewRecordingDetails()
+    {
+        Navigation.NavigateTo($"/recordings/{RecordingId}");
+    }
+
+    private async Task AnalyzeFlakiness()
+    {
+        try
+        {
+            loading = true;
+            StateHasChanged();
+
+            var response = await HttpClient.PostAsJsonAsync(
+                $"/api/analytics/recordings/{RecordingId}/analyze-flakiness",
+                new { });
+
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadInsights();
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to analyze flakiness: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ExportInsights()
+    {
+        // TODO: Implement export functionality
+        Console.WriteLine("Export insights");
+    }
+
+    private string GetPassRateClass(double passRate)
+    {
+        if (passRate >= 90) return "metric-success";
+        if (passRate >= 70) return "metric-warning";
+        return "metric-danger";
+    }
+
+    private string GetPassRateIcon(double passRate)
+    {
+        if (passRate >= 90) return "✅";
+        if (passRate >= 70) return "⚠️";
+        return "❌";
+    }
+
+    private string GetSeverityClass(FlakinessSeverity severity)
+    {
+        return severity switch
+        {
+            FlakinessSeverity.Critical => "severity-critical",
+            FlakinessSeverity.High => "severity-high",
+            FlakinessSeverity.Medium => "severity-medium",
+            FlakinessSeverity.Low => "severity-low",
+            _ => "severity-none"
+        };
+    }
+
+    private string GetStabilityClass(StabilityClass stabilityClass)
+    {
+        return stabilityClass switch
+        {
+            StabilityClass.Stable => "stability-stable",
+            StabilityClass.MostlyStable => "stability-mostly-stable",
+            StabilityClass.Unstable => "stability-unstable",
+            StabilityClass.HighlyUnstable => "stability-highly-unstable",
+            _ => "stability-unknown"
+        };
+    }
+
+    private string GetPatternIcon(PatternType type)
+    {
+        return type switch
+        {
+            PatternType.Intermittent => "🔄",
+            PatternType.Temporal => "⏰",
+            PatternType.Sequential => "🔢",
+            PatternType.TimingDependent => "⏱️",
+            PatternType.ResourceDependent => "💾",
+            PatternType.EnvironmentSpecific => "🌍",
+            PatternType.RunCount => "🔁",
+            PatternType.Degrading => "📉",
+            _ => "❓"
+        };
+    }
+
+    private string GetTrendEmoji(int trendDirection)
+    {
+        return trendDirection switch
+        {
+            1 => "📈",
+            -1 => "📉",
+            _ => "➡️"
+        };
+    }
+
+    private string GetTrendText(int trendDirection)
+    {
+        return trendDirection switch
+        {
+            1 => "Improving",
+            -1 => "Degrading",
+            _ => "Stable"
+        };
+    }
+
+    private string FormatDuration(long milliseconds)
+    {
+        if (milliseconds < 1000)
+            return $"{milliseconds}ms";
+        if (milliseconds < 60000)
+            return $"{(milliseconds / 1000.0):F1}s";
+        return $"{(milliseconds / 60000.0):F1}m";
+    }
+
+    private void ExportInsights(string format)
+    {
+        var url = $"/api/analytics/export/recordings/{RecordingId}/insights?format={format}";
+        Navigation.NavigateTo(url, forceLoad: true);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await HubClient.UnsubscribeFromRecordingAsync(RecordingId);
+    }
+}
+
+<style>
+    .insights-page {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .btn-back {
+        padding: 8px 16px;
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-back:hover {
+        background: #e9ecef;
+    }
+
+    .header-text h1 {
+        margin: 0 0 5px 0;
+        font-size: 28px;
+        color: #333;
+    }
+
+    .subtitle {
+        margin: 0;
+        color: #666;
+        font-size: 14px;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .connection-status {
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .connection-status.connected {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .loading-container {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #007bff;
+        border-radius: 50%;
+        margin: 0 auto 20px;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .metric-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        gap: 15px;
+        border-left: 4px solid #007bff;
+    }
+
+    .metric-card.metric-success {
+        border-left-color: #28a745;
+    }
+
+    .metric-card.metric-warning {
+        border-left-color: #ffc107;
+    }
+
+    .metric-card.metric-danger {
+        border-left-color: #dc3545;
+    }
+
+    .metric-icon {
+        font-size: 40px;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .metric-content {
+        flex: 1;
+    }
+
+    .metric-value {
+        font-size: 32px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 5px;
+    }
+
+    .metric-label {
+        font-size: 14px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .metric-detail {
+        font-size: 12px;
+        color: #999;
+        margin-top: 5px;
+    }
+
+    .metric-alert {
+        margin-top: 8px;
+        padding: 4px 8px;
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    /* Section Styles */
+    .section {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .section-header h2 {
+        margin: 0;
+        font-size: 20px;
+        color: #333;
+    }
+
+    /* Issues Section */
+    .issues-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .issue-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        border-radius: 4px;
+    }
+
+    .issue-icon {
+        font-size: 20px;
+    }
+
+    .issue-text {
+        flex: 1;
+        color: #856404;
+        font-size: 14px;
+    }
+
+    /* Flaky Section */
+    .flaky-content {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .flaky-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+    }
+
+    .stat-box {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .stat-label {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+    }
+
+    .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .stat-value.danger {
+        color: #dc3545;
+    }
+
+    .patterns-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 15px;
+    }
+
+    .pattern-card {
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        border-left: 4px solid #007bff;
+    }
+
+    .pattern-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .pattern-type {
+        font-weight: 600;
+        color: #333;
+        font-size: 14px;
+    }
+
+    .pattern-confidence {
+        font-size: 12px;
+        color: #666;
+    }
+
+    .pattern-description {
+        margin: 0 0 10px 0;
+        color: #555;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .pattern-fix {
+        font-size: 12px;
+        color: #007bff;
+        font-weight: 500;
+        padding: 8px;
+        background: rgba(0, 123, 255, 0.1);
+        border-radius: 4px;
+    }
+
+    /* Stability Section */
+    .stability-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .stability-card {
+        background: #f8f9fa;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .stability-card .card-header {
+        padding: 12px 16px;
+        background: #e9ecef;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .stability-card .card-header h4 {
+        margin: 0;
+        font-size: 15px;
+        color: #333;
+    }
+
+    .stability-card .card-content {
+        padding: 16px;
+    }
+
+    .streak-item, .reliability-item, .pass-rate-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .streak-item:last-child, .reliability-item:last-child, .pass-rate-item:last-child {
+        border-bottom: none;
+    }
+
+    .streak-label, .reliability-label, .pass-rate-label {
+        font-size: 13px;
+        color: #666;
+    }
+
+    .streak-value, .reliability-value, .pass-rate-value {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .streak-value.danger, .reliability-value.danger {
+        color: #dc3545;
+    }
+
+    /* Badges */
+    .severity-badge, .stability-badge {
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .severity-critical {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+
+    .severity-high {
+        background: rgba(253, 126, 20, 0.1);
+        color: #fd7e14;
+    }
+
+    .severity-medium {
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+    }
+
+    .severity-low {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+    }
+
+    .stability-stable {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+    }
+
+    .stability-mostly-stable {
+        background: rgba(23, 162, 184, 0.1);
+        color: #17a2b8;
+    }
+
+    .stability-unstable {
+        background: rgba(255, 193, 7, 0.1);
+        color: #ffc107;
+    }
+
+    .stability-highly-unstable {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+
+    /* Recommendations */
+    .recommendations-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .recommendation-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 16px;
+        background: #d1ecf1;
+        border-left: 4px solid #17a2b8;
+        border-radius: 4px;
+    }
+
+    .recommendation-icon {
+        font-size: 20px;
+        color: #0c5460;
+    }
+
+    .recommendation-text {
+        flex: 1;
+        color: #0c5460;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    /* Actions */
+    .actions-section {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .actions-section h3 {
+        margin: 0 0 15px 0;
+        font-size: 18px;
+        color: #333;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background: #007bff;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-outline {
+        background: white;
+        color: #007bff;
+        border: 1px solid #007bff;
+    }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+
+    .alert {
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+
+    .icon {
+        font-size: 16px;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+        }
+
+        .metrics-grid, .stability-grid, .patterns-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

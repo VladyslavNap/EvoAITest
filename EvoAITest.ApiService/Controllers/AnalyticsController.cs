@@ -14,15 +14,18 @@ public sealed class AnalyticsController : ControllerBase
 {
     private readonly ITestAnalyticsService _analyticsService;
     private readonly IFlakyTestDetector _flakyDetector;
+    private readonly IAnalyticsExportService _exportService;
     private readonly ILogger<AnalyticsController> _logger;
 
     public AnalyticsController(
         ITestAnalyticsService analyticsService,
         IFlakyTestDetector flakyDetector,
+        IAnalyticsExportService exportService,
         ILogger<AnalyticsController> logger)
     {
         _analyticsService = analyticsService ?? throw new ArgumentNullException(nameof(analyticsService));
         _flakyDetector = flakyDetector ?? throw new ArgumentNullException(nameof(flakyDetector));
+        _exportService = exportService ?? throw new ArgumentNullException(nameof(exportService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -480,6 +483,235 @@ public sealed class AnalyticsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get historical trends");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    // ==================== EXPORT ENDPOINTS ====================
+
+    /// <summary>
+    /// Export dashboard statistics
+    /// </summary>
+    /// <param name="format">Export format (json, csv, html)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Exported file</returns>
+    [HttpGet("export/dashboard")]
+    public async Task<IActionResult> ExportDashboard(
+        [FromQuery] string format = "json",
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Exporting dashboard in {Format} format", format);
+
+        try
+        {
+            var statistics = await _analyticsService.GetDashboardStatisticsAsync(cancellationToken);
+
+            byte[] fileBytes;
+            string contentType;
+            string fileName;
+
+            switch (format.ToLower())
+            {
+                case "csv":
+                    fileBytes = await _exportService.ExportDashboardToCsvAsync(statistics, cancellationToken);
+                    contentType = "text/csv";
+                    fileName = $"dashboard-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.csv";
+                    break;
+
+                case "html":
+                    var flakyTests = await _flakyDetector.GetAllFlakyTestsAsync(cancellationToken: cancellationToken);
+                    fileBytes = await _exportService.GenerateAnalyticsReportAsync(statistics, flakyTests, cancellationToken);
+                    contentType = "text/html";
+                    fileName = $"analytics-report-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.html";
+                    break;
+
+                case "json":
+                default:
+                    fileBytes = await _exportService.ExportDashboardToJsonAsync(statistics, cancellationToken);
+                    contentType = "application/json";
+                    fileName = $"dashboard-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.json";
+                    break;
+            }
+
+            return File(fileBytes, contentType, fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export dashboard");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Export flaky tests
+    /// </summary>
+    /// <param name="format">Export format (json, csv)</param>
+    /// <param name="minScore">Minimum flakiness score</param>
+    /// <param name="severity">Filter by severity</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Exported file</returns>
+    [HttpGet("export/flaky-tests")]
+    public async Task<IActionResult> ExportFlakyTests(
+        [FromQuery] string format = "json",
+        [FromQuery] double? minScore = null,
+        [FromQuery] FlakinessSeverity? severity = null,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Exporting flaky tests in {Format} format", format);
+
+        try
+        {
+            var flakyTests = await _flakyDetector.GetAllFlakyTestsAsync(cancellationToken: cancellationToken);
+
+            // Apply filters
+            if (minScore.HasValue)
+            {
+                flakyTests = flakyTests.Where(t => t.FlakinessScore >= minScore.Value).ToList();
+            }
+
+            if (severity.HasValue)
+            {
+                flakyTests = flakyTests.Where(t => t.Severity == severity.Value).ToList();
+            }
+
+            byte[] fileBytes;
+            string contentType;
+            string fileName;
+
+            switch (format.ToLower())
+            {
+                case "csv":
+                    fileBytes = await _exportService.ExportFlakyTestsToCsvAsync(flakyTests, cancellationToken);
+                    contentType = "text/csv";
+                    fileName = $"flaky-tests-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.csv";
+                    break;
+
+                case "json":
+                default:
+                    fileBytes = await _exportService.ExportFlakyTestsToJsonAsync(flakyTests, cancellationToken);
+                    contentType = "application/json";
+                    fileName = $"flaky-tests-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.json";
+                    break;
+            }
+
+            return File(fileBytes, contentType, fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export flaky tests");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Export trends
+    /// </summary>
+    /// <param name="format">Export format (json, csv)</param>
+    /// <param name="interval">Trend interval</param>
+    /// <param name="days">Number of days</param>
+    /// <param name="recordingId">Optional recording filter</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Exported file</returns>
+    [HttpGet("export/trends")]
+    public async Task<IActionResult> ExportTrends(
+        [FromQuery] string format = "json",
+        [FromQuery] TrendInterval interval = TrendInterval.Daily,
+        [FromQuery] int days = 30,
+        [FromQuery] Guid? recordingId = null,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Exporting trends in {Format} format", format);
+
+        try
+        {
+            var endDate = DateTimeOffset.UtcNow;
+            var startDate = endDate.AddDays(-days);
+
+            var trends = await _analyticsService.CalculateTrendsAsync(
+                interval,
+                startDate,
+                endDate,
+                recordingId,
+                cancellationToken);
+
+            byte[] fileBytes;
+            string contentType;
+            string fileName;
+
+            switch (format.ToLower())
+            {
+                case "csv":
+                    fileBytes = await _exportService.ExportTrendsToCsvAsync(trends, cancellationToken);
+                    contentType = "text/csv";
+                    fileName = $"trends-{interval}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.csv";
+                    break;
+
+                case "json":
+                default:
+                    fileBytes = await _exportService.ExportTrendsToJsonAsync(trends, cancellationToken);
+                    contentType = "application/json";
+                    fileName = $"trends-{interval}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.json";
+                    break;
+            }
+
+            return File(fileBytes, contentType, fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export trends");
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Export recording insights
+    /// </summary>
+    /// <param name="recordingId">Recording session ID</param>
+    /// <param name="format">Export format (json, csv)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Exported file</returns>
+    [HttpGet("export/recordings/{recordingId:guid}/insights")]
+    public async Task<IActionResult> ExportRecordingInsights(
+        Guid recordingId,
+        [FromQuery] string format = "json",
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Exporting insights for recording {RecordingId} in {Format} format", recordingId, format);
+
+        try
+        {
+            var insights = await _analyticsService.GetRecordingInsightsAsync(recordingId, cancellationToken);
+
+            byte[] fileBytes;
+            string contentType;
+            string fileName;
+
+            switch (format.ToLower())
+            {
+                case "csv":
+                    fileBytes = await _exportService.ExportRecordingInsightsToCsvAsync(insights, cancellationToken);
+                    contentType = "text/csv";
+                    fileName = $"insights-{recordingId}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.csv";
+                    break;
+
+                case "json":
+                default:
+                    fileBytes = await _exportService.ExportRecordingInsightsToJsonAsync(insights, cancellationToken);
+                    contentType = "application/json";
+                    fileName = $"insights-{recordingId}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}.json";
+                    break;
+            }
+
+            return File(fileBytes, contentType, fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Recording {RecordingId} not found", recordingId);
+            return NotFound(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to export insights");
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
         }
     }

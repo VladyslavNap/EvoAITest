@@ -15,6 +15,12 @@
             <button class="btn btn-secondary" @onclick="RefreshTests" disabled="@loading">
                 <span class="icon">🔄</span> @(loading ? "Loading..." : "Refresh")
             </button>
+            <button class="btn btn-secondary" @onclick='() => ExportFlakyTests("json")'>
+                <span class="icon">📥</span> Export JSON
+            </button>
+            <button class="btn btn-secondary" @onclick='() => ExportFlakyTests("csv")'>
+                <span class="icon">📥</span> Export CSV
+            </button>
             <button class="btn btn-primary" @onclick="NavigateToDashboard">
                 <span class="icon">📊</span> Dashboard
             </button>
@@ -402,6 +408,23 @@
             PatternType.Degrading => "📉",
             _ => "❓"
         };
+    }
+
+    private void ExportFlakyTests(string format)
+    {
+        var url = $"/api/analytics/export/flaky-tests?format={format}";
+        
+        // Apply current filters to export
+        if (!string.IsNullOrEmpty(selectedSeverity))
+        {
+            url += $"&severity={selectedSeverity}";
+        }
+        if (minScore.HasValue)
+        {
+            url += $"&minScore={minScore.Value}";
+        }
+
+        Navigation.NavigateTo(url, forceLoad: true);
     }
 }
 
