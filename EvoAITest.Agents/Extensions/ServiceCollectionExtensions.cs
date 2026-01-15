@@ -32,6 +32,10 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<EvoAITest.Core.Abstractions.ITestResultCollector, EvoAITest.Agents.Services.Execution.TestResultCollectorService>();
         services.TryAddScoped<EvoAITest.Core.Abstractions.ITestResultStorage, EvoAITest.Agents.Services.Execution.TestResultStorageService>();
 
+        // Register analytics services
+        services.TryAddScoped<EvoAITest.Core.Abstractions.IFlakyTestDetector, EvoAITest.Agents.Services.Analytics.FlakyTestDetectorService>();
+        services.TryAddScoped<EvoAITest.Core.Abstractions.ITestAnalyticsService, EvoAITest.Agents.Services.Analytics.TestAnalyticsService>();
+
         // Other agent implementations will be registered as they are implemented
         // services.TryAddScoped<IAgent, BrowserAutomationAgent>();
 

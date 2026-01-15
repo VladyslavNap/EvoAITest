@@ -1,0 +1,416 @@
+@using EvoAITest.Core.Models.Analytics
+
+<div class="trend-chart-container">
+    @if (string.IsNullOrEmpty(Title) == false)
+    {
+        <div class="chart-header">
+            <h3>@Title</h3>
+            @if (!string.IsNullOrEmpty(Subtitle))
+            {
+                <p class="chart-subtitle">@Subtitle</p>
+            }
+        </div>
+    }
+
+    @if (loading)
+    {
+        <div class="chart-loading">
+            <div class="spinner-small"></div>
+            <span>Loading chart data...</span>
+        </div>
+    }
+    else if (Trends == null || !Trends.Any())
+    {
+        <div class="chart-empty">
+            <span class="empty-icon">📊</span>
+            <p>No trend data available</p>
+        </div>
+    }
+    else
+    {
+        <div class="chart-content">
+            <!-- Y-axis Labels -->
+            <div class="y-axis">
+                <div class="y-label">@MaxValue.ToString(YAxisFormat)</div>
+                <div class="y-label">@((MaxValue * 0.75).ToString(YAxisFormat))</div>
+                <div class="y-label">@((MaxValue * 0.5).ToString(YAxisFormat))</div>
+                <div class="y-label">@((MaxValue * 0.25).ToString(YAxisFormat))</div>
+                <div class="y-label">0</div>
+            </div>
+
+            <!-- Chart Area -->
+            <div class="chart-area">
+                <svg class="chart-svg" viewBox="0 0 @Width @Height" preserveAspectRatio="xMidYMid meet">
+                    <!-- Grid Lines -->
+                    <g class="grid-lines">
+                        @for (int i = 0; i <= 4; i++)
+                        {
+                            var y = (Height / 4.0) * i;
+                            <line x1="0" y1="@y" x2="@Width" y2="@y" 
+                                  class="grid-line" stroke="#e0e0e0" stroke-width="1"/>
+                        }
+                    </g>
+
+                    <!-- Data Line -->
+                    @if (dataPoints.Any())
+                    {
+                        <polyline points="@GetPolylinePoints()" 
+                                  fill="none" 
+                                  stroke="@LineColor" 
+                                  stroke-width="3"
+                                  class="data-line"/>
+
+                        <!-- Data Points -->
+                        @foreach (var point in dataPoints)
+                        {
+                            <circle cx="@point.X" 
+                                    cy="@point.Y" 
+                                    r="5" 
+                                    fill="@PointColor"
+                                    stroke="white"
+                                    stroke-width="2"
+                                    class="data-point"
+                                    @onclick="() => OnPointClick(point)"
+                                    style="cursor: pointer;">
+                                <title>@point.Label: @point.Value.ToString(ValueFormat)</title>
+                            </circle>
+                        }
+
+                        <!-- Threshold Line (if specified) -->
+                        @if (ThresholdValue.HasValue)
+                        {
+                            var thresholdY = Height - ((ThresholdValue.Value / MaxValue) * Height);
+                            <line x1="0" y1="@thresholdY" x2="@Width" y2="@thresholdY"
+                                  stroke="@ThresholdColor"
+                                  stroke-width="2"
+                                  stroke-dasharray="5,5"
+                                  class="threshold-line"/>
+                        }
+                    }
+                </svg>
+
+                <!-- X-axis Labels -->
+                <div class="x-axis">
+                    @foreach (var label in xAxisLabels)
+                    {
+                        <div class="x-label" title="@label">@label</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        @if (ShowLegend && !string.IsNullOrEmpty(DatasetLabel))
+        {
+            <div class="chart-legend">
+                <div class="legend-item">
+                    <span class="legend-color" style="background: @LineColor"></span>
+                    <span>@DatasetLabel</span>
+                </div>
+                @if (ThresholdValue.HasValue)
+                {
+                    <div class="legend-item">
+                        <span class="legend-line" style="border-color: @ThresholdColor"></span>
+                        <span>@ThresholdLabel</span>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public List<TestTrend>? Trends { get; set; }
+
+    [Parameter]
+    public string MetricType { get; set; } = "PassRate"; // PassRate, AverageDuration, TotalExecutions
+
+    [Parameter]
+    public int Width { get; set; } = 800;
+
+    [Parameter]
+    public int Height { get; set; } = 300;
+
+    [Parameter]
+    public string LineColor { get; set; } = "#007bff";
+
+    [Parameter]
+    public string PointColor { get; set; } = "#007bff";
+
+    [Parameter]
+    public double? ThresholdValue { get; set; }
+
+    [Parameter]
+    public string ThresholdColor { get; set; } = "#dc3545";
+
+    [Parameter]
+    public string ThresholdLabel { get; set; } = "Threshold";
+
+    [Parameter]
+    public bool ShowLegend { get; set; } = true;
+
+    [Parameter]
+    public string? DatasetLabel { get; set; }
+
+    [Parameter]
+    public EventCallback<ChartPoint> OnDataPointClick { get; set; }
+
+    private List<ChartPoint> dataPoints = new();
+    private List<string> xAxisLabels = new();
+    private double MaxValue = 100;
+    private bool loading = false;
+    private string YAxisFormat = "F0";
+    private string ValueFormat = "F1";
+
+    protected override void OnParametersSet()
+    {
+        CalculateDataPoints();
+    }
+
+    private void CalculateDataPoints()
+    {
+        if (Trends == null || !Trends.Any())
+        {
+            dataPoints.Clear();
+            xAxisLabels.Clear();
+            return;
+        }
+
+        var orderedTrends = Trends.OrderBy(t => t.Timestamp).ToList();
+        dataPoints.Clear();
+        xAxisLabels.Clear();
+
+        // Determine max value based on metric type
+        MaxValue = MetricType switch
+        {
+            "PassRate" => 100,
+            "AverageDuration" => orderedTrends.Max(t => t.AverageDurationMs) * 1.1,
+            "TotalExecutions" => orderedTrends.Max(t => t.TotalExecutions) * 1.1,
+            _ => 100
+        };
+
+        // Ensure minimum max value
+        if (MaxValue < 10) MaxValue = 10;
+
+        // Set formats
+        YAxisFormat = MetricType == "AverageDuration" ? "F0" : "F0";
+        ValueFormat = MetricType == "PassRate" ? "F1" : "F0";
+
+        var step = Width / (double)Math.Max(orderedTrends.Count - 1, 1);
+
+        for (int i = 0; i < orderedTrends.Count; i++)
+        {
+            var trend = orderedTrends[i];
+            
+            var value = MetricType switch
+            {
+                "PassRate" => trend.PassRate,
+                "AverageDuration" => trend.AverageDurationMs,
+                "TotalExecutions" => trend.TotalExecutions,
+                _ => trend.PassRate
+            };
+
+            var x = i * step;
+            var y = Height - ((value / MaxValue) * Height);
+
+            var label = trend.Interval switch
+            {
+                TrendInterval.Hourly => trend.Timestamp.ToString("MMM dd HH:mm"),
+                TrendInterval.Daily => trend.Timestamp.ToString("MMM dd"),
+                TrendInterval.Weekly => $"Week of {trend.Timestamp.ToString("MMM dd")}",
+                TrendInterval.Monthly => trend.Timestamp.ToString("MMM yyyy"),
+                _ => trend.Timestamp.ToString("MMM dd")
+            };
+
+            dataPoints.Add(new ChartPoint
+            {
+                X = x,
+                Y = y,
+                Value = value,
+                Label = label,
+                Trend = trend
+            });
+
+            // Add x-axis labels (show every Nth label to avoid crowding)
+            if (orderedTrends.Count <= 10 || i % Math.Max(orderedTrends.Count / 8, 1) == 0 || i == orderedTrends.Count - 1)
+            {
+                xAxisLabels.Add(label);
+            }
+        }
+    }
+
+    private string GetPolylinePoints()
+    {
+        if (!dataPoints.Any()) return "";
+        return string.Join(" ", dataPoints.Select(p => $"{p.X},{p.Y}"));
+    }
+
+    private async Task OnPointClick(ChartPoint point)
+    {
+        if (OnDataPointClick.HasDelegate)
+        {
+            await OnDataPointClick.InvokeAsync(point);
+        }
+    }
+
+    public class ChartPoint
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Value { get; set; }
+        public string Label { get; set; } = "";
+        public TestTrend? Trend { get; set; }
+    }
+}
+
+<style>
+    .trend-chart-container {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .chart-header {
+        margin-bottom: 20px;
+    }
+
+    .chart-header h3 {
+        margin: 0 0 5px 0;
+        font-size: 18px;
+        color: #333;
+    }
+
+    .chart-subtitle {
+        margin: 0;
+        font-size: 13px;
+        color: #666;
+    }
+
+    .chart-loading, .chart-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        color: #666;
+    }
+
+    .spinner-small {
+        width: 30px;
+        height: 30px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #007bff;
+        border-radius: 50%;
+        margin-bottom: 10px;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .empty-icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+    }
+
+    .chart-content {
+        display: flex;
+        gap: 10px;
+    }
+
+    .y-axis {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-width: 50px;
+        padding: 10px 5px;
+    }
+
+    .y-label {
+        font-size: 12px;
+        color: #666;
+        text-align: right;
+    }
+
+    .chart-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chart-svg {
+        width: 100%;
+        height: auto;
+        margin-bottom: 10px;
+    }
+
+    .data-line {
+        transition: stroke-width 0.2s;
+    }
+
+    .data-line:hover {
+        stroke-width: 4;
+    }
+
+    .data-point {
+        transition: r 0.2s;
+    }
+
+    .data-point:hover {
+        r: 7;
+    }
+
+    .x-axis {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 5px;
+    }
+
+    .x-label {
+        font-size: 11px;
+        color: #666;
+        transform: rotate(-45deg);
+        transform-origin: center;
+        white-space: nowrap;
+        margin-top: 10px;
+    }
+
+    .chart-legend {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #555;
+    }
+
+    .legend-color {
+        width: 20px;
+        height: 3px;
+        border-radius: 2px;
+    }
+
+    .legend-line {
+        width: 20px;
+        height: 0;
+        border-top: 2px dashed;
+    }
+</style>

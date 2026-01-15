@@ -1,0 +1,357 @@
+@using EvoAITest.Core.Models.Analytics
+
+<div class="heatmap-container">
+    @if (!string.IsNullOrEmpty(Title))
+    {
+        <div class="heatmap-header">
+            <h3>@Title</h3>
+            @if (!string.IsNullOrEmpty(Subtitle))
+            {
+                <p class="heatmap-subtitle">@Subtitle</p>
+            }
+        </div>
+    }
+
+    @if (loading)
+    {
+        <div class="heatmap-loading">
+            <div class="spinner-small"></div>
+            <span>Loading heatmap data...</span>
+        </div>
+    }
+    else if (Data == null || !Data.Any())
+    {
+        <div class="heatmap-empty">
+            <span class="empty-icon">🗺️</span>
+            <p>No stability data available</p>
+        </div>
+    }
+    else
+    {
+        <div class="heatmap-content">
+            <!-- Color Scale Legend -->
+            <div class="color-scale">
+                <span class="scale-label">Low Stability</span>
+                <div class="scale-gradient"></div>
+                <span class="scale-label">High Stability</span>
+            </div>
+
+            <!-- Heatmap Grid -->
+            <div class="heatmap-grid" style="grid-template-columns: repeat(@ColumnsPerRow, 1fr);">
+                @foreach (var cell in heatmapCells)
+                {
+                    <div class="heatmap-cell @GetCellClass(cell.Score)"
+                         style="background: @GetCellColor(cell.Score)"
+                         title="@cell.Tooltip"
+                         @onclick="() => HandleCellClick(cell)">
+                        <div class="cell-label">@cell.Label</div>
+                        <div class="cell-value">@cell.Score.ToString("F0")%</div>
+                    </div>
+                }
+            </div>
+
+            <!-- Stats Summary -->
+            <div class="heatmap-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Average Stability:</span>
+                    <span class="stat-value">@AverageStability.ToString("F1")%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Stable Tests:</span>
+                    <span class="stat-value">@StableCount / @TotalCount</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Unstable Tests:</span>
+                    <span class="stat-value danger">@UnstableCount</span>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public List<TestStabilityMetrics>? Data { get; set; }
+
+    [Parameter]
+    public int ColumnsPerRow { get; set; } = 7; // Default to 7 for week view
+
+    [Parameter]
+    public EventCallback<HeatmapCell> OnCellClick { get; set; }
+
+    private List<HeatmapCell> heatmapCells = new();
+    private bool loading = false;
+    private double AverageStability = 0;
+    private int StableCount = 0;
+    private int UnstableCount = 0;
+    private int TotalCount = 0;
+
+    protected override void OnParametersSet()
+    {
+        CalculateHeatmap();
+    }
+
+    private void CalculateHeatmap()
+    {
+        if (Data == null || !Data.Any())
+        {
+            heatmapCells.Clear();
+            return;
+        }
+
+        heatmapCells.Clear();
+        TotalCount = Data.Count;
+
+        foreach (var metrics in Data)
+        {
+            var score = metrics.StabilityScore;
+            var tooltip = $"{metrics.TestName}\n" +
+                         $"Stability: {score:F1}%\n" +
+                         $"Pass Rate (7d): {metrics.PassRateLast7Days:F1}%\n" +
+                         $"Executions: {metrics.ExecutionsLast7Days}";
+
+            heatmapCells.Add(new HeatmapCell
+            {
+                Label = TruncateName(metrics.TestName, 15),
+                Score = score,
+                Tooltip = tooltip,
+                Metrics = metrics
+            });
+
+            if (score >= 85) StableCount++;
+            else UnstableCount++;
+        }
+
+        AverageStability = Data.Average(d => d.StabilityScore);
+    }
+
+    private string GetCellColor(double score)
+    {
+        // Color scale from red (0) to yellow (50) to green (100)
+        if (score >= 90)
+            return "#28a745"; // Dark green
+        else if (score >= 75)
+            return "#5cb85c"; // Light green
+        else if (score >= 60)
+            return "#ffc107"; // Yellow
+        else if (score >= 40)
+            return "#fd7e14"; // Orange
+        else
+            return "#dc3545"; // Red
+    }
+
+    private string GetCellClass(double score)
+    {
+        if (score >= 85)
+            return "cell-stable";
+        else if (score >= 70)
+            return "cell-moderate";
+        else
+            return "cell-unstable";
+    }
+
+    private string TruncateName(string name, int maxLength)
+    {
+        if (name.Length <= maxLength)
+            return name;
+        return name.Substring(0, maxLength - 2) + "..";
+    }
+
+    private async Task HandleCellClick(HeatmapCell cell)
+    {
+        if (OnCellClick.HasDelegate)
+        {
+            await OnCellClick.InvokeAsync(cell);
+        }
+    }
+
+    public class HeatmapCell
+    {
+        public string Label { get; set; } = "";
+        public double Score { get; set; }
+        public string Tooltip { get; set; } = "";
+        public TestStabilityMetrics? Metrics { get; set; }
+    }
+}
+
+<style>
+    .heatmap-container {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .heatmap-header {
+        margin-bottom: 20px;
+    }
+
+    .heatmap-header h3 {
+        margin: 0 0 5px 0;
+        font-size: 18px;
+        color: #333;
+    }
+
+    .heatmap-subtitle {
+        margin: 0;
+        font-size: 13px;
+        color: #666;
+    }
+
+    .heatmap-loading, .heatmap-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        color: #666;
+    }
+
+    .spinner-small {
+        width: 30px;
+        height: 30px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #007bff;
+        border-radius: 50%;
+        margin-bottom: 10px;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .empty-icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+    }
+
+    .heatmap-content {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .color-scale {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .scale-label {
+        font-size: 12px;
+        color: #666;
+        font-weight: 500;
+    }
+
+    .scale-gradient {
+        flex: 1;
+        height: 20px;
+        border-radius: 10px;
+        background: linear-gradient(to right, 
+            #dc3545 0%, 
+            #fd7e14 25%, 
+            #ffc107 50%, 
+            #5cb85c 75%, 
+            #28a745 100%);
+    }
+
+    .heatmap-grid {
+        display: grid;
+        gap: 8px;
+    }
+
+    .heatmap-cell {
+        aspect-ratio: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        color: white;
+        font-weight: 600;
+        padding: 8px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .heatmap-cell:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10;
+    }
+
+    .cell-label {
+        font-size: 10px;
+        text-align: center;
+        line-height: 1.2;
+        margin-bottom: 4px;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .cell-value {
+        font-size: 16px;
+        font-weight: bold;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .heatmap-stats {
+        display: flex;
+        justify-content: space-around;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .stat-label {
+        font-size: 12px;
+        color: #666;
+        text-transform: uppercase;
+    }
+
+    .stat-value {
+        font-size: 20px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .stat-value.danger {
+        color: #dc3545;
+    }
+
+    /* Responsive adjustments */
+    @@media (max-width: 768px) {
+        .heatmap-grid {
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)) !important;
+        }
+
+        .cell-value {
+            font-size: 14px;
+        }
+
+        .cell-label {
+            font-size: 9px;
+        }
+    }
+</style>

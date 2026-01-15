@@ -30,6 +30,9 @@ builder.Services.AddProblemDetails();
 // Add SignalR for real-time LLM streaming
 builder.Services.AddSignalR();
 
+// Add analytics broadcast background service
+builder.Services.AddHostedService<EvoAITest.ApiService.Services.AnalyticsBroadcastService>();
+
 // Add controllers for Visual Regression API
 builder.Services.AddControllers();
 
@@ -87,6 +90,9 @@ app.MapControllers();
 
 // Map SignalR hub for LLM streaming
 app.MapHub<EvoAITest.ApiService.Hubs.LLMStreamingHub>("/hubs/llm-streaming");
+
+// Map SignalR hub for analytics updates
+app.MapHub<EvoAITest.ApiService.Hubs.AnalyticsHub>("/hubs/analytics");
 
 // Map API endpoints
 app.MapTaskEndpoints();

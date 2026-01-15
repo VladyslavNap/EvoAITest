@@ -1,0 +1,905 @@
+@page "/analytics/dashboard"
+@using EvoAITest.Core.Models.Analytics
+@using EvoAITest.Web.Services
+@inject HttpClient HttpClient
+@inject NavigationManager Navigation
+@inject AnalyticsHubClient HubClient
+@implements IAsyncDisposable
+
+<PageTitle>Analytics Dashboard - EvoAITest</PageTitle>
+
+<div class="analytics-dashboard">
+    <div class="dashboard-header">
+        <h1>📊 Analytics Dashboard</h1>
+        <div class="header-actions">
+            <button class="btn btn-primary" @onclick="RefreshDashboard" disabled="@loading">
+                <span class="icon">🔄</span> @(loading ? "Loading..." : "Refresh")
+            </button>
+            <button class="btn btn-secondary" @onclick="NavigateToFlakyTests">
+                <span class="icon">⚠️</span> View Flaky Tests
+            </button>
+            @if (HubClient.IsConnected)
+            {
+                <span class="connection-status connected" title="Real-time updates active">
+                    🟢 Live
+                </span>
+            }
+            else
+            {
+                <span class="connection-status disconnected" title="Real-time updates inactive">
+                    🔴 Offline
+                </span>
+            }
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Loading analytics data...</p>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="alert alert-danger">
+            <h4>Error Loading Dashboard</h4>
+            <p>@error</p>
+            <button class="btn btn-sm btn-secondary" @onclick="RefreshDashboard">Retry</button>
+        </div>
+    }
+    else if (statistics != null)
+    {
+        <!-- Health Status Banner -->
+        <div class="health-banner @GetHealthClass(statistics.Health)">
+            <div class="health-content">
+                <span class="health-icon">@GetHealthIcon(statistics.Health)</span>
+                <div class="health-info">
+                    <h3>Test Suite Health: @statistics.Health</h3>
+                    <p>@GetHealthDescription(statistics.Health)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="stats-grid">
+            <!-- Total Executions -->
+            <div class="stat-card">
+                <div class="stat-icon">🚀</div>
+                <div class="stat-content">
+                    <div class="stat-value">@statistics.TotalExecutions.ToString("N0")</div>
+                    <div class="stat-label">Total Executions</div>
+                    <div class="stat-detail">@statistics.ExecutionsLast24Hours in last 24h</div>
+                </div>
+            </div>
+
+            <!-- Pass Rate -->
+            <div class="stat-card @(statistics.OverallPassRate >= 90 ? "stat-success" : statistics.OverallPassRate >= 70 ? "stat-warning" : "stat-danger")">
+                <div class="stat-icon">✅</div>
+                <div class="stat-content">
+                    <div class="stat-value">@statistics.OverallPassRate.ToString("F1")%</div>
+                    <div class="stat-label">Overall Pass Rate</div>
+                    <div class="stat-detail">
+                        7d: @statistics.PassRateLast7Days.ToString("F1")% | 
+                        30d: @statistics.PassRateLast30Days.ToString("F1")%
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Tests -->
+            <div class="stat-card">
+                <div class="stat-icon">🧪</div>
+                <div class="stat-content">
+                    <div class="stat-value">@statistics.TotalTests</div>
+                    <div class="stat-label">Total Tests</div>
+                    <div class="stat-detail">Across @statistics.TotalRecordings recordings</div>
+                </div>
+            </div>
+
+            <!-- Flaky Tests -->
+            <div class="stat-card @(statistics.FlakyTestCount > 0 ? "stat-warning" : "stat-success")">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-content">
+                    <div class="stat-value">@statistics.FlakyTestCount</div>
+                    <div class="stat-label">Flaky Tests</div>
+                    <div class="stat-detail">@statistics.StableTestCount stable tests</div>
+                </div>
+            </div>
+
+            <!-- Average Duration -->
+            <div class="stat-card">
+                <div class="stat-icon">⏱️</div>
+                <div class="stat-content">
+                    <div class="stat-value">@FormatDuration(statistics.AverageExecutionDurationMs)</div>
+                    <div class="stat-label">Avg Duration</div>
+                    <div class="stat-detail">@statistics.TotalExecutionTimeHours.ToString("F1")h total time</div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="stat-card">
+                <div class="stat-icon">📈</div>
+                <div class="stat-content">
+                    <div class="stat-value">@statistics.ExecutionsLast7Days</div>
+                    <div class="stat-label">Last 7 Days</div>
+                    <div class="stat-detail">@statistics.ExecutionsLast30Days in last 30 days</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trends Section -->
+        @if (statistics.RecentTrends.Any())
+        {
+            <div class="section-container">
+                <div class="section-header">
+                    <h2>📊 Pass Rate Trends (Last 30 Days)</h2>
+                </div>
+                <div class="trend-chart-container">
+                    <div class="simple-chart">
+                        @foreach (var trend in statistics.RecentTrends.OrderBy(t => t.Timestamp))
+                        {
+                            var height = trend.PassRate;
+                            var colorClass = trend.PassRate >= 90 ? "bar-success" : 
+                                           trend.PassRate >= 70 ? "bar-warning" : "bar-danger";
+                            
+                            <div class="chart-bar-wrapper" title="@trend.Timestamp.ToString("MMM dd"): @trend.PassRate.ToString("F1")%">
+                                <div class="chart-bar @colorClass" style="height: @(height)%">
+                                    <span class="bar-label">@trend.PassRate.ToString("F0")%</span>
+                                </div>
+                                <div class="chart-label">@trend.Timestamp.ToString("MMM dd")</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Top Lists Section -->
+        <div class="top-lists-grid">
+            <!-- Top Failing Tests -->
+            <div class="list-card">
+                <div class="list-header">
+                    <h3>❌ Top Failing Tests</h3>
+                    <span class="badge">@statistics.TopFailingTests.Count</span>
+                </div>
+                <div class="list-content">
+                    @if (statistics.TopFailingTests.Any())
+                    {
+                        @foreach (var test in statistics.TopFailingTests)
+                        {
+                            <div class="list-item" @onclick="() => NavigateToRecording(test.RecordingSessionId)">
+                                <div class="item-main">
+                                    <span class="item-name" title="@test.TestName">@TruncateName(test.TestName, 40)</span>
+                                    <span class="badge badge-danger">@test.FailedCount fails</span>
+                                </div>
+                                <div class="item-details">
+                                    <span>Pass Rate: @test.PassRate.ToString("F1")%</span>
+                                    <span>Executions: @test.ExecutionCount</span>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state">
+                            <p>✨ No failing tests found!</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Slowest Tests -->
+            <div class="list-card">
+                <div class="list-header">
+                    <h3>🐌 Slowest Tests</h3>
+                    <span class="badge">@statistics.SlowestTests.Count</span>
+                </div>
+                <div class="list-content">
+                    @if (statistics.SlowestTests.Any())
+                    {
+                        @foreach (var test in statistics.SlowestTests)
+                        {
+                            <div class="list-item" @onclick="() => NavigateToRecording(test.RecordingSessionId)">
+                                <div class="item-main">
+                                    <span class="item-name" title="@test.TestName">@TruncateName(test.TestName, 40)</span>
+                                    <span class="badge badge-info">@FormatDuration(test.AverageDurationMs)</span>
+                                </div>
+                                <div class="item-details">
+                                    <span>Pass Rate: @test.PassRate.ToString("F1")%</span>
+                                    <span>Executions: @test.ExecutionCount</span>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state">
+                            <p>No execution data available</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Most Executed Tests -->
+            <div class="list-card">
+                <div class="list-header">
+                    <h3>🔥 Most Executed Tests</h3>
+                    <span class="badge">@statistics.TopExecutedTests.Count</span>
+                </div>
+                <div class="list-content">
+                    @if (statistics.TopExecutedTests.Any())
+                    {
+                        @foreach (var test in statistics.TopExecutedTests)
+                        {
+                            <div class="list-item" @onclick="() => NavigateToRecording(test.RecordingSessionId)">
+                                <div class="item-main">
+                                    <span class="item-name" title="@test.TestName">@TruncateName(test.TestName, 40)</span>
+                                    <span class="badge badge-primary">@test.ExecutionCount runs</span>
+                                </div>
+                                <div class="item-details">
+                                    <span>Pass Rate: @test.PassRate.ToString("F1")%</span>
+                                    <span>Avg: @FormatDuration(test.AverageDurationMs)</span>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state">
+                            <p>No execution data available</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <h3>Quick Actions</h3>
+            <div class="action-buttons">
+                <button class="btn btn-outline" @onclick="NavigateToFlakyTestsPage">
+                    View All Flaky Tests
+                </button>
+                <button class="btn btn-outline" @onclick="NavigateToExecutionHistory">
+                    View Execution History
+                </button>
+                <button class="btn btn-outline" @onclick="ExportDashboard">
+                    Export Dashboard Data
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+private DashboardStatistics? statistics;
+private bool loading = true;
+private string? error = null;
+private bool realtimeUpdatesEnabled = true;
+
+protected override async Task OnInitializedAsync()
+{
+    // Load initial dashboard data
+    await LoadDashboard();
+
+    // Connect to SignalR hub for real-time updates
+    await InitializeSignalR();
+}
+
+private async Task InitializeSignalR()
+{
+    try
+    {
+        if (!HubClient.IsConnected)
+        {
+            await HubClient.StartAsync();
+        }
+
+        // Subscribe to dashboard updates
+        await HubClient.SubscribeToDashboardAsync();
+
+        // Register event handlers
+        HubClient.OnDashboardUpdated += HandleDashboardUpdate;
+        HubClient.OnFlakyTestDetected += HandleFlakyTestDetected;
+        HubClient.OnPassRateAlert += HandlePassRateAlert;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"SignalR connection error: {ex.Message}");
+        // Continue without real-time updates
+    }
+}
+
+private async Task HandleDashboardUpdate(DashboardStatistics updatedStatistics)
+{
+    if (realtimeUpdatesEnabled)
+    {
+        statistics = updatedStatistics;
+        await InvokeAsync(StateHasChanged);
+    }
+}
+
+private async Task HandleFlakyTestDetected(FlakyTestAnalysis analysis)
+{
+    Console.WriteLine($"New flaky test detected: {analysis.TestName} (Score: {analysis.FlakinessScore:F1})");
+    // Could show a toast notification here
+    await InvokeAsync(StateHasChanged);
+}
+
+private async Task HandlePassRateAlert(PassRateAlert alert)
+{
+    Console.WriteLine($"Pass rate alert: {alert.Message}");
+    // Could show a toast notification here
+    await InvokeAsync(StateHasChanged);
+}
+
+private async Task LoadDashboard()
+{
+    try
+    {
+        loading = true;
+        error = null;
+        StateHasChanged();
+
+        statistics = await HttpClient.GetFromJsonAsync<DashboardStatistics>("/api/analytics/dashboard");
+    }
+    catch (Exception ex)
+    {
+        error = $"Failed to load dashboard: {ex.Message}";
+    }
+    finally
+    {
+        loading = false;
+        StateHasChanged();
+    }
+}
+
+public async ValueTask DisposeAsync()
+{
+    // Unregister event handlers
+    HubClient.OnDashboardUpdated -= HandleDashboardUpdate;
+    HubClient.OnFlakyTestDetected -= HandleFlakyTestDetected;
+    HubClient.OnPassRateAlert -= HandlePassRateAlert;
+
+    // Unsubscribe from dashboard updates
+    await HubClient.UnsubscribeFromDashboardAsync();
+}
+
+    private async Task RefreshDashboard()
+    {
+        await LoadDashboard();
+    }
+
+    private void NavigateToFlakyTests()
+    {
+        Navigation.NavigateTo("/analytics/flaky-tests");
+    }
+
+    private void NavigateToFlakyTestsPage()
+    {
+        Navigation.NavigateTo("/analytics/flaky-tests");
+    }
+
+    private void NavigateToExecutionHistory()
+    {
+        Navigation.NavigateTo("/test-execution/results");
+    }
+
+    private void NavigateToRecording(Guid recordingId)
+    {
+        Navigation.NavigateTo($"/analytics/recordings/{recordingId}/insights");
+    }
+
+    private string GetHealthClass(TestSuiteHealth health)
+    {
+        return health switch
+        {
+            TestSuiteHealth.Excellent => "health-excellent",
+            TestSuiteHealth.Good => "health-good",
+            TestSuiteHealth.Fair => "health-fair",
+            TestSuiteHealth.Poor => "health-poor",
+            _ => "health-unknown"
+        };
+    }
+
+    private string GetHealthIcon(TestSuiteHealth health)
+    {
+        return health switch
+        {
+            TestSuiteHealth.Excellent => "🌟",
+            TestSuiteHealth.Good => "✅",
+            TestSuiteHealth.Fair => "⚠️",
+            TestSuiteHealth.Poor => "❌",
+            _ => "❓"
+        };
+    }
+
+    private string GetHealthDescription(TestSuiteHealth health)
+    {
+        return health switch
+        {
+            TestSuiteHealth.Excellent => "Your test suite is performing excellently with high pass rates and minimal flakiness.",
+            TestSuiteHealth.Good => "Your test suite is in good shape with reliable test execution.",
+            TestSuiteHealth.Fair => "Your test suite needs some attention to improve reliability.",
+            TestSuiteHealth.Poor => "Your test suite requires immediate attention due to frequent failures or high flakiness.",
+            _ => "Insufficient data to determine test suite health."
+        };
+    }
+
+    private string FormatDuration(long milliseconds)
+    {
+        if (milliseconds < 1000)
+            return $"{milliseconds}ms";
+        if (milliseconds < 60000)
+            return $"{(milliseconds / 1000.0):F1}s";
+        return $"{(milliseconds / 60000.0):F1}m";
+    }
+
+    private string TruncateName(string name, int maxLength)
+    {
+        if (name.Length <= maxLength)
+            return name;
+        return name.Substring(0, maxLength - 3) + "...";
+    }
+
+    private void ExportDashboard()
+    {
+        // TODO: Implement export functionality
+        Console.WriteLine("Export dashboard data");
+    }
+}
+
+<style>
+    .analytics-dashboard {
+        padding: 20px;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    .dashboard-header h1 {
+        margin: 0;
+        font-size: 32px;
+        color: #333;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    .loading-container {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #007bff;
+        border-radius: 50%;
+        margin: 0 auto 20px;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Health Banner */
+    .health-banner {
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+        border-left: 6px solid;
+    }
+
+    .health-excellent {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        border-color: #28a745;
+    }
+
+    .health-good {
+        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+        border-color: #17a2b8;
+    }
+
+    .health-fair {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        border-color: #ffc107;
+    }
+
+    .health-poor {
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        border-color: #dc3545;
+    }
+
+    .health-unknown {
+        background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%);
+        border-color: #6c757d;
+    }
+
+    .health-content {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .health-icon {
+        font-size: 48px;
+    }
+
+    .health-info h3 {
+        margin: 0 0 5px 0;
+        font-size: 24px;
+    }
+
+    .health-info p {
+        margin: 0;
+        color: #555;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        gap: 15px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .stat-icon {
+        font-size: 40px;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .stat-content {
+        flex: 1;
+    }
+
+    .stat-value {
+        font-size: 32px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 5px;
+    }
+
+    .stat-label {
+        font-size: 14px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 5px;
+    }
+
+    .stat-detail {
+        font-size: 12px;
+        color: #999;
+    }
+
+    .stat-success {
+        border-left: 4px solid #28a745;
+    }
+
+    .stat-warning {
+        border-left: 4px solid #ffc107;
+    }
+
+    .stat-danger {
+        border-left: 4px solid #dc3545;
+    }
+
+    /* Trend Chart */
+    .section-container {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 30px;
+    }
+
+    .section-header {
+        margin-bottom: 20px;
+    }
+
+    .section-header h2 {
+        margin: 0;
+        font-size: 20px;
+        color: #333;
+    }
+
+    .trend-chart-container {
+        overflow-x: auto;
+    }
+
+    .simple-chart {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        min-height: 200px;
+        padding: 10px 0;
+    }
+
+    .chart-bar-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 40px;
+    }
+
+    .chart-bar {
+        width: 100%;
+        min-height: 20px;
+        border-radius: 4px 4px 0 0;
+        position: relative;
+        transition: all 0.3s;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 5px;
+    }
+
+    .chart-bar:hover {
+        opacity: 0.8;
+        transform: scaleY(1.05);
+    }
+
+    .bar-success {
+        background: linear-gradient(180deg, #28a745 0%, #20c997 100%);
+    }
+
+    .bar-warning {
+        background: linear-gradient(180deg, #ffc107 0%, #fd7e14 100%);
+    }
+
+    .bar-danger {
+        background: linear-gradient(180deg, #dc3545 0%, #c82333 100%);
+    }
+
+    .bar-label {
+        font-size: 11px;
+        color: white;
+        font-weight: bold;
+    }
+
+    .chart-label {
+        font-size: 10px;
+        color: #666;
+        margin-top: 5px;
+        transform: rotate(-45deg);
+        transform-origin: center;
+        white-space: nowrap;
+    }
+
+    /* Top Lists */
+    .top-lists-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .list-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .list-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .list-header h3 {
+        margin: 0;
+        font-size: 18px;
+        color: #333;
+    }
+
+    .list-content {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .list-item {
+        padding: 15px 20px;
+        border-bottom: 1px solid #f0f0f0;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .list-item:hover {
+        background: #f8f9fa;
+    }
+
+    .list-item:last-child {
+        border-bottom: none;
+    }
+
+    .item-main {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .item-name {
+        font-weight: 500;
+        color: #333;
+        flex: 1;
+    }
+
+    .item-details {
+        display: flex;
+        gap: 15px;
+        font-size: 12px;
+        color: #666;
+    }
+
+    .badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .badge-primary {
+        background: #007bff;
+        color: white;
+    }
+
+    .badge-danger {
+        background: #dc3545;
+        color: white;
+    }
+
+    .badge-info {
+        background: #17a2b8;
+        color: white;
+    }
+
+    .empty-state {
+        padding: 40px 20px;
+        text-align: center;
+        color: #999;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .quick-actions h3 {
+        margin: 0 0 15px 0;
+        font-size: 18px;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background: #007bff;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-outline {
+        background: white;
+        color: #007bff;
+        border: 1px solid #007bff;
+    }
+
+    .btn-outline:hover {
+        background: #007bff;
+        color: white;
+    }
+
+    .alert {
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+
+    .alert h4 {
+        margin: 0 0 10px 0;
+    }
+
+    .icon {
+        font-size: 16px;
+    }
+
+    .connection-status {
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .connection-status.connected {
+        background: rgba(40, 167, 69, 0.1);
+        color: #28a745;
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .connection-status.disconnected {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+        border: 1px solid rgba(220, 53, 69, 0.3);
+    }
+</style>
