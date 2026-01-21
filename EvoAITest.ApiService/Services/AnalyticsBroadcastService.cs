@@ -14,6 +14,11 @@ public sealed class AnalyticsBroadcastService : BackgroundService
     private readonly IHubContext<AnalyticsHub> _hubContext;
     private readonly TimeSpan _updateInterval = TimeSpan.FromSeconds(30); // Update every 30 seconds
     private readonly TimeSpan _trendCalculationInterval = TimeSpan.FromMinutes(5); // Calculate trends every 5 minutes
+    
+    // Throttling
+    private DateTimeOffset _lastDashboardUpdate = DateTimeOffset.MinValue;
+    private DateTimeOffset _lastTrendCalculation = DateTimeOffset.MinValue;
+    private const int MinSecondsBetweenUpdates = 10; // Minimum 10 seconds between updates
 
     public AnalyticsBroadcastService(
         ILogger<AnalyticsBroadcastService> logger,
@@ -63,6 +68,14 @@ public sealed class AnalyticsBroadcastService : BackgroundService
 
     private async Task BroadcastDashboardUpdate(CancellationToken cancellationToken)
     {
+        // Throttle updates
+        var timeSinceLastUpdate = DateTimeOffset.UtcNow - _lastDashboardUpdate;
+        if (timeSinceLastUpdate.TotalSeconds < MinSecondsBetweenUpdates)
+        {
+            _logger.LogDebug("Skipping dashboard update due to throttling");
+            return;
+        }
+
         try
         {
             using var scope = _scopeFactory.CreateScope();
@@ -71,6 +84,8 @@ public sealed class AnalyticsBroadcastService : BackgroundService
             var statistics = await analyticsService.GetDashboardStatisticsAsync(cancellationToken);
 
             await _hubContext.SendDashboardUpdate(statistics);
+
+            _lastDashboardUpdate = DateTimeOffset.UtcNow;
 
             // Check for pass rate alerts
             if (statistics.PassRateLast24Hours < 90)
@@ -91,6 +106,14 @@ public sealed class AnalyticsBroadcastService : BackgroundService
 
     private async Task CalculateAndBroadcastTrends(CancellationToken cancellationToken)
     {
+        // Throttle trend calculations
+        var timeSinceLastCalculation = DateTimeOffset.UtcNow - _lastTrendCalculation;
+        if (timeSinceLastCalculation < _trendCalculationInterval)
+        {
+            _logger.LogDebug("Skipping trend calculation due to throttling");
+            return;
+        }
+
         try
         {
             using var scope = _scopeFactory.CreateScope();
@@ -106,9 +129,13 @@ public sealed class AnalyticsBroadcastService : BackgroundService
                 null,
                 cancellationToken);
 
-            await _hubContext.SendTrendCalculated(trends);
-
-            _logger.LogInformation("Trends calculated and broadcasted: {Count} data points", trends.Count);
+            // Only broadcast if there are trends and we have clients
+            if (trends.Any())
+            {
+                await _hubContext.SendTrendCalculated(trends);
+                _lastTrendCalculation = DateTimeOffset.UtcNow;
+                _logger.LogInformation("Trends calculated and broadcasted: {Count} data points", trends.Count);
+            }
         }
         catch (Exception ex)
         {

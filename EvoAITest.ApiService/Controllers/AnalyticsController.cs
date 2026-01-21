@@ -29,6 +29,8 @@ public sealed class AnalyticsController : ControllerBase
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    // ==================== QUERY ENDPOINTS ====================
+
     /// <summary>
     /// Gets comprehensive dashboard statistics
     /// </summary>
@@ -36,6 +38,7 @@ public sealed class AnalyticsController : ControllerBase
     /// <returns>Dashboard statistics including pass rates, flaky tests, and trends</returns>
     [HttpGet("dashboard")]
     [ProducesResponseType<DashboardStatistics>(StatusCodes.Status200OK)]
+    [ResponseCache(Duration = 30, Location = ResponseCacheLocation.Any, VaryByHeader = "User-Agent")]
     public async Task<IActionResult> GetDashboard(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Generating dashboard statistics");
@@ -61,6 +64,7 @@ public sealed class AnalyticsController : ControllerBase
     /// <returns>List of flaky test analyses</returns>
     [HttpGet("flaky-tests")]
     [ProducesResponseType<List<FlakyTestAnalysis>>(StatusCodes.Status200OK)]
+    [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "minScore", "severity" })]
     public async Task<IActionResult> GetFlakyTests(
         [FromQuery] double? minScore = null,
         [FromQuery] FlakinessSeverity? severity = null,
@@ -103,6 +107,7 @@ public sealed class AnalyticsController : ControllerBase
     /// <returns>List of trend data points</returns>
     [HttpGet("trends")]
     [ProducesResponseType<List<TestTrend>>(StatusCodes.Status200OK)]
+    [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "interval", "days", "recordingId" })]
     public async Task<IActionResult> GetTrends(
         [FromQuery] TrendInterval interval = TrendInterval.Daily,
         [FromQuery] int days = 30,

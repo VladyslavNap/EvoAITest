@@ -27,6 +27,12 @@ builder.Services.AddAgentServices();
 // Add services to the container.
 builder.Services.AddProblemDetails();
 
+// Add response caching for analytics endpoints
+builder.Services.AddResponseCaching();
+
+// Add memory cache for analytics
+builder.Services.AddMemoryCache();
+
 // Add SignalR for real-time LLM streaming
 builder.Services.AddSignalR();
 
@@ -73,6 +79,9 @@ app.UseExceptionHandler();
 
 // Enable CORS
 app.UseCors("AllowBlazorWeb");
+
+// Enable response caching
+app.UseResponseCaching();
 
 // Enable authentication and authorization middleware.
 // Note: In development, requests without authentication will fall back to "anonymous-user".
