@@ -281,7 +281,7 @@
 private DashboardStatistics? statistics;
 private bool loading = true;
 private string? error = null;
-private bool realtimeUpdatesEnabled = true;
+private readonly bool realtimeUpdatesEnabled = true;
 
 protected override async Task OnInitializedAsync()
 {

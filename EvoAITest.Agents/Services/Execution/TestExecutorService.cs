@@ -277,7 +277,7 @@ public sealed class TestExecutorService : ITestExecutor
         session.TotalSteps = CountTestSteps(testCode);
         session.CurrentStep = 0;
 
-        var playwright = await Playwright.CreateAsync();
+        using var playwright = await Playwright.CreateAsync();
         IBrowser? browser = null;
 
         try
@@ -383,7 +383,6 @@ public sealed class TestExecutorService : ITestExecutor
             {
                 await browser.CloseAsync();
             }
-            playwright.Dispose();
         }
 
         session.CompletedAt = DateTimeOffset.UtcNow;
@@ -492,16 +491,13 @@ public sealed class TestExecutorService : ITestExecutor
             @"\[TestMethod\]\s+public\s+async\s+Task\s+(\w+)\("
         };
 
-        foreach (var pattern in patterns)
-        {
-            var match = Regex.Match(testCode, pattern);
-            if (match.Success)
-            {
-                return match.Groups[1].Value;
-            }
-        }
+        var testName = patterns
+            .Select(pattern => Regex.Match(testCode, pattern))
+            .Where(match => match.Success)
+            .Select(match => match.Groups[1].Value)
+            .FirstOrDefault();
 
-        return null;
+        return testName;
     }
 
     private string? DetectFramework(string testCode)
