@@ -1,7 +1,7 @@
 @using EvoAITest.Core.Models.Analytics
 
 <div class="trend-chart-container">
-    @if (string.IsNullOrEmpty(Title) == false)
+    @if (!string.IsNullOrEmpty(Title))
     {
         <div class="chart-header">
             <h3>@Title</h3>
@@ -162,10 +162,10 @@
     [Parameter]
     public EventCallback<ChartPoint> OnDataPointClick { get; set; }
 
-    private List<ChartPoint> dataPoints = new();
-    private List<string> xAxisLabels = new();
+    private readonly List<ChartPoint> dataPoints = new();
+    private readonly List<string> xAxisLabels = new();
     private double MaxValue = 100;
-    private bool loading = false;
+    private readonly bool loading = false;
     private string YAxisFormat = "F0";
     private string ValueFormat = "F1";
 

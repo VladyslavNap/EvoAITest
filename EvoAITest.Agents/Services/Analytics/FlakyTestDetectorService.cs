@@ -75,7 +75,6 @@ public sealed class FlakyTestDetectorService : IFlakyTestDetector
         // Calculate basic statistics
         var totalExecutions = resultsList.Count;
         var passedExecutions = resultsList.Count(r => r.Status == TestExecutionStatus.Passed);
-        var failedExecutions = resultsList.Count(r => r.Status == TestExecutionStatus.Failed);
         var passRate = totalExecutions > 0 ? (double)passedExecutions / totalExecutions * 100 : 0;
 
         // Identify flaky failures (failures followed by passes)
@@ -480,7 +479,7 @@ public sealed class FlakyTestDetectorService : IFlakyTestDetector
         var durations = results.Select(r => (double)r.DurationMs).ToList();
         var mean = durations.Average();
 
-        if (mean == 0)
+        if (results.All(r => r.DurationMs == 0))
         {
             return 0;
         }
@@ -683,13 +682,9 @@ public sealed class FlakyTestDetectorService : IFlakyTestDetector
             recommendations.Add("Check for race conditions and timing dependencies");
         }
 
-        foreach (var pattern in patterns)
-        {
-            if (!string.IsNullOrEmpty(pattern.SuggestedFix))
-            {
-                recommendations.Add(pattern.SuggestedFix);
-            }
-        }
+        recommendations.AddRange(patterns
+            .Where(p => !string.IsNullOrEmpty(p.SuggestedFix))
+            .Select(p => p.SuggestedFix!));
 
         if (!recommendations.Any())
         {

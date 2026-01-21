@@ -264,7 +264,7 @@
 @code {
     private List<FlakyTestAnalysis> flakyTests = new();
     private List<FlakyTestAnalysis> filteredTests = new();
-    private HashSet<Guid> expandedTestIds = new();
+    private readonly HashSet<Guid> expandedTestIds = new();
     private bool loading = true;
     private string? error = null;
 

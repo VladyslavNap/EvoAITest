@@ -110,7 +110,7 @@
     public EventCallback<BarChartItem> OnBarClick { get; set; }
 
     private List<BarChartItem> orderedData = new();
-    private bool loading = false;
+    private readonly bool loading = false;
     private double MaxValue = 0;
     private double MinValue = 0;
     private double AverageValue = 0;

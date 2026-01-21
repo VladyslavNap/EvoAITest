@@ -234,7 +234,7 @@
     private bool loading = true;
     private string? error = null;
     private int currentPage = 0;
-    private int pageSize = 20;
+    private readonly int pageSize = 20;
 
     protected override async Task OnInitializedAsync()
     {

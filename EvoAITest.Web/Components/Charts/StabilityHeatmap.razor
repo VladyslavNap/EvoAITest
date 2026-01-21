@@ -85,8 +85,8 @@
     [Parameter]
     public EventCallback<HeatmapCell> OnCellClick { get; set; }
 
-    private List<HeatmapCell> heatmapCells = new();
-    private bool loading = false;
+    private readonly List<HeatmapCell> heatmapCells = new();
+    private readonly bool loading = false;
     private double AverageStability = 0;
     private int StableCount = 0;
     private int UnstableCount = 0;
