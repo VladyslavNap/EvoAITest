@@ -1,0 +1,382 @@
+@using EvoAITest.Core.Models.Analytics
+
+<div class="bar-chart-container">
+    @if (!string.IsNullOrEmpty(Title))
+    {
+        <div class="chart-header">
+            <h3>@Title</h3>
+            @if (!string.IsNullOrEmpty(Subtitle))
+            {
+                <p class="chart-subtitle">@Subtitle</p>
+            }
+        </div>
+    }
+
+    @if (loading)
+    {
+        <div class="chart-loading">
+            <div class="spinner-small"></div>
+            <span>Loading chart data...</span>
+        </div>
+    }
+    else if (DataItems == null || !DataItems.Any())
+    {
+        <div class="chart-empty">
+            <span class="empty-icon">📊</span>
+            <p>No data available</p>
+        </div>
+    }
+    else
+    {
+        <div class="chart-content">
+            <div class="bars-container">
+                @foreach (var item in orderedData)
+                {
+                    var percentage = MaxValue > 0 ? (item.Value / MaxValue) * 100 : 0;
+                    var barColor = GetBarColor(item.Value);
+
+                    <div class="bar-row" @onclick="() => HandleBarClick(item)">
+                        <div class="bar-label" title="@item.Label">
+                            @TruncateLabel(item.Label, MaxLabelLength)
+                        </div>
+                        <div class="bar-wrapper">
+                            <div class="bar-fill @GetBarClass(item.Value)" 
+                                 style="width: @(percentage)%; background: @barColor"
+                                 title="@item.Tooltip">
+                                <span class="bar-value">@item.Value.ToString(ValueFormat)</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (ShowStats)
+            {
+                <div class="chart-stats">
+                    <div class="stat-box">
+                        <span class="stat-label">Total:</span>
+                        <span class="stat-value">@TotalValue.ToString(ValueFormat)</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Average:</span>
+                        <span class="stat-value">@AverageValue.ToString(ValueFormat)</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Max:</span>
+                        <span class="stat-value">@MaxValue.ToString(ValueFormat)</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Min:</span>
+                        <span class="stat-value">@MinValue.ToString(ValueFormat)</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public List<BarChartItem>? DataItems { get; set; }
+
+    [Parameter]
+    public string SortBy { get; set; } = "value"; // value, label
+
+    [Parameter]
+    public bool SortDescending { get; set; } = true;
+
+    [Parameter]
+    public string ColorScheme { get; set; } = "blue"; // blue, gradient, conditional
+
+    [Parameter]
+    public string ValueFormat { get; set; } = "F0";
+
+    [Parameter]
+    public int MaxLabelLength { get; set; } = 30;
+
+    [Parameter]
+    public bool ShowStats { get; set; } = true;
+
+    [Parameter]
+    public double? ConditionalThreshold { get; set; }
+
+    [Parameter]
+    public EventCallback<BarChartItem> OnBarClick { get; set; }
+
+    private List<BarChartItem> orderedData = new();
+    private readonly bool loading = false;
+    private double MaxValue = 0;
+    private double MinValue = 0;
+    private double AverageValue = 0;
+    private double TotalValue = 0;
+
+    protected override void OnParametersSet()
+    {
+        ProcessData();
+    }
+
+    private void ProcessData()
+    {
+        if (DataItems == null || !DataItems.Any())
+        {
+            orderedData.Clear();
+            return;
+        }
+
+        // Sort data
+        orderedData = SortBy.ToLower() switch
+        {
+            "label" => SortDescending 
+                ? DataItems.OrderByDescending(d => d.Label).ToList()
+                : DataItems.OrderBy(d => d.Label).ToList(),
+            _ => SortDescending
+                ? DataItems.OrderByDescending(d => d.Value).ToList()
+                : DataItems.OrderBy(d => d.Value).ToList()
+        };
+
+        // Calculate statistics
+        MaxValue = DataItems.Max(d => d.Value);
+        MinValue = DataItems.Min(d => d.Value);
+        AverageValue = DataItems.Average(d => d.Value);
+        TotalValue = DataItems.Sum(d => d.Value);
+    }
+
+    private string GetBarColor(double value)
+    {
+        return ColorScheme.ToLower() switch
+        {
+            "gradient" => GetGradientColor(value),
+            "conditional" => GetConditionalColor(value),
+            _ => "#007bff" // Default blue
+        };
+    }
+
+    private string GetGradientColor(double value)
+    {
+        var percentage = MaxValue > 0 ? (value / MaxValue) : 0;
+        
+        if (percentage >= 0.8)
+            return "#28a745"; // Green
+        else if (percentage >= 0.6)
+            return "#5cb85c"; // Light green
+        else if (percentage >= 0.4)
+            return "#ffc107"; // Yellow
+        else if (percentage >= 0.2)
+            return "#fd7e14"; // Orange
+        else
+            return "#dc3545"; // Red
+    }
+
+    private string GetConditionalColor(double value)
+    {
+        if (!ConditionalThreshold.HasValue)
+            return "#007bff";
+
+        return value >= ConditionalThreshold.Value 
+            ? "#28a745" // Green (good)
+            : "#dc3545"; // Red (bad)
+    }
+
+    private string GetBarClass(double value)
+    {
+        if (ColorScheme.ToLower() == "conditional" && ConditionalThreshold.HasValue)
+        {
+            return value >= ConditionalThreshold.Value ? "bar-success" : "bar-danger";
+        }
+        return "bar-default";
+    }
+
+    private string TruncateLabel(string label, int maxLength)
+    {
+        if (label.Length <= maxLength)
+            return label;
+        return label.Substring(0, maxLength - 3) + "...";
+    }
+
+    private async Task HandleBarClick(BarChartItem item)
+    {
+        if (OnBarClick.HasDelegate)
+        {
+            await OnBarClick.InvokeAsync(item);
+        }
+    }
+
+    public class BarChartItem
+    {
+        public string Label { get; set; } = "";
+        public double Value { get; set; }
+        public string? Tooltip { get; set; }
+        public object? Data { get; set; }
+    }
+}
+
+<style>
+    .bar-chart-container {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .chart-header {
+        margin-bottom: 20px;
+    }
+
+    .chart-header h3 {
+        margin: 0 0 5px 0;
+        font-size: 18px;
+        color: #333;
+    }
+
+    .chart-subtitle {
+        margin: 0;
+        font-size: 13px;
+        color: #666;
+    }
+
+    .chart-loading, .chart-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        color: #666;
+    }
+
+    .spinner-small {
+        width: 30px;
+        height: 30px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #007bff;
+        border-radius: 50%;
+        margin-bottom: 10px;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .empty-icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+    }
+
+    .chart-content {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .bars-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .bar-row {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+
+    .bar-row:hover {
+        opacity: 0.8;
+    }
+
+    .bar-label {
+        min-width: 150px;
+        font-size: 13px;
+        color: #555;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .bar-wrapper {
+        flex: 1;
+        background: #f0f0f0;
+        border-radius: 4px;
+        height: 32px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 10px;
+        transition: width 0.5s ease, transform 0.2s;
+        position: relative;
+        min-width: 30px;
+    }
+
+    .bar-fill:hover {
+        transform: scaleY(1.1);
+    }
+
+    .bar-value {
+        font-size: 12px;
+        font-weight: 600;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .chart-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 15px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .stat-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .stat-label {
+        font-size: 11px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .bar-label {
+            min-width: 100px;
+            font-size: 12px;
+        }
+
+        .bar-wrapper {
+            height: 28px;
+        }
+
+        .bar-value {
+            font-size: 11px;
+        }
+    }
+</style>

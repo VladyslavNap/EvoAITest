@@ -27,8 +27,17 @@ builder.Services.AddAgentServices();
 // Add services to the container.
 builder.Services.AddProblemDetails();
 
+// Add response caching for analytics endpoints
+builder.Services.AddResponseCaching();
+
+// Add memory cache for analytics
+builder.Services.AddMemoryCache();
+
 // Add SignalR for real-time LLM streaming
 builder.Services.AddSignalR();
+
+// Add analytics broadcast background service
+builder.Services.AddHostedService<EvoAITest.ApiService.Services.AnalyticsBroadcastService>();
 
 // Add controllers for Visual Regression API
 builder.Services.AddControllers();
@@ -71,6 +80,9 @@ app.UseExceptionHandler();
 // Enable CORS
 app.UseCors("AllowBlazorWeb");
 
+// Enable response caching
+app.UseResponseCaching();
+
 // Enable authentication and authorization middleware.
 // Note: In development, requests without authentication will fall back to "anonymous-user".
 // In production, configure proper authentication (e.g., JWT Bearer) to secure endpoints.
@@ -87,6 +99,9 @@ app.MapControllers();
 
 // Map SignalR hub for LLM streaming
 app.MapHub<EvoAITest.ApiService.Hubs.LLMStreamingHub>("/hubs/llm-streaming");
+
+// Map SignalR hub for analytics updates
+app.MapHub<EvoAITest.ApiService.Hubs.AnalyticsHub>("/hubs/analytics");
 
 // Map API endpoints
 app.MapTaskEndpoints();

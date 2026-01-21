@@ -15,6 +15,9 @@ builder.Services.AddEvoAITestCore(builder.Configuration);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Add SignalR client for real-time analytics updates
+builder.Services.AddSingleton<EvoAITest.Web.Services.AnalyticsHubClient>();
+
 builder.Services.AddHttpClient<WeatherApiClient>(client =>
     {
         // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.

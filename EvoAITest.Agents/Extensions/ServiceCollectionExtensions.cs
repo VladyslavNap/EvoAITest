@@ -27,6 +27,18 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<EvoAITest.Core.Abstractions.ITestGenerator, EvoAITest.Agents.Services.Recording.TestGeneratorService>();
         services.TryAddScoped<RecordingAgent>();
 
+        // Register test execution services
+        services.TryAddScoped<EvoAITest.Core.Abstractions.ITestExecutor, EvoAITest.Agents.Services.Execution.TestExecutorService>();
+        services.TryAddScoped<EvoAITest.Core.Abstractions.ITestResultCollector, EvoAITest.Agents.Services.Execution.TestResultCollectorService>();
+        services.TryAddScoped<EvoAITest.Core.Abstractions.ITestResultStorage, EvoAITest.Agents.Services.Execution.TestResultStorageService>();
+
+        // Register analytics services
+        services.TryAddScoped<EvoAITest.Core.Abstractions.IFlakyTestDetector, EvoAITest.Agents.Services.Analytics.FlakyTestDetectorService>();
+        services.TryAddScoped<EvoAITest.Core.Abstractions.ITestAnalyticsService, EvoAITest.Agents.Services.Analytics.TestAnalyticsService>();
+        services.TryAddScoped<EvoAITest.Core.Abstractions.IAnalyticsExportService, EvoAITest.Agents.Services.Analytics.AnalyticsExportService>();
+        services.TryAddSingleton<EvoAITest.Agents.Services.Analytics.AnalyticsCacheService>();
+        services.TryAddSingleton<EvoAITest.Agents.Services.Analytics.AnalyticsPerformanceMonitor>();
+
         // Other agent implementations will be registered as they are implemented
         // services.TryAddScoped<IAgent, BrowserAutomationAgent>();
 

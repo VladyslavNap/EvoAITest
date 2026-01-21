@@ -2,6 +2,8 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using EvoAITest.Core.Models;
 using EvoAITest.Core.Data.Models;
+using EvoAITest.Core.Models.Execution;
+using EvoAITest.Core.Models.Analytics;
 
 namespace EvoAITest.Core.Data;
 
@@ -72,6 +74,26 @@ public sealed class EvoAIDbContext : DbContext
     /// Gets or sets the RecordedInteractions DbSet.
     /// </summary>
     public DbSet<RecordedInteractionEntity> RecordedInteractions => Set<RecordedInteractionEntity>();
+
+    /// <summary>
+    /// Gets or sets the TestExecutionResults DbSet.
+    /// </summary>
+    public DbSet<TestExecutionResult> TestExecutionResults => Set<TestExecutionResult>();
+
+    /// <summary>
+    /// Gets or sets the TestExecutionSessions DbSet.
+    /// </summary>
+    public DbSet<TestExecutionSession> TestExecutionSessions => Set<TestExecutionSession>();
+
+    /// <summary>
+    /// Gets or sets the FlakyTestAnalyses DbSet.
+    /// </summary>
+    public DbSet<FlakyTestAnalysis> FlakyTestAnalyses => Set<FlakyTestAnalysis>();
+
+    /// <summary>
+    /// Gets or sets the TestTrends DbSet.
+    /// </summary>
+    public DbSet<TestTrend> TestTrends => Set<TestTrend>();
 
     /// <summary>
     /// Configures the database model using the specified model builder.
@@ -591,6 +613,292 @@ public sealed class EvoAIDbContext : DbContext
                 .WithMany(s => s.Interactions)
                 .HasForeignKey(e => e.SessionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure TestExecutionResult entity
+        modelBuilder.Entity<TestExecutionResult>(entity =>
+        {
+            entity.ToTable("TestExecutionResults");
+            entity.HasKey(e => e.Id);
+
+            // Required properties
+            entity.Property(e => e.RecordingSessionId)
+                .IsRequired();
+
+            entity.Property(e => e.TestName)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(e => e.TestFramework)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasConversion<string>()
+                .IsRequired();
+
+            entity.Property(e => e.StartedAt)
+                .IsRequired();
+
+            // Optional properties
+            entity.Property(e => e.ErrorMessage)
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(e => e.StackTrace)
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(e => e.StandardOutput)
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(e => e.ErrorOutput)
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(e => e.Environment)
+                .HasMaxLength(500);
+
+            // JSON columns
+            entity.Property(e => e.StepResults)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<TestStepResult>>(v, JsonOptions) ?? new List<TestStepResult>()
+                );
+
+            entity.Property(e => e.Artifacts)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<TestArtifact>>(v, JsonOptions) ?? new List<TestArtifact>()
+                );
+
+            entity.Property(e => e.Metadata)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, JsonOptions) ?? new Dictionary<string, string>()
+                );
+
+            entity.Property(e => e.CompilationErrors)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<string>>(v, JsonOptions) ?? new List<string>()
+                );
+
+            // Indexes for performance
+            entity.HasIndex(e => e.RecordingSessionId)
+                .HasDatabaseName("IX_TestExecutionResults_RecordingSessionId");
+
+            entity.HasIndex(e => e.Status)
+                .HasDatabaseName("IX_TestExecutionResults_Status");
+
+            entity.HasIndex(e => e.StartedAt)
+                .HasDatabaseName("IX_TestExecutionResults_StartedAt");
+
+            entity.HasIndex(e => new { e.RecordingSessionId, e.Status })
+                .HasDatabaseName("IX_TestExecutionResults_RecordingSessionId_Status");
+
+            entity.HasIndex(e => new { e.Status, e.StartedAt })
+                .HasDatabaseName("IX_TestExecutionResults_Status_StartedAt");
+        });
+
+        // Configure TestExecutionSession entity
+        modelBuilder.Entity<TestExecutionSession>(entity =>
+        {
+            entity.ToTable("TestExecutionSessions");
+            entity.HasKey(e => e.Id);
+
+            // Required properties
+            entity.Property(e => e.RecordingSessionId)
+                .IsRequired();
+
+            entity.Property(e => e.TestFramework)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasConversion<string>()
+                .IsRequired();
+
+            entity.Property(e => e.StartedAt)
+                .IsRequired();
+
+            // Optional properties
+            entity.Property(e => e.TestCode)
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(e => e.ErrorMessage)
+                .HasColumnType("nvarchar(max)");
+
+            // JSON columns
+            entity.Property(e => e.StepResults)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<TestStepResult>>(v, JsonOptions) ?? new List<TestStepResult>()
+                );
+
+            entity.Property(e => e.Artifacts)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<TestArtifact>>(v, JsonOptions) ?? new List<TestArtifact>()
+                );
+
+            entity.Property(e => e.ConsoleOutput)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<string>>(v, JsonOptions) ?? new List<string>()
+                );
+
+            entity.Property(e => e.ErrorOutput)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<string>>(v, JsonOptions) ?? new List<string>()
+                );
+
+            entity.Property(e => e.Metadata)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, JsonOptions) ?? new Dictionary<string, string>()
+                );
+
+            // Indexes for performance
+            entity.HasIndex(e => e.RecordingSessionId)
+                .HasDatabaseName("IX_TestExecutionSessions_RecordingSessionId");
+
+            entity.HasIndex(e => e.Status)
+                .HasDatabaseName("IX_TestExecutionSessions_Status");
+
+            entity.HasIndex(e => e.StartedAt)
+                .HasDatabaseName("IX_TestExecutionSessions_StartedAt");
+        });
+
+        // Configure FlakyTestAnalysis entity
+        modelBuilder.Entity<FlakyTestAnalysis>(entity =>
+        {
+            entity.ToTable("FlakyTestAnalyses");
+            entity.HasKey(e => e.Id);
+
+            // Required properties
+            entity.Property(e => e.RecordingSessionId)
+                .IsRequired();
+
+            entity.Property(e => e.TestName)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(e => e.FlakinessScore)
+                .IsRequired();
+
+            entity.Property(e => e.Severity)
+                .HasMaxLength(50)
+                .HasConversion<string>()
+                .IsRequired();
+
+            entity.Property(e => e.AnalyzedAt)
+                .IsRequired();
+
+            // JSON columns
+            entity.Property(e => e.Patterns)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<FlakyTestPattern>>(v, JsonOptions) ?? new List<FlakyTestPattern>()
+                );
+
+            entity.Property(e => e.Recommendations)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<string>>(v, JsonOptions) ?? new List<string>()
+                );
+
+            entity.Property(e => e.RootCauses)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<string>>(v, JsonOptions) ?? new List<string>()
+                );
+
+            entity.Property(e => e.Metadata)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, JsonOptions) ?? new Dictionary<string, string>()
+                );
+
+            // Indexes for analytics queries
+            entity.HasIndex(e => e.RecordingSessionId)
+                .HasDatabaseName("IX_FlakyTestAnalyses_RecordingSessionId");
+
+            entity.HasIndex(e => e.Severity)
+                .HasDatabaseName("IX_FlakyTestAnalyses_Severity");
+
+            entity.HasIndex(e => e.FlakinessScore)
+                .HasDatabaseName("IX_FlakyTestAnalyses_FlakinessScore");
+
+            entity.HasIndex(e => e.AnalyzedAt)
+                .HasDatabaseName("IX_FlakyTestAnalyses_AnalyzedAt");
+
+            entity.HasIndex(e => new { e.RecordingSessionId, e.FlakinessScore })
+                .HasDatabaseName("IX_FlakyTestAnalyses_RecordingId_Score");
+        });
+
+        // Configure TestTrend entity
+        modelBuilder.Entity<TestTrend>(entity =>
+        {
+            entity.ToTable("TestTrends");
+            entity.HasKey(e => e.Id);
+
+            // Required properties
+            entity.Property(e => e.Timestamp)
+                .IsRequired();
+
+            entity.Property(e => e.Interval)
+                .HasMaxLength(50)
+                .HasConversion<string>()
+                .IsRequired();
+
+            entity.Property(e => e.CalculatedAt)
+                .IsRequired();
+
+            // Optional properties
+            entity.Property(e => e.TestName)
+                .HasMaxLength(500);
+
+            // JSON column for additional metrics
+            entity.Property(e => e.Metrics)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<Dictionary<string, double>>(v, JsonOptions) ?? new Dictionary<string, double>()
+                );
+
+            // Indexes for trend queries
+            entity.HasIndex(e => e.Timestamp)
+                .HasDatabaseName("IX_TestTrends_Timestamp");
+
+            entity.HasIndex(e => e.RecordingSessionId)
+                .HasDatabaseName("IX_TestTrends_RecordingSessionId");
+
+            entity.HasIndex(e => e.Interval)
+                .HasDatabaseName("IX_TestTrends_Interval");
+
+            entity.HasIndex(e => new { e.RecordingSessionId, e.Timestamp })
+                .HasDatabaseName("IX_TestTrends_RecordingId_Timestamp");
+
+            entity.HasIndex(e => new { e.Interval, e.Timestamp })
+                .HasDatabaseName("IX_TestTrends_Interval_Timestamp");
+
+            // Composite index for most common query pattern
+            entity.HasIndex(e => new { e.RecordingSessionId, e.Interval, e.Timestamp })
+                .HasDatabaseName("IX_TestTrends_RecordingId_Interval_Timestamp");
         });
     }
 
