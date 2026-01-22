@@ -1004,19 +1004,40 @@ public sealed class FlakyTestDetectorService : IFlakyTestDetector
         };
     }
 
-    private TestStabilityMetrics CreateDefaultStabilityMetrics(
-        Guid recordingSessionId,
-        DateTimeOffset windowStart)
-    {
-        return new TestStabilityMetrics
+        private TestStabilityMetrics CreateDefaultStabilityMetrics(
+            Guid recordingSessionId,
+            DateTimeOffset windowStart)
         {
-            RecordingSessionId = recordingSessionId,
-            TestName = "Unknown",
-            StabilityClass = StabilityClass.Unknown,
-            StabilityScore = 0,
-            WindowStart = windowStart,
-            WindowEnd = DateTimeOffset.UtcNow,
-            AssessmentConfidence = 0
-        };
+            return new TestStabilityMetrics
+            {
+                RecordingSessionId = recordingSessionId,
+                TestName = "Unknown",
+                StabilityClass = StabilityClass.Unknown,
+                StabilityScore = 0,
+                WindowStart = windowStart,
+                WindowEnd = DateTimeOffset.UtcNow,
+                AssessmentConfidence = 0
+            };
+        }
+
+        public async Task<List<Guid>> GetRecordingsWithRecentExecutionsAsync(
+            int days = 30,
+            CancellationToken cancellationToken = default)
+        {
+            _logger.LogInformation(
+                "Getting recording sessions with executions in the last {Days} days",
+                days);
+
+            var cutoffDate = DateTimeOffset.UtcNow.AddDays(-days);
+
+            var recordingIds = await _resultStorage.GetRecordingIdsWithExecutionsSinceAsync(
+                cutoffDate,
+                cancellationToken);
+
+            _logger.LogInformation(
+                "Found {Count} recordings with recent executions",
+                recordingIds.Count);
+
+            return recordingIds;
+        }
     }
-}

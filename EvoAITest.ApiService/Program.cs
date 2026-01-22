@@ -21,8 +21,8 @@ builder.Services.AddEvoAITestCore(builder.Configuration);
 // Add LLM services (required for AI-powered recording analysis)
 builder.Services.AddLLMServices(builder.Configuration);
 
-// Add Agent services (includes ActionAnalyzer, TestGenerator, RecordingAgent)
-builder.Services.AddAgentServices();
+// Add Agent services (includes ActionAnalyzer, TestGenerator, RecordingAgent, Analytics Background Service)
+builder.Services.AddAgentServices(builder.Configuration);
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
