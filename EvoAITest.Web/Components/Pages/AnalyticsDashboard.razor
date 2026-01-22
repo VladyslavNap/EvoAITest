@@ -4,6 +4,7 @@
 @inject HttpClient HttpClient
 @inject NavigationManager Navigation
 @inject AnalyticsHubClient HubClient
+@inject IJSRuntime JS
 @implements IAsyncDisposable
 
 <PageTitle>Analytics Dashboard - EvoAITest</PageTitle>
@@ -12,12 +13,58 @@
     <div class="dashboard-header">
         <h1>📊 Analytics Dashboard</h1>
         <div class="header-actions">
+            <!-- Date Range Filter -->
+            <div class="filter-group">
+                <label>Date Range:</label>
+                <select class="form-select" @bind="selectedDateRange" @bind:after="OnDateRangeChanged">
+                    <option value="7">Last 7 Days</option>
+                    <option value="30" selected>Last 30 Days</option>
+                    <option value="90">Last 90 Days</option>
+                    <option value="custom">Custom Range</option>
+                </select>
+            </div>
+
+            <!-- Recording Filter -->
+            @if (availableRecordings.Any())
+            {
+                <div class="filter-group">
+                    <label>Recording:</label>
+                    <select class="form-select" @bind="selectedRecordingId" @bind:after="OnRecordingFilterChanged">
+                        <option value="">All Recordings</option>
+                        @foreach (var recording in availableRecordings)
+                        {
+                            <option value="@recording.Id">@recording.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+
             <button class="btn btn-primary" @onclick="RefreshDashboard" disabled="@loading">
                 <span class="icon">🔄</span> @(loading ? "Loading..." : "Refresh")
             </button>
+
+            <!-- Export Dropdown -->
+            <div class="dropdown">
+                <button class="btn btn-secondary dropdown-toggle" type="button" id="exportDropdown">
+                    📥 Export
+                </button>
+                <div class="dropdown-menu">
+                    <button class="dropdown-item" @onclick='() => ExportDashboard("json")'>
+                        <span class="icon">📄</span> Export as JSON
+                    </button>
+                    <button class="dropdown-item" @onclick='() => ExportDashboard("csv")'>
+                        <span class="icon">📊</span> Export as CSV
+                    </button>
+                    <button class="dropdown-item" @onclick='() => ExportDashboard("html")'>
+                        <span class="icon">📋</span> Export HTML Report
+                    </button>
+                </div>
+            </div>
+
             <button class="btn btn-secondary" @onclick="NavigateToFlakyTests">
                 <span class="icon">⚠️</span> View Flaky Tests
             </button>
+
             @if (HubClient.IsConnected)
             {
                 <span class="connection-status connected" title="Real-time updates active">
@@ -50,6 +97,42 @@
     }
     else if (statistics != null)
     {
+        <!-- Health Score Widget (NEW) -->
+        @if (healthScore != null)
+        {
+            <div class="health-score-widget">
+                <div class="health-score-main">
+                    <div class="score-circle @GetHealthScoreClass(healthScore.Score)">
+                        <div class="score-value">@healthScore.Score.ToString("F0")</div>
+                        <div class="score-max">/100</div>
+                    </div>
+                    <div class="health-details">
+                        <h2>@healthScore.Health</h2>
+                        <p class="health-description">@GetHealthDescription(healthScore.Health)</p>
+                        <div class="health-metrics">
+                            <div class="metric">
+                                <span class="metric-label">Pass Rate:</span>
+                                <span class="metric-value @(healthScore.PassRate >= 90 ? "text-success" : "text-warning")">
+                                    @healthScore.PassRate.ToString("F1")%
+                                </span>
+                                <span class="trend-indicator">@GetTrendIcon(healthScore.Trends.PassRateTrend)</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Flaky Tests:</span>
+                                <span class="metric-value">@healthScore.FlakyTestPercentage.ToString("F1")%</span>
+                                <span class="trend-indicator">@GetTrendIcon(healthScore.Trends.FlakyTestTrend)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="health-score-actions">
+                    <button class="btn btn-sm btn-outline" @onclick="ShowHealthDetails">
+                        View Details
+                    </button>
+                </div>
+            </div>
+        }
+
         <!-- Health Status Banner -->
         <div class="health-banner @GetHealthClass(statistics.Health)">
             <div class="health-content">
@@ -278,102 +361,153 @@
 </div>
 
 @code {
-private DashboardStatistics? statistics;
-private bool loading = true;
-private string? error = null;
-private readonly bool realtimeUpdatesEnabled = true;
+    private DashboardStatistics? statistics;
+    private HealthScoreResponse? healthScore;
+    private bool loading = true;
+    private string? error = null;
+    private readonly bool realtimeUpdatesEnabled = true;
 
-protected override async Task OnInitializedAsync()
-{
-    // Load initial dashboard data
-    await LoadDashboard();
+    // Filter state
+    private string selectedDateRange = "30";
+    private string selectedRecordingId = "";
+    private List<RecordingSummary> availableRecordings = new();
 
-    // Connect to SignalR hub for real-time updates
-    await InitializeSignalR();
-}
+    // Modal state
+    private bool showHealthDetailsModal = false;
+    private TestExecutionSummary? selectedTestForDrilldown = null;
 
-private async Task InitializeSignalR()
-{
-    try
+    protected override async Task OnInitializedAsync()
     {
-        if (!HubClient.IsConnected)
+        // Load initial dashboard data
+        await LoadDashboard();
+
+        // Load health score
+        await LoadHealthScore();
+
+        // Load available recordings for filter
+        await LoadAvailableRecordings();
+
+        // Connect to SignalR hub for real-time updates
+        await InitializeSignalR();
+    }
+
+    private async Task InitializeSignalR()
+    {
+        try
         {
-            await HubClient.StartAsync();
+            if (!HubClient.IsConnected)
+            {
+                await HubClient.StartAsync();
+            }
+
+            // Subscribe to dashboard updates
+            await HubClient.SubscribeToDashboardAsync();
+
+            // Register event handlers
+            HubClient.OnDashboardUpdated += HandleDashboardUpdate;
+            HubClient.OnFlakyTestDetected += HandleFlakyTestDetected;
+            HubClient.OnPassRateAlert += HandlePassRateAlert;
         }
-
-        // Subscribe to dashboard updates
-        await HubClient.SubscribeToDashboardAsync();
-
-        // Register event handlers
-        HubClient.OnDashboardUpdated += HandleDashboardUpdate;
-        HubClient.OnFlakyTestDetected += HandleFlakyTestDetected;
-        HubClient.OnPassRateAlert += HandlePassRateAlert;
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR connection error: {ex.Message}");
+            // Continue without real-time updates
+        }
     }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"SignalR connection error: {ex.Message}");
-        // Continue without real-time updates
-    }
-}
 
-private async Task HandleDashboardUpdate(DashboardStatistics updatedStatistics)
-{
-    if (realtimeUpdatesEnabled)
+    private async Task HandleDashboardUpdate(DashboardStatistics updatedStatistics)
     {
-        statistics = updatedStatistics;
+        if (realtimeUpdatesEnabled)
+        {
+            statistics = updatedStatistics;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task HandleFlakyTestDetected(FlakyTestAnalysis analysis)
+    {
+        Console.WriteLine($"New flaky test detected: {analysis.TestName} (Score: {analysis.FlakinessScore:F1})");
         await InvokeAsync(StateHasChanged);
     }
-}
 
-private async Task HandleFlakyTestDetected(FlakyTestAnalysis analysis)
-{
-    Console.WriteLine($"New flaky test detected: {analysis.TestName} (Score: {analysis.FlakinessScore:F1})");
-    // Could show a toast notification here
-    await InvokeAsync(StateHasChanged);
-}
-
-private async Task HandlePassRateAlert(PassRateAlert alert)
-{
-    Console.WriteLine($"Pass rate alert: {alert.Message}");
-    // Could show a toast notification here
-    await InvokeAsync(StateHasChanged);
-}
-
-private async Task LoadDashboard()
-{
-    try
+    private async Task HandlePassRateAlert(PassRateAlert alert)
     {
-        loading = true;
-        error = null;
-        StateHasChanged();
-
-        statistics = await HttpClient.GetFromJsonAsync<DashboardStatistics>("/api/analytics/dashboard");
+        Console.WriteLine($"Pass rate alert: {alert.Message}");
+        await InvokeAsync(StateHasChanged);
     }
-    catch (Exception ex)
+
+    private async Task LoadDashboard()
     {
-        error = $"Failed to load dashboard: {ex.Message}";
+        try
+        {
+            loading = true;
+            error = null;
+            StateHasChanged();
+
+            statistics = await HttpClient.GetFromJsonAsync<DashboardStatistics>("/api/analytics/dashboard");
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to load dashboard: {ex.Message}";
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
     }
-    finally
+
+    private async Task LoadHealthScore()
     {
-        loading = false;
-        StateHasChanged();
+        try
+        {
+            healthScore = await HttpClient.GetFromJsonAsync<HealthScoreResponse>("/api/analytics/health");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load health score: {ex.Message}");
+        }
     }
-}
 
-public async ValueTask DisposeAsync()
-{
-    // Unregister event handlers
-    HubClient.OnDashboardUpdated -= HandleDashboardUpdate;
-    HubClient.OnFlakyTestDetected -= HandleFlakyTestDetected;
-    HubClient.OnPassRateAlert -= HandlePassRateAlert;
+    private async Task LoadAvailableRecordings()
+    {
+        try
+        {
+            // This would need a new API endpoint to list recordings
+            // For now, we'll leave it empty
+            availableRecordings = new List<RecordingSummary>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load recordings: {ex.Message}");
+        }
+    }
 
-    // Unsubscribe from dashboard updates
-    await HubClient.UnsubscribeFromDashboardAsync();
-}
+    private async Task OnDateRangeChanged()
+    {
+        await RefreshDashboard();
+    }
+
+    private async Task OnRecordingFilterChanged()
+    {
+        await RefreshDashboard();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Unregister event handlers
+        HubClient.OnDashboardUpdated -= HandleDashboardUpdate;
+        HubClient.OnFlakyTestDetected -= HandleFlakyTestDetected;
+        HubClient.OnPassRateAlert -= HandlePassRateAlert;
+
+        // Unsubscribe from dashboard updates
+        await HubClient.UnsubscribeFromDashboardAsync();
+    }
 
     private async Task RefreshDashboard()
     {
         await LoadDashboard();
+        await LoadHealthScore();
     }
 
     private void NavigateToFlakyTests()
@@ -396,6 +530,22 @@ public async ValueTask DisposeAsync()
         Navigation.NavigateTo($"/analytics/recordings/{recordingId}/insights");
     }
 
+    private void ShowHealthDetails()
+    {
+        showHealthDetailsModal = true;
+    }
+
+    private void ShowTestDrilldown(TestExecutionSummary test)
+    {
+        selectedTestForDrilldown = test;
+    }
+
+    private void CloseModals()
+    {
+        showHealthDetailsModal = false;
+        selectedTestForDrilldown = null;
+    }
+
     private string GetHealthClass(TestSuiteHealth health)
     {
         return health switch
@@ -405,6 +555,17 @@ public async ValueTask DisposeAsync()
             TestSuiteHealth.Fair => "health-fair",
             TestSuiteHealth.Poor => "health-poor",
             _ => "health-unknown"
+        };
+    }
+
+    private string GetHealthScoreClass(double score)
+    {
+        return score switch
+        {
+            >= 90 => "score-excellent",
+            >= 75 => "score-good",
+            >= 60 => "score-fair",
+            _ => "score-poor"
         };
     }
 
@@ -432,6 +593,18 @@ public async ValueTask DisposeAsync()
         };
     }
 
+    private string GetTrendIcon(string trend)
+    {
+        return trend.ToLowerInvariant() switch
+        {
+            "improving" => "📈",
+            "degrading" => "📉",
+            "increasing" => "⬆️",
+            "decreasing" => "⬇️",
+            _ => "➡️"
+        };
+    }
+
     private string FormatDuration(long milliseconds)
     {
         if (milliseconds < 1000)
@@ -453,7 +626,33 @@ public async ValueTask DisposeAsync()
         var url = $"/api/analytics/export/dashboard?format={format}";
         Navigation.NavigateTo(url, forceLoad: true);
     }
-}
+
+        // Helper class for recording filter
+        private class RecordingSummary
+        {
+            public Guid Id { get; set; }
+            public string Name { get; set; } = "";
+        }
+
+        // DTOs for new API endpoints
+        private class HealthScoreResponse
+        {
+            public TestSuiteHealth Health { get; set; }
+            public double Score { get; set; }
+            public double PassRate { get; set; }
+            public double FlakyTestPercentage { get; set; }
+            public int TotalTests { get; set; }
+            public int TotalExecutions { get; set; }
+            public DateTimeOffset CalculatedAt { get; set; }
+            public HealthTrends Trends { get; set; } = new();
+        }
+
+        private class HealthTrends
+        {
+            public string PassRateTrend { get; set; } = "stable";
+            public string FlakyTestTrend { get; set; } = "stable";
+        }
+    }
 
 <style>
     .analytics-dashboard {

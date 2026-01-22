@@ -1,5 +1,7 @@
 using EvoAITest.Agents.Abstractions;
 using EvoAITest.Agents.Agents;
+using EvoAITest.Agents.Services;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -14,14 +16,17 @@ public static class ServiceCollectionExtensions
     /// Adds agent orchestration services to the service collection.
     /// </summary>
     /// <param name="services">The service collection.</param>
+    /// <param name="configuration">Optional configuration for agent services.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddAgentServices(this IServiceCollection services)
+    public static IServiceCollection AddAgentServices(
+        this IServiceCollection services,
+        IConfiguration? configuration = null)
     {
         // Register default implementations
         services.TryAddScoped<IPlanner, PlannerAgent>();
         services.TryAddScoped<IExecutor, ExecutorAgent>();
         services.TryAddScoped<IHealer, HealerAgent>();
-        
+
         // Register recording agent and services
         services.TryAddScoped<EvoAITest.Core.Abstractions.IActionAnalyzer, EvoAITest.Agents.Services.Recording.ActionAnalyzerService>();
         services.TryAddScoped<EvoAITest.Core.Abstractions.ITestGenerator, EvoAITest.Agents.Services.Recording.TestGeneratorService>();
@@ -38,6 +43,14 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<EvoAITest.Core.Abstractions.IAnalyticsExportService, EvoAITest.Agents.Services.Analytics.AnalyticsExportService>();
         services.TryAddSingleton<EvoAITest.Agents.Services.Analytics.AnalyticsCacheService>();
         services.TryAddSingleton<EvoAITest.Agents.Services.Analytics.AnalyticsPerformanceMonitor>();
+
+        // Register analytics background services
+        if (configuration != null)
+        {
+            services.Configure<AnalyticsPersistenceOptions>(
+                configuration.GetSection("AnalyticsPersistence"));
+            services.AddHostedService<AnalyticsPersistenceHostedService>();
+        }
 
         // Other agent implementations will be registered as they are implemented
         // services.TryAddScoped<IAgent, BrowserAutomationAgent>();

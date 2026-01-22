@@ -468,12 +468,55 @@ public sealed class TestAnalyticsService : ITestAnalyticsService
     {
         var trendsList = trends.ToList();
 
+        if (!trendsList.Any())
+        {
+            _logger.LogDebug("No trends to save");
+            return;
+        }
+
         _logger.LogInformation("Saving {Count} trends to database", trendsList.Count);
 
-        await _dbContext.TestTrends.AddRangeAsync(trendsList, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            // Check for existing trends to avoid duplicates
+            var timestamps = trendsList.Select(t => t.Timestamp).Distinct().ToList();
+            var intervals = trendsList.Select(t => t.Interval).Distinct().ToList();
+            var recordingIds = trendsList.Select(t => t.RecordingSessionId).Distinct().ToList();
 
-        _logger.LogInformation("Trends saved successfully");
+            var existingTrends = await _dbContext.TestTrends
+                .Where(t => timestamps.Contains(t.Timestamp) &&
+                           intervals.Contains(t.Interval))
+                .ToListAsync(cancellationToken);
+
+            // Filter out duplicates
+            var newTrends = trendsList.Where(trend =>
+                !existingTrends.Any(existing =>
+                    existing.Timestamp == trend.Timestamp &&
+                    existing.Interval == trend.Interval &&
+                    existing.RecordingSessionId == trend.RecordingSessionId &&
+                    existing.TestName == trend.TestName))
+                .ToList();
+
+            if (!newTrends.Any())
+            {
+                _logger.LogInformation("All trends already exist in database, skipping insert");
+                return;
+            }
+
+            // Batch insert for performance
+            await _dbContext.TestTrends.AddRangeAsync(newTrends, cancellationToken);
+            var savedCount = await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Saved {SavedCount} new trends (skipped {SkippedCount} duplicates)",
+                savedCount,
+                trendsList.Count - newTrends.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save trends to database");
+            throw;
+        }
     }
 
     public async Task SaveFlakyTestAnalysisAsync(
@@ -481,13 +524,57 @@ public sealed class TestAnalyticsService : ITestAnalyticsService
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "Saving flaky test analysis for {TestName}",
-            analysis.TestName);
+            "Saving flaky test analysis for {RecordingId}/{TestName}, Score={Score}, Severity={Severity}",
+            analysis.RecordingSessionId,
+            analysis.TestName,
+            analysis.FlakinessScore,
+            analysis.Severity);
 
-        await _dbContext.FlakyTestAnalyses.AddAsync(analysis, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            // Check for existing analysis for this recording/test
+            var existingAnalysis = await _dbContext.FlakyTestAnalyses
+                .Where(a => a.RecordingSessionId == analysis.RecordingSessionId &&
+                           a.TestName == analysis.TestName)
+                .OrderByDescending(a => a.AnalyzedAt)
+                .FirstOrDefaultAsync(cancellationToken);
 
-        _logger.LogInformation("Flaky test analysis saved");
+            // If analysis already exists with same or better score, skip
+            if (existingAnalysis != null)
+            {
+                var scoreDelta = Math.Abs(analysis.FlakinessScore - existingAnalysis.FlakinessScore);
+
+                if (scoreDelta < 5.0) // Less than 5% change
+                {
+                    _logger.LogInformation(
+                        "Skipping flaky test analysis - score delta {Delta:F2} is below threshold",
+                        scoreDelta);
+                    return;
+                }
+
+                _logger.LogInformation(
+                    "Superseding previous analysis (Score: {OldScore:F2} → {NewScore:F2})",
+                    existingAnalysis.FlakinessScore,
+                    analysis.FlakinessScore);
+            }
+
+            await _dbContext.FlakyTestAnalyses.AddAsync(analysis, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Flaky test analysis saved: Id={Id}, IsFlaky={IsFlaky}",
+                analysis.Id,
+                analysis.IsFlaky);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to save flaky test analysis for {RecordingId}/{TestName}",
+                analysis.RecordingSessionId,
+                analysis.TestName);
+            throw;
+        }
     }
 
     public async Task<List<TestTrend>> GetHistoricalTrendsAsync(

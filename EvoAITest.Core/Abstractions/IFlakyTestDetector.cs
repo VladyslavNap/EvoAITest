@@ -74,15 +74,25 @@ public interface IFlakyTestDetector
         IEnumerable<TestExecutionResult> results,
         FlakyCriteria criteria);
 
-    /// <summary>
-    /// Determines severity level based on flakiness score and metrics
-    /// </summary>
-    /// <param name="score">Flakiness score</param>
-    /// <param name="passRate">Pass rate percentage</param>
-    /// <param name="retryCount">Number of flaky retries</param>
-    /// <returns>Flakiness severity</returns>
-    FlakinessSeverity DetermineSeverity(
-        double score,
-        double passRate,
-        int retryCount);
-}
+        /// <summary>
+        /// Determines severity level based on flakiness score and metrics
+        /// </summary>
+        /// <param name="score">Flakiness score</param>
+        /// <param name="passRate">Pass rate percentage</param>
+        /// <param name="retryCount">Number of flaky retries</param>
+        /// <returns>Flakiness severity</returns>
+        FlakinessSeverity DetermineSeverity(
+            double score,
+            double passRate,
+            int retryCount);
+
+        /// <summary>
+        /// Gets recording session IDs that have test executions within the specified time window
+        /// </summary>
+        /// <param name="days">Number of days to look back</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>List of recording session IDs</returns>
+        Task<List<Guid>> GetRecordingsWithRecentExecutionsAsync(
+            int days = 30,
+            CancellationToken cancellationToken = default);
+    }

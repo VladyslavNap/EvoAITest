@@ -96,6 +96,16 @@ public sealed class EvoAIDbContext : DbContext
     public DbSet<TestTrend> TestTrends => Set<TestTrend>();
 
     /// <summary>
+    /// Gets or sets the AlertRules DbSet.
+    /// </summary>
+    public DbSet<AlertRule> AlertRules => Set<AlertRule>();
+
+    /// <summary>
+    /// Gets or sets the AlertHistory DbSet.
+    /// </summary>
+    public DbSet<AlertHistory> AlertHistory => Set<AlertHistory>();
+
+    /// <summary>
     /// Configures the database model using the specified model builder.
     /// </summary>
     /// <param name="modelBuilder">The model builder to use.</param>
@@ -896,11 +906,130 @@ public sealed class EvoAIDbContext : DbContext
             entity.HasIndex(e => new { e.Interval, e.Timestamp })
                 .HasDatabaseName("IX_TestTrends_Interval_Timestamp");
 
-            // Composite index for most common query pattern
-            entity.HasIndex(e => new { e.RecordingSessionId, e.Interval, e.Timestamp })
-                .HasDatabaseName("IX_TestTrends_RecordingId_Interval_Timestamp");
-        });
-    }
+                    // Composite index for most common query pattern
+                    entity.HasIndex(e => new { e.RecordingSessionId, e.Interval, e.Timestamp })
+                        .HasDatabaseName("IX_TestTrends_RecordingId_Interval_Timestamp");
+                });
+
+                // Configure AlertRule entity
+                modelBuilder.Entity<AlertRule>(entity =>
+                {
+                    entity.ToTable("AlertRules");
+                    entity.HasKey(e => e.Id);
+
+                    // Required fields
+                    entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+                    entity.Property(e => e.Description).HasMaxLength(1000);
+                    entity.Property(e => e.Metric).IsRequired().HasMaxLength(100);
+
+                    // Enum conversions
+                    entity.Property(e => e.Operator)
+                        .HasColumnType("nvarchar(50)")
+                        .HasConversion<string>()
+                        .IsRequired();
+
+                    entity.Property(e => e.Severity)
+                        .HasColumnType("nvarchar(50)")
+                        .HasConversion<string>()
+                        .IsRequired();
+
+                    // JSON columns
+                    entity.Property(e => e.Channels)
+                        .HasColumnType("nvarchar(max)")
+                        .IsRequired();
+
+                    entity.Property(e => e.Recipients)
+                        .HasColumnType("nvarchar(max)")
+                        .IsRequired();
+
+                    entity.Property(e => e.Metadata)
+                        .HasColumnType("nvarchar(max)")
+                        .HasConversion(
+                            v => JsonSerializer.Serialize(v, JsonOptions),
+                            v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, JsonOptions) ?? new Dictionary<string, string>()
+                        );
+
+                    // Indexes
+                    entity.HasIndex(e => e.Enabled)
+                        .HasFilter("[Enabled] = 1")
+                        .HasDatabaseName("IX_AlertRules_Enabled");
+
+                    entity.HasIndex(e => e.Metric)
+                        .HasDatabaseName("IX_AlertRules_Metric");
+
+                    entity.HasIndex(e => e.RecordingSessionId)
+                        .HasDatabaseName("IX_AlertRules_RecordingSessionId");
+
+                    entity.HasIndex(e => e.Severity)
+                        .HasDatabaseName("IX_AlertRules_Severity");
+
+                    entity.HasIndex(e => e.LastTriggeredAt)
+                        .HasDatabaseName("IX_AlertRules_LastTriggered");
+
+                    entity.HasIndex(e => new { e.Enabled, e.Metric })
+                        .HasFilter("[Enabled] = 1")
+                        .HasDatabaseName("IX_AlertRules_Enabled_Metric");
+
+                    // Relationships
+                    entity.HasMany<AlertHistory>()
+                        .WithOne(h => h.AlertRule)
+                        .HasForeignKey(h => h.AlertRuleId)
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
+
+                // Configure AlertHistory entity
+                modelBuilder.Entity<AlertHistory>(entity =>
+                {
+                    entity.ToTable("AlertHistory");
+                    entity.HasKey(e => e.Id);
+
+                    // Required fields
+                    entity.Property(e => e.AlertRuleId).IsRequired();
+                    entity.Property(e => e.TriggeredAt).IsRequired();
+                    entity.Property(e => e.Message).IsRequired();
+                    entity.Property(e => e.ChannelsNotified).IsRequired();
+
+                    // Enum conversion
+                    entity.Property(e => e.Severity)
+                        .HasColumnType("nvarchar(50)")
+                        .HasConversion<string>()
+                        .IsRequired();
+
+                    // JSON columns
+                    entity.Property(e => e.Context)
+                        .HasColumnType("nvarchar(max)")
+                        .HasConversion(
+                            v => JsonSerializer.Serialize(v, JsonOptions),
+                            v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, JsonOptions) ?? new Dictionary<string, string>()
+                        );
+
+                    // Indexes
+                    entity.HasIndex(e => e.AlertRuleId)
+                        .HasDatabaseName("IX_AlertHistory_AlertRuleId");
+
+                    entity.HasIndex(e => e.TriggeredAt)
+                        .HasDatabaseName("IX_AlertHistory_TriggeredAt");
+
+                    entity.HasIndex(e => e.Acknowledged)
+                        .HasFilter("[Acknowledged] = 0")
+                        .HasDatabaseName("IX_AlertHistory_Acknowledged");
+
+                    entity.HasIndex(e => e.RecordingSessionId)
+                        .HasDatabaseName("IX_AlertHistory_RecordingSessionId");
+
+                    entity.HasIndex(e => e.Severity)
+                        .HasDatabaseName("IX_AlertHistory_Severity");
+
+                    entity.HasIndex(e => new { e.AlertRuleId, e.TriggeredAt })
+                        .HasDatabaseName("IX_AlertHistory_RuleId_Triggered");
+
+                    // Relationships
+                    entity.HasOne(e => e.AlertRule)
+                        .WithMany()
+                        .HasForeignKey(e => e.AlertRuleId)
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
+            }
 
     /// <summary>
     /// Saves all changes made in this context to the database.
