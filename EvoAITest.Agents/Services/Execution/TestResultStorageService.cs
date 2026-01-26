@@ -1,6 +1,7 @@
 using EvoAITest.Core.Abstractions;
 using EvoAITest.Core.Data;
 using EvoAITest.Core.Models.Execution;
+using EvoAITest.Agents.Services.Analytics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -13,13 +14,16 @@ public sealed class TestResultStorageService : ITestResultStorage
 {
     private readonly ILogger<TestResultStorageService> _logger;
     private readonly EvoAIDbContext _dbContext;
+    private readonly AnalyticsCacheService? _cacheService;
 
     public TestResultStorageService(
         ILogger<TestResultStorageService> logger,
-        EvoAIDbContext dbContext)
+        EvoAIDbContext dbContext,
+        AnalyticsCacheService? cacheService = null)
     {
         _logger = logger;
         _dbContext = dbContext;
+        _cacheService = cacheService;
     }
 
     public async Task<TestExecutionResult> SaveResultAsync(
@@ -35,6 +39,14 @@ public sealed class TestResultStorageService : ITestResultStorage
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Execution result {ResultId} saved successfully", result.Id);
+
+        // Invalidate analytics caches after new test execution
+        if (_cacheService != null)
+        {
+            _cacheService.InvalidateDashboard();
+            _cacheService.InvalidateAllTrends();
+            _logger.LogDebug("Analytics caches invalidated after test execution");
+        }
 
         return result;
     }
@@ -211,27 +223,49 @@ public sealed class TestResultStorageService : ITestResultStorage
         return results;
     }
 
-    public async Task UpdateStatusAsync(
-        Guid resultId,
-        TestExecutionStatus status,
-        CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation(
-            "Updating status for execution result {ResultId} to {Status}",
-            resultId,
-            status);
-
-        var result = await _dbContext.TestExecutionResults
-            .FirstOrDefaultAsync(r => r.Id == resultId, cancellationToken);
-
-        if (result == null)
+        public async Task UpdateStatusAsync(
+            Guid resultId,
+            TestExecutionStatus status,
+            CancellationToken cancellationToken = default)
         {
-            throw new InvalidOperationException($"Execution result {resultId} not found");
+            _logger.LogInformation(
+                "Updating status for execution result {ResultId} to {Status}",
+                resultId,
+                status);
+
+            var result = await _dbContext.TestExecutionResults
+                .FirstOrDefaultAsync(r => r.Id == resultId, cancellationToken);
+
+            if (result == null)
+            {
+                throw new InvalidOperationException($"Execution result {resultId} not found");
+            }
+
+            result.Status = status;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Status updated successfully for result {ResultId}", resultId);
         }
 
-        result.Status = status;
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        public async Task<List<Guid>> GetRecordingIdsWithExecutionsSinceAsync(
+            DateTimeOffset sinceDate,
+            CancellationToken cancellationToken = default)
+        {
+            _logger.LogDebug(
+                "Getting recording session IDs with executions since {Date}",
+                sinceDate);
 
-        _logger.LogInformation("Status updated successfully for result {ResultId}", resultId);
+            var recordingIds = await _dbContext.TestExecutionResults
+                .Where(r => r.StartedAt >= sinceDate)
+                .Select(r => r.RecordingSessionId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            _logger.LogDebug(
+                "Found {Count} recording sessions with executions since {Date}",
+                recordingIds.Count,
+                sinceDate);
+
+            return recordingIds;
+        }
     }
-}

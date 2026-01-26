@@ -188,23 +188,109 @@ public static class AnalyticsHubExtensions
             });
     }
 
-    /// <summary>
-    /// Broadcasts a general analytics notification
-    /// </summary>
-    public static async Task BroadcastNotification(
-        this IHubContext<AnalyticsHub> hubContext,
-        string title,
-        string message,
-        string type = "info")
-    {
-        await hubContext.Clients.All.SendAsync(
-            "Notification",
-            new
-            {
-                Title = title,
-                Message = message,
-                Type = type, // info, success, warning, danger
-                Timestamp = DateTimeOffset.UtcNow
-            });
+        /// <summary>
+        /// Broadcasts a general analytics notification
+        /// </summary>
+        public static async Task BroadcastNotification(
+            this IHubContext<AnalyticsHub> hubContext,
+            string title,
+            string message,
+            string type = "info")
+        {
+            await hubContext.Clients.All.SendAsync(
+                "Notification",
+                new
+                {
+                    Title = title,
+                    Message = message,
+                    Type = type, // info, success, warning, danger
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        /// <summary>
+        /// Sends health score update
+        /// </summary>
+        public static async Task SendHealthScoreUpdate(
+            this IHubContext<AnalyticsHub> hubContext,
+            TestSuiteHealth previousHealth,
+            TestSuiteHealth currentHealth,
+            double score)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "HealthScoreUpdated",
+                new
+                {
+                    PreviousHealth = previousHealth.ToString(),
+                    CurrentHealth = currentHealth.ToString(),
+                    Score = score,
+                    Changed = previousHealth != currentHealth,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        /// <summary>
+        /// Sends period comparison results
+        /// </summary>
+        public static async Task SendComparisonUpdate(
+            this IHubContext<AnalyticsHub> hubContext,
+            string comparisonType,
+            double currentValue,
+            double previousValue,
+            string verdict)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "ComparisonUpdated",
+                new
+                {
+                    Type = comparisonType, // "week-over-week", "month-over-month"
+                    CurrentValue = currentValue,
+                    PreviousValue = previousValue,
+                    Change = currentValue - previousValue,
+                    ChangePercent = previousValue > 0 ? ((currentValue - previousValue) / previousValue * 100) : 0,
+                    Verdict = verdict,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        /// <summary>
+        /// Sends cache invalidation notification (for debugging)
+        /// </summary>
+        public static async Task SendCacheInvalidated(
+            this IHubContext<AnalyticsHub> hubContext,
+            string cacheKey,
+            string reason)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "CacheInvalidated",
+                new
+                {
+                    CacheKey = cacheKey,
+                    Reason = reason,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        /// <summary>
+        /// Sends background job completion notification
+        /// </summary>
+        public static async Task SendBackgroundJobCompleted(
+            this IHubContext<AnalyticsHub> hubContext,
+            string jobName,
+            bool success,
+            int itemsProcessed,
+            long durationMs)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "BackgroundJobCompleted",
+                new
+                {
+                    JobName = jobName,
+                    Success = success,
+                    ItemsProcessed = itemsProcessed,
+                    DurationMs = durationMs,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
     }
-}
+

@@ -79,14 +79,24 @@ public interface ITestResultStorage
         TestExecutionSearchCriteria criteria,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Updates the status of an existing execution result
-    /// </summary>
-    /// <param name="resultId">The execution result ID</param>
-    /// <param name="status">New status</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    Task UpdateStatusAsync(
-        Guid resultId,
-        TestExecutionStatus status,
-        CancellationToken cancellationToken = default);
-}
+        /// <summary>
+        /// Updates the status of an existing execution result
+        /// </summary>
+        /// <param name="resultId">The execution result ID</param>
+        /// <param name="status">New status</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        Task UpdateStatusAsync(
+            Guid resultId,
+            TestExecutionStatus status,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Gets recording session IDs that have executions since the specified date
+        /// </summary>
+        /// <param name="sinceDate">Start date for filtering</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>List of recording session IDs</returns>
+        Task<List<Guid>> GetRecordingIdsWithExecutionsSinceAsync(
+            DateTimeOffset sinceDate,
+            CancellationToken cancellationToken = default);
+    }

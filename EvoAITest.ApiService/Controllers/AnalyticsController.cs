@@ -1,5 +1,6 @@
 using EvoAITest.Core.Abstractions;
 using EvoAITest.Core.Models.Analytics;
+using EvoAITest.ApiService.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EvoAITest.ApiService.Controllers;
@@ -483,16 +484,199 @@ public sealed class AnalyticsController : ControllerBase
                 endDate,
                 cancellationToken);
 
-            return Ok(trends);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get historical trends");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
-        }
-    }
+                    return Ok(trends);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to get historical trends");
+                    return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+                }
+            }
 
-    // ==================== EXPORT ENDPOINTS ====================
+            // ==================== HEALTH & COMPARISON ENDPOINTS ====================
+
+            /// <summary>
+            /// Gets the overall test suite health score
+            /// </summary>
+            /// <param name="cancellationToken">Cancellation token</param>
+            /// <returns>Health score and status</returns>
+            [HttpGet("health")]
+            [ProducesResponseType<HealthScoreResponse>(StatusCodes.Status200OK)]
+            [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any)]
+            public async Task<IActionResult> GetHealthScore(CancellationToken cancellationToken = default)
+            {
+                _logger.LogInformation("Getting test suite health score");
+
+                try
+                {
+                    var statistics = await _analyticsService.GetDashboardStatisticsAsync(cancellationToken);
+                    var health = _analyticsService.DetermineHealth(statistics);
+
+                    var response = new HealthScoreResponse
+                    {
+                        Health = health,
+                        Score = CalculateNumericHealthScore(statistics),
+                        PassRate = statistics.OverallPassRate,
+                        FlakyTestPercentage = statistics.TotalTests > 0 
+                            ? (double)statistics.FlakyTestCount / statistics.TotalTests * 100 
+                            : 0,
+                        TotalTests = statistics.TotalTests,
+                        TotalExecutions = statistics.TotalExecutions,
+                        CalculatedAt = DateTimeOffset.UtcNow,
+                        Trends = new HealthTrends
+                        {
+                            PassRateTrend = CalculatePassRateTrend(statistics),
+                            FlakyTestTrend = CalculateFlakyTestTrend(statistics)
+                        }
+                    };
+
+                    return Ok(response);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to get health score");
+                    return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+                }
+            }
+
+            /// <summary>
+            /// Compares analytics between two time periods
+            /// </summary>
+            /// <param name="request">Comparison request with time periods</param>
+            /// <param name="cancellationToken">Cancellation token</param>
+            /// <returns>Period comparison results</returns>
+            [HttpPost("compare")]
+            [ProducesResponseType<PeriodComparisonResponse>(StatusCodes.Status200OK)]
+            public async Task<IActionResult> ComparePeriods(
+                [FromBody] PeriodComparisonRequest request,
+                CancellationToken cancellationToken = default)
+            {
+                _logger.LogInformation(
+                    "Comparing periods: Current({CurrentStart} to {CurrentEnd}) vs Previous({PrevStart} to {PrevEnd})",
+                    request.CurrentPeriodStart,
+                    request.CurrentPeriodEnd,
+                    request.PreviousPeriodStart,
+                    request.PreviousPeriodEnd);
+
+                try
+                {
+                    // Calculate trends for both periods
+                    var currentTrends = await _analyticsService.CalculateTrendsAsync(
+                        TrendInterval.Daily,
+                        request.CurrentPeriodStart,
+                        request.CurrentPeriodEnd,
+                        request.RecordingSessionId,
+                        cancellationToken);
+
+                    var previousTrends = await _analyticsService.CalculateTrendsAsync(
+                        TrendInterval.Daily,
+                        request.PreviousPeriodStart,
+                        request.PreviousPeriodEnd,
+                        request.RecordingSessionId,
+                        cancellationToken);
+
+                    var response = new PeriodComparisonResponse
+                    {
+                        CurrentPeriod = AggregateTrends(currentTrends),
+                        PreviousPeriod = AggregateTrends(previousTrends),
+                        Comparison = CalculateComparison(currentTrends, previousTrends)
+                    };
+
+                    return Ok(response);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to compare periods");
+                    return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+                }
+            }
+
+            /// <summary>
+            /// Gets paginated list of flaky tests with filtering
+            /// </summary>
+            /// <param name="page">Page number (1-based)</param>
+            /// <param name="pageSize">Items per page (max 100)</param>
+            /// <param name="minScore">Minimum flakiness score</param>
+            /// <param name="severity">Filter by severity</param>
+            /// <param name="sortBy">Sort field (score, severity, analyzed)</param>
+            /// <param name="sortDescending">Sort direction</param>
+            /// <param name="cancellationToken">Cancellation token</param>
+            /// <returns>Paginated flaky test results</returns>
+            [HttpGet("flaky-tests/paged")]
+            [ProducesResponseType<PaginatedResponse<FlakyTestAnalysis>>(StatusCodes.Status200OK)]
+            public async Task<IActionResult> GetFlakyTestsPaged(
+                [FromQuery] int page = 1,
+                [FromQuery] int pageSize = 20,
+                [FromQuery] double? minScore = null,
+                [FromQuery] FlakinessSeverity? severity = null,
+                [FromQuery] string sortBy = "score",
+                [FromQuery] bool sortDescending = true,
+                CancellationToken cancellationToken = default)
+            {
+                if (page < 1) page = 1;
+                if (pageSize < 1 || pageSize > 100) pageSize = 20;
+
+                _logger.LogInformation(
+                    "Getting flaky tests page {Page}, size {PageSize}, minScore={MinScore}, severity={Severity}",
+                    page,
+                    pageSize,
+                    minScore,
+                    severity);
+
+                try
+                {
+                    var allTests = await _flakyDetector.GetAllFlakyTestsAsync(cancellationToken: cancellationToken);
+
+                    // Apply filters
+                    if (minScore.HasValue)
+                    {
+                        allTests = allTests.Where(t => t.FlakinessScore >= minScore.Value).ToList();
+                    }
+
+                    if (severity.HasValue)
+                    {
+                        allTests = allTests.Where(t => t.Severity == severity.Value).ToList();
+                    }
+
+                    // Apply sorting
+                    allTests = sortBy.ToLowerInvariant() switch
+                    {
+                        "severity" => sortDescending 
+                            ? allTests.OrderByDescending(t => t.Severity).ToList()
+                            : allTests.OrderBy(t => t.Severity).ToList(),
+                        "analyzed" => sortDescending
+                            ? allTests.OrderByDescending(t => t.AnalyzedAt).ToList()
+                            : allTests.OrderBy(t => t.AnalyzedAt).ToList(),
+                        _ => sortDescending
+                            ? allTests.OrderByDescending(t => t.FlakinessScore).ToList()
+                            : allTests.OrderBy(t => t.FlakinessScore).ToList()
+                    };
+
+                    // Paginate
+                    var totalCount = allTests.Count;
+                    var pagedTests = allTests
+                        .Skip((page - 1) * pageSize)
+                        .Take(pageSize)
+                        .ToList();
+
+                    var response = new PaginatedResponse<FlakyTestAnalysis>
+                    {
+                        Items = pagedTests,
+                        PageNumber = page,
+                        PageSize = pageSize,
+                        TotalCount = totalCount
+                    };
+
+                    return Ok(response);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to get paginated flaky tests");
+                    return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+                }
+            }
+
+            // ==================== EXPORT ENDPOINTS ====================
 
     /// <summary>
     /// Export dashboard statistics
@@ -716,11 +900,100 @@ public sealed class AnalyticsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to export insights");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
-        }
-    }
-}
+                        _logger.LogError(ex, "Failed to export insights");
+                        return StatusCode(StatusCodes.Status500InternalServerError, new { error = ex.Message });
+                    }
+                }
+
+                // ==================== HELPER METHODS ====================
+
+                private static double CalculateNumericHealthScore(DashboardStatistics statistics)
+                {
+                    // Weighted score: Pass Rate (60%), Flaky % (20%), Execution Count (10%), Trend (10%)
+                    var passRateScore = statistics.OverallPassRate;
+
+                    var flakyPercentage = statistics.TotalTests > 0
+                        ? (double)statistics.FlakyTestCount / statistics.TotalTests * 100
+                        : 0;
+                    var flakyScore = Math.Max(0, 100 - flakyPercentage * 5); // Each 1% flaky = -5 points
+
+                    var executionScore = statistics.TotalExecutions >= 100 ? 100 :
+                                       statistics.TotalExecutions >= 50 ? 80 :
+                                       statistics.TotalExecutions >= 10 ? 60 : 40;
+
+                    var trendScore = statistics.PassRateLast7Days >= statistics.OverallPassRate ? 100 : 80;
+
+                    return (passRateScore * 0.6) + (flakyScore * 0.2) + (executionScore * 0.1) + (trendScore * 0.1);
+                }
+
+                private static string CalculatePassRateTrend(DashboardStatistics statistics)
+                {
+                    var diff = statistics.PassRateLast7Days - statistics.PassRateLast30Days;
+                    return diff > 5 ? "improving" :
+                           diff < -5 ? "degrading" : "stable";
+                }
+
+                private static string CalculateFlakyTestTrend(DashboardStatistics statistics)
+                {
+                    // Simplified - in real implementation, compare with historical data
+                    return statistics.FlakyTestCount > statistics.StableTestCount * 0.1 ? "increasing" : "stable";
+                }
+
+                private static PeriodSummary AggregateTrends(List<TestTrend> trends)
+                {
+                    if (!trends.Any())
+                    {
+                        return new PeriodSummary();
+                    }
+
+                    return new PeriodSummary
+                    {
+                        TotalExecutions = trends.Sum(t => t.TotalExecutions),
+                        PassedExecutions = trends.Sum(t => t.PassedExecutions),
+                        FailedExecutions = trends.Sum(t => t.FailedExecutions),
+                        PassRate = trends.Average(t => t.PassRate),
+                        AverageDurationMs = (long)trends.Average(t => t.AverageDurationMs),
+                        FlakyTestCount = trends.Sum(t => t.FlakyTestCount),
+                        UniqueTestCount = trends.Max(t => t.UniqueTestCount),
+                        DataPoints = trends.Count
+                    };
+                }
+
+                private static ComparisonMetrics CalculateComparison(List<TestTrend> current, List<TestTrend> previous)
+                {
+                    var currentSummary = AggregateTrends(current);
+                    var previousSummary = AggregateTrends(previous);
+
+                    return new ComparisonMetrics
+                    {
+                        PassRateChange = currentSummary.PassRate - previousSummary.PassRate,
+                        ExecutionCountChange = currentSummary.TotalExecutions - previousSummary.TotalExecutions,
+                        FlakyTestCountChange = currentSummary.FlakyTestCount - previousSummary.FlakyTestCount,
+                        AvgDurationChange = currentSummary.AverageDurationMs - previousSummary.AverageDurationMs,
+                        PassRateChangePercent = previousSummary.PassRate > 0
+                            ? ((currentSummary.PassRate - previousSummary.PassRate) / previousSummary.PassRate * 100)
+                            : 0,
+                        Verdict = DetermineVerdict(currentSummary, previousSummary)
+                    };
+                }
+
+                private static string DetermineVerdict(PeriodSummary current, PeriodSummary previous)
+                {
+                    var passRateDiff = current.PassRate - previous.PassRate;
+                    var flakyDiff = current.FlakyTestCount - previous.FlakyTestCount;
+
+                    if (passRateDiff >= 5 && flakyDiff <= 0)
+                        return "significantly_improved";
+                    if (passRateDiff >= 2 && flakyDiff <= 1)
+                        return "improved";
+                    if (passRateDiff <= -5 || flakyDiff >= 5)
+                        return "degraded";
+                    if (passRateDiff <= -2 || flakyDiff >= 2)
+                        return "slightly_degraded";
+
+                    return "stable";
+                }
+            }
 
 /// <summary>
 /// Request model for analyzing flakiness
