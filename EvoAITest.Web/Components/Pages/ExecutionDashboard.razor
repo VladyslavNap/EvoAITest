@@ -356,22 +356,20 @@
 
     private string GetErrorRateClass(double errorRate)
     {
-        return errorRate switch
-        {
-            < 5 => "text-success",
-            < 15 => "text-warning",
-            _ => "text-danger"
-        };
+        if (errorRate < 5)
+            return "text-success";
+        if (errorRate < 15)
+            return "text-warning";
+        return "text-danger";
     }
 
     private string GetConsecutiveFailuresClass(int failures)
     {
-        return failures switch
-        {
-            0 => "text-success",
-            < 3 => "text-warning",
-            _ => "text-danger"
-        };
+        if (failures == 0)
+            return "text-success";
+        if (failures < 3)
+            return "text-warning";
+        return "text-danger";
     }
 
     private string FormatDuration(long milliseconds)

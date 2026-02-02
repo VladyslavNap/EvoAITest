@@ -1,3 +1,4 @@
+using EvoAITest.Core.Models;
 using EvoAITest.Core.Models.Analytics;
 
 namespace EvoAITest.Core.Abstractions;
