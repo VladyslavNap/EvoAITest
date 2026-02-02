@@ -232,7 +232,6 @@ public sealed class DashboardAnalyticsIntegrationTests : ApiIntegrationTests
         // Arrange - Get initial dashboard state
         var initialResponse = await _client.GetAsync("/api/execution-analytics/dashboard");
         var initialAnalytics = await initialResponse.Content.ReadFromJsonAsync<DashboardAnalytics>();
-        var initialExecutionCount = initialAnalytics!.ExecutionsLastHour;
 
         // Create and execute a task
         var createRequest = new CreateTaskRequest
