@@ -39,8 +39,8 @@ public sealed class AnalyticsService : IAnalyticsService
         }
         catch (Exception ex)
         {
+            // Metrics recording is non-critical; log the failure but do not disrupt the main execution flow.
             _logger.LogError(ex, "Failed to record execution metrics for Task {TaskId}", metrics.TaskId);
-            throw;
         }
     }
 
