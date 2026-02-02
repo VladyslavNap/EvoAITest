@@ -1,4 +1,5 @@
 using EvoAITest.Core.Models;
+using EvoAITest.Core.Models.Accessibility;
 
 namespace EvoAITest.Core.Abstractions;
 
@@ -264,6 +265,14 @@ public interface IBrowserAgent : IAsyncDisposable
     /// Thrown if the browser agent is not initialized.
     /// </exception>
     Task<string> GetAccessibilityTreeAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs a full WCAG accessibility audit on the current page using Axe-core.
+    /// </summary>
+    /// <param name="tags">Optional list of rule tags to run (e.g., 'wcag2a', 'wcag2aa'). If null, runs default rules.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A detailed accessibility report.</returns>
+    Task<AccessibilityReport> RunAccessibilityAuditAsync(List<string>? tags = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Waits for an element matching the specified CSS selector to appear on the page.

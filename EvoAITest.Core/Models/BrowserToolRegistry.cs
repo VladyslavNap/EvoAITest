@@ -369,6 +369,16 @@ public static class BrowserToolRegistry
                     ["page_url"] = new ParameterDef("string", false, "Optional page URL context for healing history", null),
                     ["confidence_threshold"] = new ParameterDef("number", false, "Minimum confidence score (0.0-1.0) to accept a healed selector", 0.75)
                 }
+            ),
+
+            ["accessibility_check"] = new BrowserToolDefinition(
+                Name: "accessibility_check",
+                Description: "Run a WCAG accessibility audit on the current page to detect violations.",
+                Parameters: new Dictionary<string, ParameterDef>
+                {
+                    ["tags"] = new ParameterDef("array", false, "Array of tags to check (e.g., 'wcag2a', 'wcag2aa'). Default: wcag2a, wcag2aa.", null),
+                    ["save_report"] = new ParameterDef("boolean", false, "Whether to save the report to the database", true)
+                }
             )
         };
     }

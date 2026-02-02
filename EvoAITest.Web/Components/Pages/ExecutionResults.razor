@@ -1,8 +1,11 @@
 @page "/test-execution/results"
 @page "/test-execution/results/{ResultId:guid}"
 @using EvoAITest.Core.Models.Execution
+@using EvoAITest.Core.Models.Accessibility
+@using EvoAITest.Core.Abstractions
 @inject HttpClient HttpClient
 @inject NavigationManager Navigation
+@inject IAccessibilityService AccessibilityService
 
 <PageTitle>Test Execution Results</PageTitle>
 
@@ -129,6 +132,49 @@
                 </div>
             }
 
+            <!-- Accessibility Reports -->
+            @if (accessibilityReports.Any())
+            {
+                <div class="output-section">
+                    <h3>Accessibility Audits (@accessibilityReports.Count)</h3>
+                    <div class="results-table">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Title</th>
+                                    <th>Score</th>
+                                    <th>Violations</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var report in accessibilityReports)
+                                {
+                                    <tr>
+                                        <td>@report.Timestamp.ToLocalTime().ToString("g")</td>
+                                        <td>@report.Title</td>
+                                        <td>
+                                            <span class="@(report.Score >= 90 ? "text-success fw-bold" : "text-danger fw-bold")">
+                                                @report.Score.ToString("F0")
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (report.CriticalCount > 0) { <span class="badge bg-danger me-1">@report.CriticalCount Crit</span> }
+                                            @if (report.SeriousCount > 0) { <span class="badge bg-warning text-dark me-1">@report.SeriousCount Serious</span> }
+                                            <span class="badge bg-secondary">@report.Violations.Count Total</span>
+                                        </td>
+                                        <td>
+                                            <a href="accessibility-report/@report.Id" class="btn btn-sm btn-info">View Report</a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
             <!-- Console Output -->
             @if (!string.IsNullOrEmpty(currentResult.StandardOutput))
             {
@@ -231,6 +277,7 @@
 
     private List<TestExecutionResult> results = new();
     private TestExecutionResult? currentResult = null;
+    private List<AccessibilityReport> accessibilityReports = new();
     private bool loading = true;
     private string? error = null;
     private int currentPage = 0;
@@ -259,6 +306,12 @@
                 // Load single result
                 currentResult = await HttpClient.GetFromJsonAsync<TestExecutionResult>(
                     $"/api/test-execution/results/{ResultId.Value}");
+                
+                // Load accessibility reports
+                if (currentResult != null)
+                {
+                    accessibilityReports = await AccessibilityService.GetReportsResultsAsync(ResultId.Value);
+                }
             }
             else
             {

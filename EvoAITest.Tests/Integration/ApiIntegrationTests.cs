@@ -603,6 +603,17 @@ public sealed class ApiIntegrationTests
 
         public Task<string> GetAccessibilityTreeAsync(CancellationToken cancellationToken = default) => Task.FromResult("{}");
 
+        public Task<EvoAITest.Core.Models.Accessibility.AccessibilityReport> RunAccessibilityAuditAsync(List<string>? tags = null, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new EvoAITest.Core.Models.Accessibility.AccessibilityReport
+            {
+                Score = 100,
+                Url = "https://example.com",
+                Title = "Report",
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
         public Task WaitForElementAsync(string selector, int timeoutMs = 30000, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Task<string> GetPageHtmlAsync(CancellationToken cancellationToken = default) => Task.FromResult("<html><body><h1>Example Domain</h1></body></html>");

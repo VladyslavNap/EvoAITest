@@ -42,6 +42,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
     private readonly ToolExecutorOptions _options;
     private readonly ILogger<DefaultToolExecutor> _logger;
     private readonly IVisualComparisonService? _visualComparisonService;
+    private readonly IAccessibilityService? _accessibilityService;
     private readonly ISelectorHealingService? _selectorHealingService;
     private readonly IErrorRecoveryService? _errorRecoveryService;
     
@@ -104,6 +105,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
     /// <param name="options">Configuration options for retry behavior and timeouts.</param>
     /// <param name="logger">Logger for structured telemetry.</param>
     /// <param name="visualComparisonService">Optional service for visual regression testing.</param>
+    /// <param name="accessibilityService">Optional service for accessibility checks.</param>
     /// <param name="selectorHealingService">Optional service for automatic selector healing.</param>
     /// <param name="errorRecoveryService">Optional service for intelligent error recovery.</param>
     public DefaultToolExecutor(
@@ -112,6 +114,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
         IOptions<ToolExecutorOptions> options,
         ILogger<DefaultToolExecutor> logger,
         IVisualComparisonService? visualComparisonService = null,
+        IAccessibilityService? accessibilityService = null,
         ISelectorHealingService? selectorHealingService = null,
         IErrorRecoveryService? errorRecoveryService = null)
     {
@@ -120,6 +123,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _visualComparisonService = visualComparisonService; // Optional for backwards compatibility
+        _accessibilityService = accessibilityService;
         _selectorHealingService = selectorHealingService; // Optional for self-healing capability
         _errorRecoveryService = errorRecoveryService; // Optional for intelligent error recovery
         
@@ -709,6 +713,7 @@ public sealed class DefaultToolExecutor : IToolExecutor
                 "get_page_html" => await ExecuteGetPageHtmlAsync(toolCall, cancellationToken).ConfigureAwait(false),
                 "clear_input" => await ExecuteClearInputAsync(toolCall, cancellationToken).ConfigureAwait(false),
                 "visual_check" => await ExecuteVisualCheckAsync(toolCall, cancellationToken).ConfigureAwait(false),
+                "accessibility_check" => await ExecuteAccessibilityCheckAsync(toolCall, cancellationToken).ConfigureAwait(false),
                 
                 // Mobile Device Emulation Tools
                 "set_device_emulation" => await ExecuteSetDeviceEmulationAsync(toolCall, cancellationToken).ConfigureAwait(false),
@@ -849,6 +854,58 @@ public sealed class DefaultToolExecutor : IToolExecutor
         var selector = GetRequiredParameter<string>(toolCall, "selector");
         await _browserAgent.TypeAsync(selector, string.Empty, cancellationToken).ConfigureAwait(false);
         return null;
+    }
+
+    private async Task<object?> ExecuteAccessibilityCheckAsync(ToolCall toolCall, CancellationToken cancellationToken)
+    {
+        // Parse optional parameters
+        var tagsParam = GetOptionalParameter<object?>(toolCall, "tags", null);
+        var saveReport = GetOptionalParameter(toolCall, "save_report", true);
+        
+        List<string>? tags = null;
+        if (tagsParam != null)
+        {
+            if (tagsParam is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Array)
+            {
+                tags = jsonElement.EnumerateArray()
+                    .Where(e => e.ValueKind == JsonValueKind.String)
+                    .Select(e => e.GetString()!)
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToList();
+            }
+            else if (tagsParam is IEnumerable<object> objEnum)
+            {
+                tags = objEnum.Select(o => o.ToString()!).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+            }
+        }
+
+        var report = await _browserAgent.RunAccessibilityAuditAsync(tags, cancellationToken).ConfigureAwait(false);
+
+        if (saveReport && _accessibilityService != null)
+        {
+            // Extract IDs from parameters if available
+            if (toolCall.Parameters.TryGetValue("task_id", out var taskIdObj) && 
+                (taskIdObj is Guid taskId || (taskIdObj is string s && Guid.TryParse(s, out taskId))))
+            {
+                report.AutomationTaskId = taskId;
+            }
+            if (toolCall.Parameters.TryGetValue("execution_history_id", out var ehIdObj) && 
+                (ehIdObj is Guid ehId || (ehIdObj is string s2 && Guid.TryParse(s2, out ehId))))
+            {
+                report.ExecutionHistoryId = ehId;
+            }
+
+            // Save report
+            await _accessibilityService.SaveReportAsync(report, cancellationToken).ConfigureAwait(false);
+        }
+
+        return new Dictionary<string, object>
+        {
+            ["score"] = report.Score,
+            ["violations_count"] = report.ViolationCount,
+            ["critical_violations"] = report.CriticalCount,
+            ["report_id"] = report.Id
+        };
     }
 
     private async Task<object?> ExecuteVisualCheckAsync(ToolCall toolCall, CancellationToken cancellationToken)

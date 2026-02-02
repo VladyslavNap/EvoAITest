@@ -106,6 +106,11 @@ public sealed class EvoAIDbContext : DbContext
     public DbSet<AlertHistory> AlertHistory => Set<AlertHistory>();
 
     /// <summary>
+    /// Gets or sets the AccessibilityReports DbSet.
+    /// </summary>
+    public DbSet<EvoAITest.Core.Models.Accessibility.AccessibilityReport> AccessibilityReports => Set<EvoAITest.Core.Models.Accessibility.AccessibilityReport>();
+
+    /// <summary>
     /// Configures the database model using the specified model builder.
     /// </summary>
     /// <param name="modelBuilder">The model builder to use.</param>
@@ -1029,7 +1034,39 @@ public sealed class EvoAIDbContext : DbContext
                         .HasForeignKey(e => e.AlertRuleId)
                         .OnDelete(DeleteBehavior.Cascade);
                 });
-            }
+
+        // Configure AccessibilityReport entity
+        modelBuilder.Entity<EvoAITest.Core.Models.Accessibility.AccessibilityReport>(entity =>
+        {
+            entity.ToTable("AccessibilityReports");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Url).HasMaxLength(2000).IsRequired();
+            entity.Property(e => e.Title).HasMaxLength(500);
+            entity.Property(e => e.Timestamp).IsRequired();
+            entity.Property(e => e.ScreenshotPath).HasMaxLength(2000);
+
+            // JSON columns
+            entity.Property(e => e.Violations)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<List<EvoAITest.Core.Models.Accessibility.AccessibilityViolation>>(v, JsonOptions) ?? new List<EvoAITest.Core.Models.Accessibility.AccessibilityViolation>()
+                );
+
+            entity.Property(e => e.Metadata)
+                .HasColumnType("nvarchar(max)")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonOptions),
+                    v => JsonSerializer.Deserialize<Dictionary<string, object>>(v, JsonOptions) ?? new Dictionary<string, object>()
+                );
+
+            // Indexes
+            entity.HasIndex(e => e.AutomationTaskId);
+            entity.HasIndex(e => e.ExecutionHistoryId);
+            entity.HasIndex(e => e.Timestamp);
+        });
+    }
 
     /// <summary>
     /// Saves all changes made in this context to the database.

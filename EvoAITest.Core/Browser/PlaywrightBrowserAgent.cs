@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using EvoAITest.Core.Abstractions;
 using EvoAITest.Core.Models;
+using EvoAITest.Core.Models.Accessibility;
+using Microsoft.Playwright;
 using Microsoft.Extensions.Logging;
 
 namespace EvoAITest.Core.Browser;
@@ -411,6 +413,102 @@ public sealed class PlaywrightBrowserAgent : IBrowserAgent
             _logger.LogWarning(ex, "Failed to extract accessibility tree");
             return string.Empty;
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<AccessibilityReport> RunAccessibilityAuditAsync(List<string>? tags = null, CancellationToken cancellationToken = default)
+    {
+        var page = EnsurePage();
+
+        // Note: Using lightweight script check as Axe package is unavailable
+        var resultsJson = await page.EvaluateAsync<JsonElement>(@"
+            () => {
+                const results = [];
+                // Check 1: Images alt
+                document.querySelectorAll('img').forEach(img => {
+                    if (!img.hasAttribute('alt') && img.getAttribute('role') !== 'presentation') {
+                        results.push({
+                            id: 'image-alt',
+                            impact: 'critical',
+                            description: 'Images must have alternate text',
+                            help: 'Add an alt attribute',
+                            helpUrl: 'https://dequeuniversity.com/rules/axe/4.4/image-alt',
+                            nodes: [{ html: img.outerHTML.substring(0, 100), target: [img.id ? '#' + img.id : img.tagName], failureSummary: 'Missing alt attribute' }]
+                        });
+                    }
+                });
+                // Check 2: Button text
+                document.querySelectorAll('button').forEach(btn => {
+                    if (!btn.innerText.trim() && !btn.getAttribute('aria-label')) {
+                         results.push({
+                            id: 'button-name',
+                            impact: 'critical',
+                            description: 'Buttons must have discernible text',
+                            help: 'Add text or aria-label',
+                            helpUrl: 'https://dequeuniversity.com/rules/axe/4.4/button-name',
+                            nodes: [{ html: btn.outerHTML.substring(0, 100), target: [btn.id ? '#' + btn.id : 'button'], failureSummary: 'Button has no text' }]
+                        });
+                    }
+                });
+                return results;
+            }
+        ").ConfigureAwait(false);
+
+        var report = new AccessibilityReport
+        {
+            Url = page.Url,
+            Timestamp = DateTime.UtcNow,
+            Title = await page.TitleAsync() ?? "Untitled",
+            Score = 100
+        };
+
+        if (resultsJson.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var v in resultsJson.EnumerateArray())
+            {
+                var violation = new AccessibilityViolation
+                {
+                    Id = v.GetProperty("id").GetString() ?? "",
+                    Impact = v.GetProperty("impact").GetString() ?? "",
+                    Description = v.GetProperty("description").GetString() ?? "",
+                    Help = v.GetProperty("help").GetString() ?? "",
+                    HelpUrl = v.GetProperty("helpUrl").GetString() ?? ""
+                };
+
+                if (v.TryGetProperty("nodes", out var nodes))
+                {
+                    foreach (var n in nodes.EnumerateArray())
+                    {
+                        string target = "";
+                        if (n.TryGetProperty("target", out var tArray) && tArray.ValueKind == JsonValueKind.Array)
+                        {
+                            target = tArray.EnumerateArray().FirstOrDefault().GetString() ?? "";
+                        }
+
+                        violation.Nodes.Add(new AccessibilityNode
+                        {
+                            Html = n.GetProperty("html").GetString() ?? "",
+                            FailureSummary = n.GetProperty("failureSummary").GetString() ?? "",
+                            Target = new List<string> { target }
+                        });
+                    }
+                }
+                report.Violations.Add(violation);
+            }
+        }
+
+        // Calculate counts
+        report.CriticalCount = report.Violations.Count(v => v.Impact?.Equals("critical", StringComparison.OrdinalIgnoreCase) == true);
+        report.SeriousCount = report.Violations.Count(v => v.Impact?.Equals("serious", StringComparison.OrdinalIgnoreCase) == true);
+        report.ModerateCount = report.Violations.Count(v => v.Impact?.Equals("moderate", StringComparison.OrdinalIgnoreCase) == true);
+        report.MinorCount = report.Violations.Count(v => v.Impact?.Equals("minor", StringComparison.OrdinalIgnoreCase) == true);
+        report.ViolationCount = report.Violations.Count;
+
+        // Simple score calculation: 100 - weighted deductions
+        double penalty = (report.CriticalCount * 10) + (report.SeriousCount * 5) + (report.ModerateCount * 2) + report.MinorCount;
+        report.Score = Math.Max(0, 100 - penalty);
+
+        return report;
     }
 
     /// <inheritdoc />

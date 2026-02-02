@@ -1,0 +1,142 @@
+@page "/accessibility-report/{ReportId:guid}"
+@using EvoAITest.Core.Models.Accessibility
+@using EvoAITest.Core.Abstractions
+@inject IAccessibilityService AccessibilityService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Accessibility Report</PageTitle>
+
+<div class="container-fluid mt-3">
+    @if (_isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status"></div>
+            <p>Loading report...</p>
+        </div>
+    }
+    else if (_report == null)
+    {
+         <div class="alert alert-warning">Report not found.</div>
+    }
+    else
+    {
+        <div class="mb-3 d-flex justify-content-between align-items-center">
+            <h3>Accessibility Report: @_report.Title</h3>
+            <button class="btn btn-secondary" @onclick="GoBack">Back</button>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Score</h5>
+                        <h2 class="@GetScoreClass(_report.Score)">@_report.Score.ToString("F0")</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-9">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Violation Summary</h5>
+                        <div class="d-flex justify-content-around">
+                            <span class="badge bg-danger p-2">Critical: @_report.CriticalCount</span>
+                            <span class="badge bg-warning text-dark p-2">Serious: @_report.SeriousCount</span>
+                            <span class="badge bg-info text-dark p-2">Moderate: @_report.ModerateCount</span>
+                            <span class="badge bg-secondary p-2">Minor: @_report.MinorCount</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                Violations (@_report.Violations.Count)
+            </div>
+            <div class="card-body">
+                @if (_report.Violations.Count == 0)
+                {
+                    <div class="alert alert-success">No violations found!</div>
+                }
+                else
+                {
+                    <div class="accordion" id="violationsAccordion">
+                        @foreach (var v in _report.Violations.Select((item, index) => new { item, index }))
+                        {
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading@(v.index)">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse@(v.index)">
+                                        <span class="badge @GetImpactClass(v.item.Impact) me-2">@v.item.Impact</span>
+                                        <span class="fw-bold me-2">@v.item.Id</span>
+                                        <span>@v.item.Description</span>
+                                    </button>
+                                </h2>
+                                <div id="collapse@(v.index)" class="accordion-collapse collapse" data-bs-parent="#violationsAccordion">
+                                    <div class="accordion-body">
+                                        <p><strong>Help:</strong> <a href="@v.item.HelpUrl" target="_blank">@v.item.Help</a></p>
+                                        <div class="mt-2">
+                                            <h6>Affected Elements (@v.item.Nodes.Count):</h6>
+                                            <ul class="list-group">
+                                                @foreach (var node in v.item.Nodes)
+                                                {
+                                                    <li class="list-group-item">
+                                                        <div class="mb-1"><code>@node.Html</code></div>
+                                                        <div class="small text-muted mb-1">Target: @string.Join(", ", node.Target)</div>
+                                                        <div class="small text-danger">@node.FailureSummary</div>
+                                                    </li>
+                                                }
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid ReportId { get; set; }
+
+    private AccessibilityReport? _report;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try 
+        {
+            _report = await AccessibilityService.GetReportAsync(ReportId);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo(_report?.AutomationTaskId.HasValue == true 
+            ? $"/tasks/{_report.AutomationTaskId}" 
+            : "/");
+    }
+
+    private string GetScoreClass(double score) => score switch
+    {
+        >= 90 => "text-success",
+        >= 70 => "text-warning",
+        _ => "text-danger"
+    };
+
+    private string GetImpactClass(string impact) => impact?.ToLower() switch
+    {
+        "critical" => "bg-danger",
+        "serious" => "bg-warning text-dark",
+        "moderate" => "bg-info text-dark",
+        "minor" => "bg-secondary",
+        _ => "bg-light text-dark"
+    };
+}
