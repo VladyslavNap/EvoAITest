@@ -26,10 +26,12 @@
     public int Height { get; set; } = 300;
 
     private string ChartId { get; set; } = $"chart-{Guid.NewGuid()}";
+    private bool chartRendered = false;
+    private bool isRendering = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && DataPoints?.Any() == true)
+        if (firstRender && DataPoints?.Any() == true && !chartRendered)
         {
             await RenderChart();
         }
@@ -37,16 +39,20 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (DataPoints?.Any() == true)
+        if (DataPoints?.Any() == true && chartRendered && !isRendering)
         {
-            await RenderChart();
+            await UpdateChart();
         }
     }
 
     private async Task RenderChart()
     {
+        if (isRendering) return;
+        
         try
         {
+            isRendering = true;
+            
             var labels = DataPoints.Select(d => d.Timestamp.ToLocalTime().ToString("HH:mm")).ToList();
             var values = DataPoints.Select(d => GetValue(d)).ToList();
 
@@ -90,10 +96,40 @@
             };
 
             await JS.InvokeVoidAsync("renderChart", ChartId, "line", chartData, options);
+            chartRendered = true;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error rendering chart: {ex.Message}");
+        }
+        finally
+        {
+            isRendering = false;
+        }
+    }
+
+    private async Task UpdateChart()
+    {
+        if (isRendering) return;
+        
+        try
+        {
+            isRendering = true;
+            
+            // Destroy existing chart before creating a new one
+            await JS.InvokeVoidAsync("destroyChart", ChartId);
+            chartRendered = false;
+            
+            // Render new chart
+            await RenderChart();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating chart: {ex.Message}");
+        }
+        finally
+        {
+            isRendering = false;
         }
     }
 

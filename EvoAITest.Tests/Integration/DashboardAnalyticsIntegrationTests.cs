@@ -250,15 +250,27 @@ public sealed class DashboardAnalyticsIntegrationTests : ApiIntegrationTests
             await Task.Delay(200); // Small delay between executions
         }
 
-        // Give time for metrics to aggregate
-        await Task.Delay(1000);
+        // Poll for metrics to aggregate with timeout
+        DashboardAnalytics? updatedAnalytics = null;
+        var maxAttempts = 10;
+        var delayBetweenAttempts = TimeSpan.FromMilliseconds(500);
+        
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            await Task.Delay(delayBetweenAttempts);
+            
+            var updatedResponse = await _client.GetAsync("/api/execution-analytics/dashboard");
+            updatedAnalytics = await updatedResponse.Content.ReadFromJsonAsync<DashboardAnalytics>();
+            
+            if (updatedAnalytics?.TotalExecutionsToday > initialAnalytics.TotalExecutionsToday)
+            {
+                break; // Metrics have been updated
+            }
+        }
 
         // Assert - Check dashboard updated
-        var updatedResponse = await _client.GetAsync("/api/execution-analytics/dashboard");
-        var updatedAnalytics = await updatedResponse.Content.ReadFromJsonAsync<DashboardAnalytics>();
-
         updatedAnalytics.Should().NotBeNull();
-        updatedAnalytics!.TotalExecutionsToday.Should().BeGreaterThanOrEqualTo(initialAnalytics.TotalExecutionsToday);
+        updatedAnalytics!.TotalExecutionsToday.Should().BeGreaterThan(initialAnalytics.TotalExecutionsToday);
     }
 
     [TestMethod]
@@ -380,16 +392,16 @@ public sealed class DashboardAnalyticsIntegrationTests : ApiIntegrationTests
             await _client.PostAsync($"/api/tasks/{task!.Id}/execute", null);
 
             // Assert - Wait for update (with timeout)
-            var receivedAnalytics = await Task.WhenAny(
+            var completedTask = await Task.WhenAny(
                 updateReceived.Task,
                 Task.Delay(TimeSpan.FromSeconds(10))
             );
 
-            if (receivedAnalytics == updateReceived.Task)
-            {
-                var analytics = await updateReceived.Task;
-                analytics.Should().NotBeNull();
-            }
+            // Test should fail if timeout occurs
+            completedTask.Should().Be(updateReceived.Task, "SignalR update should be received within timeout");
+            
+            var analytics = await updateReceived.Task;
+            analytics.Should().NotBeNull();
         }
         finally
         {

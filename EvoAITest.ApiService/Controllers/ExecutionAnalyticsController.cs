@@ -332,26 +332,32 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [HttpPost("calculate-time-series")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> CalculateTimeSeries(
+    public IActionResult CalculateTimeSeries(
         CancellationToken cancellationToken)
     {
         try
         {
             _logger.LogInformation("Starting time series calculation");
             
-            // Run in background without waiting
+            // Run in background without waiting - use a separate CancellationToken to avoid request cancellation affecting the background task
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await _analyticsService.CalculateTimeSeriesAsync(cancellationToken);
+                    // Create a new CancellationTokenSource for the background operation
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+                    await _analyticsService.CalculateTimeSeriesAsync(cts.Token);
                     _logger.LogInformation("Time series calculation completed successfully");
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogWarning("Time series calculation was cancelled");
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Time series calculation failed in background");
                 }
-            }, cancellationToken);
+            }, CancellationToken.None); // Don't link to request cancellation token
 
             return Accepted(new { message = "Time series calculation started" });
         }
