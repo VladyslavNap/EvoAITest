@@ -242,12 +242,52 @@ public sealed class AnalyticsService : IAnalyticsService
         }
     }
 
+    private static DateTimeOffset RoundToIntervalSafe(DateTimeOffset timestamp, TimeInterval interval)
+    {
+        switch (interval)
+        {
+            case TimeInterval.Hour:
+                // Truncate to the start of the hour, preserving the original offset
+                return new DateTimeOffset(
+                    timestamp.Year,
+                    timestamp.Month,
+                    timestamp.Day,
+                    timestamp.Hour,
+                    0,
+                    0,
+                    timestamp.Offset);
+
+            case TimeInterval.Day:
+                // Truncate to the start of the day, preserving the original offset
+                return new DateTimeOffset(
+                    timestamp.Year,
+                    timestamp.Month,
+                    timestamp.Day,
+                    0,
+                    0,
+                    0,
+                    timestamp.Offset);
+
+            case TimeInterval.Week:
+                // Approximate the original weekly rounding while preserving offset.
+                // Assuming Sunday as the start of the week to mirror typical DayOfWeek-based logic.
+                var localDate = timestamp.Date; // DateTime (no offset)
+                var weekStartLocal = localDate.AddDays(-(int)localDate.DayOfWeek);
+                return new DateTimeOffset(weekStartLocal, timestamp.Offset);
+
+            default:
+                // For any other intervals, fall back to returning the original timestamp
+                // to avoid introducing unexpected behavior.
+                return timestamp;
+        }
+    }
+
     private async Task CalculateTimeSeriesForIntervalAsync(
         TimeInterval interval,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var roundedTimestamp = now.RoundToInterval(interval);
+        var roundedTimestamp = RoundToIntervalSafe(now, interval);
         var intervalStart = roundedTimestamp.Subtract(interval.GetDuration());
 
         // Check if we already have data for this interval
