@@ -326,6 +326,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     /// <summary>
     /// Triggers calculation of time series data points.
     /// This is typically called by a background job but can be manually triggered.
+    /// The method returns immediately while the calculation runs asynchronously in the background.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Accepted status with calculation initiated message.</returns>
@@ -339,7 +340,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
         {
             _logger.LogInformation("Starting time series calculation");
             
-            // Run in background without waiting - use a separate CancellationToken to avoid request cancellation affecting the background task
+            // Fire-and-forget: Run in background without waiting - use a separate CancellationToken to avoid request cancellation affecting the background task
             _ = Task.Run(async () =>
             {
                 try

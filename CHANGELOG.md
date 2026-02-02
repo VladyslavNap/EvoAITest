@@ -194,8 +194,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    
    Add to `_Host.cshtml` or `App.razor` (before closing `</body>` tag):
    ```html
+   <!-- Note: Verify the SRI hash from https://www.srihash.org/ or the CDN provider -->
    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" 
-           integrity="sha384-5VlZQ8m3XdRh9Zx0nLOBPRxXjqQDV8BhqQ7KhFmPDtYVNJMPNjHjEA8F8nQJVJ0P" 
            crossorigin="anonymous"></script>
    <script>
      const chartInstances = {};
