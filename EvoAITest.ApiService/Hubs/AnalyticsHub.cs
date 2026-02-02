@@ -89,6 +89,52 @@ public sealed class AnalyticsHub : Hub
             Context.ConnectionId,
             recordingId);
     }
+
+    /// <summary>
+    /// Subscribe to task execution updates
+    /// </summary>
+    public async Task SubscribeToTask(Guid taskId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"Task_{taskId}");
+        _logger.LogInformation(
+            "Client {ConnectionId} subscribed to Task {TaskId} updates",
+            Context.ConnectionId,
+            taskId);
+    }
+
+    /// <summary>
+    /// Unsubscribe from task execution updates
+    /// </summary>
+    public async Task UnsubscribeFromTask(Guid taskId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Task_{taskId}");
+        _logger.LogInformation(
+            "Client {ConnectionId} unsubscribed from Task {TaskId} updates",
+            Context.ConnectionId,
+            taskId);
+    }
+
+    /// <summary>
+    /// Subscribe to real-time metrics
+    /// </summary>
+    public async Task SubscribeToMetrics()
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, "Metrics");
+        _logger.LogInformation(
+            "Client {ConnectionId} subscribed to Metrics updates",
+            Context.ConnectionId);
+    }
+
+    /// <summary>
+    /// Unsubscribe from real-time metrics
+    /// </summary>
+    public async Task UnsubscribeFromMetrics()
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, "Metrics");
+        _logger.LogInformation(
+            "Client {ConnectionId} unsubscribed from Metrics updates",
+            Context.ConnectionId);
+    }
 }
 
 /// <summary>
@@ -289,6 +335,164 @@ public static class AnalyticsHubExtensions
                     Success = success,
                     ItemsProcessed = itemsProcessed,
                     DurationMs = durationMs,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        // ===== Real-time Execution Tracking Methods =====
+
+        /// <summary>
+        /// Sends execution started notification
+        /// </summary>
+        public static async Task SendExecutionStarted(
+            this IHubContext<AnalyticsHub> hubContext,
+            ExecutionMetrics metrics)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "ExecutionStarted",
+                new
+                {
+                    metrics.TaskId,
+                    metrics.TaskName,
+                    metrics.TotalSteps,
+                    metrics.TargetUrl,
+                    StartedAt = metrics.RecordedAt,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        /// <summary>
+        /// Sends execution progress update
+        /// </summary>
+        public static async Task SendExecutionProgress(
+            this IHubContext<AnalyticsHub> hubContext,
+            ExecutionMetrics metrics)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "ExecutionProgress",
+                new
+                {
+                    metrics.TaskId,
+                    metrics.TaskName,
+                    metrics.CurrentStep,
+                    metrics.TotalSteps,
+                    metrics.CurrentAction,
+                    metrics.CompletionPercentage,
+                    metrics.DurationMs,
+                    metrics.StepsCompleted,
+                    metrics.StepsFailed,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        /// <summary>
+        /// Sends execution completed notification
+        /// </summary>
+        public static async Task SendExecutionCompleted(
+            this IHubContext<AnalyticsHub> hubContext,
+            ExecutionMetrics metrics)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "ExecutionCompleted",
+                new
+                {
+                    metrics.TaskId,
+                    metrics.TaskName,
+                    metrics.Status,
+                    metrics.DurationMs,
+                    metrics.StepsCompleted,
+                    metrics.StepsFailed,
+                    metrics.ErrorMessage,
+                    metrics.HealingAttempted,
+                    metrics.HealingSuccessful,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        /// <summary>
+        /// Sends real-time dashboard analytics update
+        /// </summary>
+        public static async Task SendDashboardAnalytics(
+            this IHubContext<AnalyticsHub> hubContext,
+            DashboardAnalytics analytics)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "DashboardAnalyticsUpdated",
+                analytics);
+        }
+
+        /// <summary>
+        /// Sends active executions update
+        /// </summary>
+        public static async Task SendActiveExecutionsUpdate(
+            this IHubContext<AnalyticsHub> hubContext,
+            List<ActiveExecutionInfo> activeExecutions)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "ActiveExecutionsUpdated",
+                new
+                {
+                    ActiveExecutions = activeExecutions,
+                    Count = activeExecutions.Count,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        /// <summary>
+        /// Sends time series data update
+        /// </summary>
+        public static async Task SendTimeSeriesUpdate(
+            this IHubContext<AnalyticsHub> hubContext,
+            List<TimeSeriesDataPoint> dataPoints,
+            TimeInterval interval)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "TimeSeriesUpdated",
+                new
+                {
+                    DataPoints = dataPoints,
+                    Interval = interval.ToString(),
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        /// <summary>
+        /// Sends system health update
+        /// </summary>
+        public static async Task SendSystemHealthUpdate(
+            this IHubContext<AnalyticsHub> hubContext,
+            SystemHealthMetrics health)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "SystemHealthUpdated",
+                new
+                {
+                    health.Status,
+                    health.ErrorRate,
+                    health.AverageResponseTimeMs,
+                    health.ConsecutiveFailures,
+                    health.UptimePercentage,
+                    health.HealthMessages,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+        }
+
+        /// <summary>
+        /// Sends execution metric update (individual metric point)
+        /// </summary>
+        public static async Task SendMetricUpdate(
+            this IHubContext<AnalyticsHub> hubContext,
+            string metricName,
+            double value,
+            Dictionary<string, object>? tags = null)
+        {
+            await hubContext.Clients.Group("Dashboard").SendAsync(
+                "MetricUpdated",
+                new
+                {
+                    MetricName = metricName,
+                    Value = value,
+                    Tags = tags ?? new Dictionary<string, object>(),
                     Timestamp = DateTimeOffset.UtcNow
                 });
         }

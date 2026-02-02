@@ -1,0 +1,253 @@
+@using EvoAITest.Core.Models.Analytics
+
+<div class="task-summary-table">
+    @if (Tasks == null || !Tasks.Any())
+    {
+        <div class="empty-state">
+            <p>No tasks found</p>
+        </div>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Task Name</th>
+                    <th class="text-center">Executions</th>
+                    @if (ShowDuration)
+                    {
+                        <th class="text-center">Avg Duration</th>
+                    }
+                    else
+                    {
+                        <th class="text-center">Success Rate</th>
+                    }
+                    <th class="text-center">Last Executed</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var task in Tasks.Take(10))
+                {
+                    <tr>
+                        <td class="task-name">
+                            <span class="task-name-text" title="@task.TaskName">
+                                @TruncateName(task.TaskName)
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge badge-info">
+                                @task.ExecutionCount
+                            </span>
+                        </td>
+                        @if (ShowDuration)
+                        {
+                            <td class="text-center">
+                                <span class="duration">@FormatDuration(task.AverageDurationMs)</span>
+                            </td>
+                        }
+                        else
+                        {
+                            <td class="text-center">
+                                <span class="success-rate @GetSuccessRateClass(task.SuccessRate)">
+                                    @($"{task.SuccessRate:F1}%")
+                                </span>
+                            </td>
+                        }
+                        <td class="text-center text-muted">
+                            @if (task.LastExecutedAt.HasValue)
+                            {
+                                <span>@FormatTimeAgo(task.LastExecutedAt.Value)</span>
+                            }
+                            else
+                            {
+                                <span>-</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public required List<TaskExecutionSummary> Tasks { get; set; }
+
+    [Parameter]
+    public bool HighlightFailures { get; set; }
+
+    [Parameter]
+    public bool ShowDuration { get; set; }
+
+    private string TruncateName(string name)
+    {
+        if (name.Length <= 40)
+            return name;
+        
+        return name.Substring(0, 37) + "...";
+    }
+
+    private string GetSuccessRateClass(double successRate)
+    {
+        if (HighlightFailures)
+        {
+            return successRate switch
+            {
+                >= 95 => "text-success",
+                >= 80 => "text-warning",
+                _ => "text-danger font-weight-bold"
+            };
+        }
+        
+        return successRate switch
+        {
+            >= 95 => "text-success",
+            >= 80 => "text-warning",
+            _ => "text-danger"
+        };
+    }
+
+    private string FormatDuration(long milliseconds)
+    {
+        if (milliseconds < 1000)
+            return $"{milliseconds}ms";
+        
+        var seconds = milliseconds / 1000.0;
+        if (seconds < 60)
+            return $"{seconds:F1}s";
+        
+        var minutes = seconds / 60.0;
+        if (minutes < 60)
+            return $"{minutes:F1}m";
+        
+        var hours = minutes / 60.0;
+        return $"{hours:F1}h";
+    }
+
+    private string FormatTimeAgo(DateTimeOffset dateTime)
+    {
+        var timeSpan = DateTimeOffset.UtcNow - dateTime;
+        
+        if (timeSpan.TotalMinutes < 1)
+            return "Just now";
+        if (timeSpan.TotalMinutes < 60)
+            return $"{(int)timeSpan.TotalMinutes}m ago";
+        if (timeSpan.TotalHours < 24)
+            return $"{(int)timeSpan.TotalHours}h ago";
+        if (timeSpan.TotalDays < 7)
+            return $"{(int)timeSpan.TotalDays}d ago";
+        
+        return dateTime.ToLocalTime().ToString("MMM dd");
+    }
+}
+
+<style>
+    .task-summary-table {
+        overflow-x: auto;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+    }
+
+    .table {
+        width: 100%;
+        margin-bottom: 0;
+        border-collapse: collapse;
+    }
+
+    .table thead th {
+        background: #f8f9fa;
+        padding: 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .table tbody td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #dee2e6;
+        font-size: 0.875rem;
+    }
+
+    .table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .task-name {
+        font-weight: 600;
+    }
+
+    .task-name-text {
+        display: inline-block;
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-info {
+        background: #e7f3ff;
+        color: #0066cc;
+    }
+
+    .success-rate {
+        font-weight: 700;
+    }
+
+    .duration {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+    }
+
+    .text-center {
+        text-align: center;
+    }
+
+    .text-muted {
+        color: #6c757d;
+    }
+
+    .text-success {
+        color: #28a745;
+    }
+
+    .text-warning {
+        color: #ffc107;
+    }
+
+    .text-danger {
+        color: #dc3545;
+    }
+
+    .font-weight-bold {
+        font-weight: 700;
+    }
+
+    @@media (max-width: 768px) {
+        .table {
+            font-size: 0.75rem;
+        }
+
+        .table thead th,
+        .table tbody td {
+            padding: 0.5rem;
+        }
+
+        .task-name-text {
+            max-width: 150px;
+        }
+    }
+</style>

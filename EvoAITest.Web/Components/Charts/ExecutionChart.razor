@@ -1,0 +1,147 @@
+@using EvoAITest.Core.Models.Analytics
+
+<div class="execution-chart">
+    @if (DataPoints == null || !DataPoints.Any())
+    {
+        <div class="empty-chart">
+            <p>No data available</p>
+        </div>
+    }
+    else
+    {
+        <canvas id="@ChartId" height="@Height"></canvas>
+    }
+</div>
+
+@inject IJSRuntime JS
+
+@code {
+    [Parameter]
+    public required List<TimeSeriesDataPoint> DataPoints { get; set; }
+
+    [Parameter]
+    public string MetricType { get; set; } = "SuccessRate";
+
+    [Parameter]
+    public int Height { get; set; } = 300;
+
+    private string ChartId { get; set; } = $"chart-{Guid.NewGuid()}";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && DataPoints?.Any() == true)
+        {
+            await RenderChart();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DataPoints?.Any() == true)
+        {
+            await RenderChart();
+        }
+    }
+
+    private async Task RenderChart()
+    {
+        try
+        {
+            var labels = DataPoints.Select(d => d.Timestamp.ToLocalTime().ToString("HH:mm")).ToList();
+            var values = DataPoints.Select(d => GetValue(d)).ToList();
+
+            var chartData = new
+            {
+                labels,
+                datasets = new[]
+                {
+                    new
+                    {
+                        label = MetricType,
+                        data = values,
+                        borderColor = GetChartColor(),
+                        backgroundColor = GetChartBackgroundColor(),
+                        tension = 0.4,
+                        fill = true
+                    }
+                }
+            };
+
+            var options = new
+            {
+                responsive = true,
+                maintainAspectRatio = false,
+                plugins = new
+                {
+                    legend = new { display = false },
+                    tooltip = new
+                    {
+                        callbacks = new { }
+                    }
+                },
+                scales = new
+                {
+                    y = new
+                    {
+                        beginAtZero = true,
+                        max = MetricType == "SuccessRate" ? 100 : (object?)null
+                    }
+                }
+            };
+
+            await JS.InvokeVoidAsync("renderChart", ChartId, "line", chartData, options);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error rendering chart: {ex.Message}");
+        }
+    }
+
+    private double GetValue(TimeSeriesDataPoint dataPoint)
+    {
+        return MetricType switch
+        {
+            "SuccessRate" => dataPoint.SuccessRate,
+            "ExecutionCount" => dataPoint.ExecutionCount,
+            "AverageDuration" => dataPoint.AverageDurationMs,
+            _ => dataPoint.Value
+        };
+    }
+
+    private string GetChartColor()
+    {
+        return MetricType switch
+        {
+            "SuccessRate" => "rgb(40, 167, 69)",
+            "ExecutionCount" => "rgb(0, 102, 204)",
+            "AverageDuration" => "rgb(255, 193, 7)",
+            _ => "rgb(108, 117, 125)"
+        };
+    }
+
+    private string GetChartBackgroundColor()
+    {
+        return MetricType switch
+        {
+            "SuccessRate" => "rgba(40, 167, 69, 0.1)",
+            "ExecutionCount" => "rgba(0, 102, 204, 0.1)",
+            "AverageDuration" => "rgba(255, 193, 7, 0.1)",
+            _ => "rgba(108, 117, 125, 0.1)"
+        };
+    }
+}
+
+<style>
+    .execution-chart {
+        position: relative;
+        width: 100%;
+    }
+
+    .empty-chart {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 300px;
+        color: #6c757d;
+    }
+</style>

@@ -117,6 +117,9 @@ public static class ServiceCollectionExtensions
             // Register repositories
             services.TryAddScoped<IAutomationTaskRepository, AutomationTaskRepository>();
             services.TryAddScoped<IRecordingRepository, RecordingRepository>();
+
+            // Register analytics service
+            services.TryAddScoped<IAnalyticsService, AnalyticsService>();
         }
 
         // Register recording services (no DB dependency)

@@ -1,0 +1,181 @@
+<div class="metric-card @ColorClass">
+    <div class="metric-header">
+        <span class="metric-icon">@Icon</span>
+        <h3 class="metric-title">@Title</h3>
+    </div>
+    
+    <div class="metric-body">
+        <div class="metric-value">@Value</div>
+        
+        @if (!string.IsNullOrEmpty(SubValue))
+        {
+            <div class="metric-subvalue">@SubValue</div>
+        }
+        
+        @if (!string.IsNullOrEmpty(Trend))
+        {
+            <div class="metric-trend @TrendClass">
+                <span class="trend-arrow">@Trend</span>
+                <span class="trend-value">@TrendValue</span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? SubValue { get; set; }
+
+    [Parameter]
+    public string Icon { get; set; } = "📊";
+
+    [Parameter]
+    public string Color { get; set; } = "primary";
+
+    [Parameter]
+    public string? Trend { get; set; }
+
+    [Parameter]
+    public string? TrendValue { get; set; }
+
+    private string ColorClass => $"metric-card-{Color}";
+
+    private string TrendClass
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Trend))
+                return string.Empty;
+
+            return Trend switch
+            {
+                "↑" => "trend-up",
+                "↓" => "trend-down",
+                "→" => "trend-stable",
+                _ => string.Empty
+            };
+        }
+    }
+}
+
+<style>
+    .metric-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+        border-left: 4px solid;
+    }
+
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .metric-card-primary {
+        border-left-color: #0066cc;
+    }
+
+    .metric-card-success {
+        border-left-color: #28a745;
+    }
+
+    .metric-card-danger {
+        border-left-color: #dc3545;
+    }
+
+    .metric-card-warning {
+        border-left-color: #ffc107;
+    }
+
+    .metric-card-info {
+        border-left-color: #17a2b8;
+    }
+
+    .metric-card-secondary {
+        border-left-color: #6c757d;
+    }
+
+    .metric-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .metric-icon {
+        font-size: 2rem;
+    }
+
+    .metric-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 0;
+    }
+
+    .metric-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #212529;
+        line-height: 1;
+    }
+
+    .metric-subvalue {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+
+    .metric-trend {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .trend-up {
+        color: #28a745;
+    }
+
+    .trend-down {
+        color: #dc3545;
+    }
+
+    .trend-stable {
+        color: #6c757d;
+    }
+
+    .trend-arrow {
+        font-size: 1.25rem;
+    }
+
+    @@media (max-width: 768px) {
+        .metric-card {
+            padding: 1rem;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+        }
+
+        .metric-icon {
+            font-size: 1.5rem;
+        }
+    }
+</style>

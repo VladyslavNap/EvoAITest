@@ -39,6 +39,9 @@ builder.Services.AddSignalR();
 // Add analytics broadcast background service
 builder.Services.AddHostedService<EvoAITest.ApiService.Services.AnalyticsBroadcastService>();
 
+// Add execution tracking service for real-time analytics
+builder.Services.AddScoped<EvoAITest.ApiService.Services.ExecutionTrackingService>();
+
 // Add controllers for Visual Regression API
 builder.Services.AddControllers();
 
