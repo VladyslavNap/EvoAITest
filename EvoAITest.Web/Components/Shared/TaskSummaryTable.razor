@@ -85,7 +85,7 @@
         if (name.Length <= 40)
             return name;
         
-        return name.Substring(0, 37) + "...";
+        return name[..37] + "...";
     }
 
     private string GetSuccessRateClass(double successRate)

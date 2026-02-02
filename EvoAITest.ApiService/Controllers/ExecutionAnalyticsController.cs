@@ -12,6 +12,12 @@ namespace EvoAITest.ApiService.Controllers;
 [Produces("application/json")]
 public sealed class ExecutionAnalyticsController : ControllerBase
 {
+    // Response cache durations in seconds
+    private const int CacheDurationShort = 10;
+    private const int CacheDurationMedium = 30;
+    private const int CacheDurationLong = 60;
+    private const int CacheDurationExtended = 300;
+
     private readonly IAnalyticsService _analyticsService;
     private readonly ILogger<ExecutionAnalyticsController> _logger;
 
@@ -31,7 +37,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [HttpGet("dashboard")]
     [ProducesResponseType(typeof(DashboardAnalytics), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 10)] // Cache for 10 seconds
+    [ResponseCache(Duration = CacheDurationShort)]
     public async Task<ActionResult<DashboardAnalytics>> GetDashboardAnalytics(
         CancellationToken cancellationToken)
     {
@@ -87,7 +93,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [ProducesResponseType(typeof(List<TimeSeriesDataPoint>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 60)] // Cache for 60 seconds
+    [ResponseCache(Duration = CacheDurationLong)]
     public async Task<ActionResult<List<TimeSeriesDataPoint>>> GetTimeSeries(
         [FromQuery] MetricType metricType = MetricType.SuccessRate,
         [FromQuery] TimeInterval interval = TimeInterval.Hour,
@@ -171,7 +177,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [HttpGet("health")]
     [ProducesResponseType(typeof(SystemHealthMetrics), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 30)] // Cache for 30 seconds
+    [ResponseCache(Duration = CacheDurationMedium)]
     public async Task<ActionResult<SystemHealthMetrics>> GetSystemHealth(
         CancellationToken cancellationToken)
     {
@@ -199,7 +205,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [ProducesResponseType(typeof(List<TaskExecutionSummary>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 60)] // Cache for 60 seconds
+    [ResponseCache(Duration = CacheDurationLong)]
     public async Task<ActionResult<List<TaskExecutionSummary>>> GetTopExecutedTasks(
         [FromQuery] int count = 10,
         CancellationToken cancellationToken = default)
@@ -233,7 +239,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [ProducesResponseType(typeof(List<TaskExecutionSummary>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 60)] // Cache for 60 seconds
+    [ResponseCache(Duration = CacheDurationLong)]
     public async Task<ActionResult<List<TaskExecutionSummary>>> GetTopFailingTasks(
         [FromQuery] int count = 10,
         CancellationToken cancellationToken = default)
@@ -267,7 +273,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [ProducesResponseType(typeof(List<TaskExecutionSummary>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 60)] // Cache for 60 seconds
+    [ResponseCache(Duration = CacheDurationLong)]
     public async Task<ActionResult<List<TaskExecutionSummary>>> GetSlowestTasks(
         [FromQuery] int count = 10,
         CancellationToken cancellationToken = default)
@@ -299,7 +305,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [HttpGet("trends")]
     [ProducesResponseType(typeof(ExecutionTrends), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 300)] // Cache for 5 minutes
+    [ResponseCache(Duration = CacheDurationExtended)]
     public async Task<ActionResult<ExecutionTrends>> GetTrends(
         CancellationToken cancellationToken)
     {

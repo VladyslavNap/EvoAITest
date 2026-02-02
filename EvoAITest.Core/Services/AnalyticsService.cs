@@ -781,7 +781,9 @@ public sealed class AnalyticsService : IAnalyticsService
 
     private static TrendDirection DetermineTrend(double current, double previous)
     {
-        if (previous == 0)
+        const double epsilon = 1e-10;
+        
+        if (Math.Abs(previous) < epsilon)
         {
             return TrendDirection.Unknown;
         }
@@ -799,9 +801,11 @@ public sealed class AnalyticsService : IAnalyticsService
 
     private static double CalculateChangePercent(double current, double previous)
     {
-        if (previous == 0)
+        const double epsilon = 1e-10;
+        
+        if (Math.Abs(previous) < epsilon)
         {
-            return current > 0 ? 100 : 0;
+            return Math.Abs(current) > epsilon ? 100 : 0;
         }
 
         return (current - previous) / previous * 100;

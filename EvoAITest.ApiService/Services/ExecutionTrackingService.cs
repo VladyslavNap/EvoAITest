@@ -37,6 +37,9 @@ public sealed class ExecutionTrackingService
         string? targetUrl = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(taskName);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(totalSteps);
+
         try
         {
             var metrics = new ExecutionMetrics
@@ -81,6 +84,10 @@ public sealed class ExecutionTrackingService
         long durationMs,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(currentAction);
+        ArgumentOutOfRangeException.ThrowIfNegative(currentStep);
+        ArgumentOutOfRangeException.ThrowIfNegative(durationMs);
+
         try
         {
             await _analyticsService.UpdateExecutionProgressAsync(
@@ -124,6 +131,8 @@ public sealed class ExecutionTrackingService
         bool healingSuccessful = false,
         CancellationToken cancellationToken = default)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(durationMs);
+
         try
         {
             await _analyticsService.CompleteExecutionAsync(
@@ -172,6 +181,9 @@ public sealed class ExecutionTrackingService
         long durationMs,
         CancellationToken cancellationToken = default)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(stepNumber);
+        ArgumentOutOfRangeException.ThrowIfNegative(durationMs);
+
         try
         {
             // Get current metrics and update step counts
