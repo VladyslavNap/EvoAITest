@@ -1,0 +1,590 @@
+@page "/execution-dashboard"
+@using EvoAITest.Core.Models.Analytics
+@using Microsoft.AspNetCore.SignalR.Client
+@inject HttpClient HttpClient
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Execution Dashboard - EvoAITest</PageTitle>
+
+<div class="execution-dashboard">
+    <div class="dashboard-header">
+        <h1>⚡ Real-Time Execution Dashboard</h1>
+        <div class="header-actions">
+            <button class="btn btn-primary" @onclick="RefreshDashboard" disabled="@isLoading">
+                <span class="icon">🔄</span> @(isLoading ? "Loading..." : "Refresh")
+            </button>
+
+            @if (hubConnection?.State == HubConnectionState.Connected)
+            {
+                <span class="connection-status connected" title="Real-time updates active">
+                    🟢 Live
+                </span>
+            }
+            else
+            {
+                <span class="connection-status disconnected" title="Real-time updates inactive">
+                    🔴 Connecting...
+                </span>
+            }
+        </div>
+    </div>
+
+    @if (isLoading && dashboardData == null)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Loading dashboard data...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="alert alert-danger">
+            <h4>⚠️ Error Loading Dashboard</h4>
+            <p>@errorMessage</p>
+            <button class="btn btn-sm btn-secondary" @onclick="RefreshDashboard">Retry</button>
+        </div>
+    }
+    else if (dashboardData != null)
+    {
+        <!-- Key Performance Indicators -->
+        <div class="metrics-grid">
+            <MetricCard 
+                Title="Active Executions"
+                Value="@dashboardData.ActiveExecutionCount.ToString()"
+                Icon="🏃"
+                Color="info"
+                Trend="@GetTrend(dashboardData.Trends.ExecutionVolumeTrend)"
+                TrendValue="@($"{dashboardData.Trends.ExecutionVolumeChangePercent:F1}%")" />
+
+            <MetricCard 
+                Title="Success Rate (24h)"
+                Value="@($"{dashboardData.SuccessRateLast24Hours:F1}%")"
+                Icon="✅"
+                Color="@GetSuccessRateColor(dashboardData.SuccessRateLast24Hours)"
+                Trend="@GetTrend(dashboardData.Trends.SuccessRateTrend)"
+                TrendValue="@($"{dashboardData.Trends.SuccessRateChangePercent:F1}%")" />
+
+            <MetricCard 
+                Title="Avg Duration (24h)"
+                Value="@FormatDuration(dashboardData.AverageDurationMsLast24Hours)"
+                Icon="⏱️"
+                Color="primary"
+                Trend="@GetTrend(dashboardData.Trends.DurationTrend)"
+                TrendValue="@($"{dashboardData.Trends.DurationChangePercent:F1}%")" />
+
+            <MetricCard 
+                Title="Executions Today"
+                Value="@dashboardData.TotalExecutionsToday.ToString()"
+                Icon="📊"
+                Color="success"
+                SubValue="@($"{dashboardData.SuccessfulExecutionsToday} passed, {dashboardData.FailedExecutionsToday} failed")" />
+
+            <MetricCard 
+                Title="System Health"
+                Value="@dashboardData.SystemHealth.Status.ToString()"
+                Icon="@GetHealthIcon(dashboardData.SystemHealth.Status)"
+                Color="@GetHealthColor(dashboardData.SystemHealth.Status)"
+                SubValue="@($"{dashboardData.SystemHealth.UptimePercentage:F1}% uptime")" />
+
+            <MetricCard 
+                Title="Healing Success"
+                Value="@($"{dashboardData.HealingSuccessRate:F1}%")"
+                Icon="🔧"
+                Color="warning"
+                SubValue="@($"{dashboardData.TasksWithHealingEnabled} tasks")" />
+        </div>
+
+        <!-- Active Executions -->
+        @if (dashboardData.ActiveExecutions.Any())
+        {
+            <div class="section">
+                <h2>🏃 Active Executions</h2>
+                <ActiveExecutionsList Executions="@dashboardData.ActiveExecutions" />
+            </div>
+        }
+
+        <!-- Time Series Charts -->
+        <div class="charts-grid">
+            <div class="chart-container">
+                <h3>📈 Success Rate Trend (24 Hours)</h3>
+                <ExecutionChart 
+                    DataPoints="@dashboardData.TimeSeriesLast24Hours"
+                    MetricType="SuccessRate"
+                    Height="300" />
+            </div>
+
+            <div class="chart-container">
+                <h3>📊 Execution Volume (7 Days)</h3>
+                <ExecutionChart 
+                    DataPoints="@dashboardData.TimeSeriesLast7Days"
+                    MetricType="ExecutionCount"
+                    Height="300" />
+            </div>
+        </div>
+
+        <!-- Top Tasks Tables -->
+        <div class="tables-grid">
+            <div class="table-container">
+                <h3>🔥 Most Executed Tasks</h3>
+                <TaskSummaryTable Tasks="@dashboardData.TopExecutedTasks" />
+            </div>
+
+            <div class="table-container">
+                <h3>⚠️ Top Failing Tasks</h3>
+                <TaskSummaryTable Tasks="@dashboardData.TopFailingTasks" HighlightFailures="true" />
+            </div>
+
+            <div class="table-container">
+                <h3>🐌 Slowest Tasks</h3>
+                <TaskSummaryTable Tasks="@dashboardData.SlowestTasks" ShowDuration="true" />
+            </div>
+        </div>
+
+        <!-- System Health Details -->
+        <div class="section">
+            <h2>💚 System Health</h2>
+            <div class="health-details">
+                <div class="health-metric">
+                    <span class="label">Error Rate:</span>
+                    <span class="value @GetErrorRateClass(dashboardData.SystemHealth.ErrorRate)">
+                        @($"{dashboardData.SystemHealth.ErrorRate:F2}%")
+                    </span>
+                </div>
+                <div class="health-metric">
+                    <span class="label">Avg Response Time:</span>
+                    <span class="value">@FormatDuration(dashboardData.SystemHealth.AverageResponseTimeMs)</span>
+                </div>
+                <div class="health-metric">
+                    <span class="label">Consecutive Failures:</span>
+                    <span class="value @GetConsecutiveFailuresClass(dashboardData.SystemHealth.ConsecutiveFailures)">
+                        @dashboardData.SystemHealth.ConsecutiveFailures
+                    </span>
+                </div>
+            </div>
+
+            @if (dashboardData.SystemHealth.HealthMessages.Any())
+            {
+                <div class="health-messages">
+                    @foreach (var message in dashboardData.SystemHealth.HealthMessages)
+                    {
+                        <div class="health-message">
+                            <span class="icon">ℹ️</span>
+                            <span>@message</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="dashboard-footer">
+            <p class="text-muted">
+                Last updated: @dashboardData.CalculatedAt.ToLocalTime().ToString("HH:mm:ss")
+            </p>
+        </div>
+    }
+</div>
+
+@code {
+    private DashboardAnalytics? dashboardData;
+    private HubConnection? hubConnection;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private System.Threading.Timer? refreshTimer;
+    private readonly CancellationTokenSource _disposalCts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+        await InitializeSignalR();
+        StartAutoRefresh();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+            StateHasChanged();
+
+            var response = await HttpClient.GetAsync("api/execution-analytics/dashboard");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                dashboardData = await response.Content.ReadFromJsonAsync<DashboardAnalytics>();
+            }
+            else
+            {
+                errorMessage = $"Failed to load dashboard: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading dashboard: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task InitializeSignalR()
+    {
+        try
+        {
+            var hubUrl = Navigation.ToAbsoluteUri("/hubs/analytics");
+            
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(hubUrl)
+                .WithAutomaticReconnect()
+                .Build();
+
+            // Subscribe to dashboard updates
+            hubConnection.On<DashboardAnalytics>("DashboardAnalyticsUpdated", async (analytics) =>
+            {
+                dashboardData = analytics;
+                await InvokeAsync(StateHasChanged);
+            });
+
+            // Subscribe to execution events
+            hubConnection.On<object>("ExecutionStarted", async (data) =>
+            {
+                await RefreshDashboard();
+            });
+
+            hubConnection.On<object>("ExecutionCompleted", async (data) =>
+            {
+                await RefreshDashboard();
+            });
+
+            hubConnection.On<List<ActiveExecutionInfo>>("ActiveExecutionsUpdated", async (executions) =>
+            {
+                if (dashboardData != null)
+                {
+                    dashboardData.ActiveExecutions = executions;
+                    dashboardData.ActiveExecutionCount = executions.Count;
+                    await InvokeAsync(StateHasChanged);
+                }
+            });
+
+            await hubConnection.StartAsync();
+
+            // Subscribe to dashboard updates
+            await hubConnection.InvokeAsync("SubscribeToDashboard");
+            await hubConnection.InvokeAsync("SubscribeToMetrics");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR connection error: {ex.Message}");
+            errorMessage = $"Error connecting to live updates: {ex.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void StartAutoRefresh()
+    {
+        // Refresh every 30 seconds
+        refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            if (_disposalCts.Token.IsCancellationRequested)
+                return;
+
+            try
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadDashboardData();
+                });
+            }
+            catch (ObjectDisposedException)
+            {
+                // Component has been disposed, ignore
+            }
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task RefreshDashboard()
+    {
+        await LoadDashboardData();
+    }
+
+    private string GetTrend(TrendDirection direction)
+    {
+        return direction switch
+        {
+            TrendDirection.Up => "↑",
+            TrendDirection.Down => "↓",
+            TrendDirection.Stable => "→",
+            _ => ""
+        };
+    }
+
+    private string GetSuccessRateColor(double successRate)
+    {
+        return successRate switch
+        {
+            >= 95 => "success",
+            >= 80 => "warning",
+            _ => "danger"
+        };
+    }
+
+    private string GetHealthIcon(HealthStatus status)
+    {
+        return status switch
+        {
+            HealthStatus.Healthy => "💚",
+            HealthStatus.Degraded => "💛",
+            HealthStatus.Unhealthy => "❤️",
+            _ => "❓"
+        };
+    }
+
+    private string GetHealthColor(HealthStatus status)
+    {
+        return status switch
+        {
+            HealthStatus.Healthy => "success",
+            HealthStatus.Degraded => "warning",
+            HealthStatus.Unhealthy => "danger",
+            _ => "secondary"
+        };
+    }
+
+    private string GetErrorRateClass(double errorRate)
+    {
+        if (errorRate < 5)
+            return "text-success";
+        if (errorRate < 15)
+            return "text-warning";
+        return "text-danger";
+    }
+
+    private string GetConsecutiveFailuresClass(int failures)
+    {
+        if (failures == 0)
+            return "text-success";
+        if (failures < 3)
+            return "text-warning";
+        return "text-danger";
+    }
+
+    private string FormatDuration(long milliseconds)
+    {
+        if (milliseconds < 1000)
+            return $"{milliseconds}ms";
+        
+        var seconds = milliseconds / 1000.0;
+        if (seconds < 60)
+            return $"{seconds:F1}s";
+        
+        var minutes = seconds / 60.0;
+        return $"{minutes:F1}m";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposalCts.Cancel();
+        
+        refreshTimer?.Dispose();
+        
+        if (hubConnection != null)
+        {
+            try
+            {
+                await hubConnection.InvokeAsync("UnsubscribeFromDashboard");
+                await hubConnection.InvokeAsync("UnsubscribeFromMetrics");
+                await hubConnection.DisposeAsync();
+            }
+            catch (Exception)
+            {
+                // Ignore exceptions during disposal
+            }
+        }
+        
+        _disposalCts.Dispose();
+    }
+}
+
+<style>
+    .execution-dashboard {
+        padding: 2rem;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .connection-status {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .connection-status.connected {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .connection-status.disconnected {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .chart-container {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .chart-container h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.25rem;
+    }
+
+    .tables-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .table-container {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .table-container h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.25rem;
+    }
+
+    .section {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+    }
+
+    .section h2 {
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        font-size: 1.5rem;
+    }
+
+    .health-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .health-metric {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .health-metric .label {
+        font-weight: 600;
+        color: #6c757d;
+    }
+
+    .health-metric .value {
+        font-weight: 700;
+    }
+
+    .health-messages {
+        margin-top: 1rem;
+    }
+
+    .health-message {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        background: #e7f3ff;
+        border-left: 4px solid #0066cc;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+    }
+
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+    }
+
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #0066cc;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .dashboard-footer {
+        text-align: center;
+        padding: 1rem;
+        color: #6c757d;
+    }
+
+    @@media (max-width: 768px) {
+        .metrics-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .tables-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

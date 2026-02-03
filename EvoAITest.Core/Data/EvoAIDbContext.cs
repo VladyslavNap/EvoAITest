@@ -111,6 +111,16 @@ public sealed class EvoAIDbContext : DbContext
     public DbSet<EvoAITest.Core.Models.Accessibility.AccessibilityReport> AccessibilityReports => Set<EvoAITest.Core.Models.Accessibility.AccessibilityReport>();
 
     /// <summary>
+    /// Gets or sets the ExecutionMetrics DbSet for real-time analytics.
+    /// </summary>
+    public DbSet<ExecutionMetrics> ExecutionMetrics => Set<ExecutionMetrics>();
+
+    /// <summary>
+    /// Gets or sets the TimeSeriesData DbSet for historical trend analysis.
+    /// </summary>
+    public DbSet<TimeSeriesDataPoint> TimeSeriesData => Set<TimeSeriesDataPoint>();
+
+    /// <summary>
     /// Configures the database model using the specified model builder.
     /// </summary>
     /// <param name="modelBuilder">The model builder to use.</param>

@@ -1,0 +1,224 @@
+@using EvoAITest.Core.Models.Analytics
+
+<div class="active-executions-list">
+    @if (!Executions.Any())
+    {
+        <div class="empty-state">
+            <span class="icon">💤</span>
+            <p>No active executions</p>
+        </div>
+    }
+    else
+    {
+        <div class="executions-grid">
+            @foreach (var execution in Executions)
+            {
+                <div class="execution-card">
+                    <div class="execution-header">
+                        <h4 class="execution-name">@execution.TaskName</h4>
+                        <span class="execution-time">@FormatDuration(execution.DurationMs)</span>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(execution.TargetUrl))
+                    {
+                        <div class="execution-url">
+                            <span class="icon">🌐</span>
+                            <span class="url">@TruncateUrl(execution.TargetUrl)</span>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(execution.CurrentAction))
+                    {
+                        <div class="execution-action">
+                            <span class="icon">⚡</span>
+                            <span>@execution.CurrentAction</span>
+                        </div>
+                    }
+
+                    <div class="execution-progress">
+                        <div class="progress-info">
+                            <span>Step @execution.CurrentStep of @execution.TotalSteps</span>
+                            <span class="percentage">@($"{execution.CompletionPercentage:F0}%")</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" style="width: @($"{execution.CompletionPercentage}%")"></div>
+                        </div>
+                    </div>
+
+                    <div class="execution-meta">
+                        <span class="started-at">
+                            Started: @execution.StartedAt.ToLocalTime().ToString("HH:mm:ss")
+                        </span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public required List<ActiveExecutionInfo> Executions { get; set; }
+
+    private string FormatDuration(long milliseconds)
+    {
+        if (milliseconds < 1000)
+            return $"{milliseconds}ms";
+        
+        var seconds = milliseconds / 1000.0;
+        if (seconds < 60)
+            return $"{seconds:F1}s";
+        
+        var minutes = seconds / 60.0;
+        return $"{minutes:F1}m";
+    }
+
+    private string TruncateUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url))
+            return string.Empty;
+
+        const int maxLength = 50;
+        const int ellipsisLength = 3;
+
+        if (url.Length <= maxLength)
+            return url;
+
+        int substringLength = Math.Max(0, maxLength - ellipsisLength);
+
+        return url.Length > substringLength
+            ? url[..substringLength] + "..."
+            : url;
+    }
+}
+
+<style>
+    .active-executions-list {
+        min-height: 200px;
+    }
+
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+
+    .empty-state .icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .executions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 1rem;
+    }
+
+    .execution-card {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        transition: box-shadow 0.2s;
+    }
+
+    .execution-card:hover {
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .execution-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .execution-name {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0;
+        color: #212529;
+    }
+
+    .execution-time {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #0066cc;
+        background: #e7f3ff;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+    }
+
+    .execution-url,
+    .execution-action {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-bottom: 0.5rem;
+    }
+
+    .execution-url .url {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .execution-progress {
+        margin: 1rem 0;
+    }
+
+    .progress-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+        color: #495057;
+    }
+
+    .percentage {
+        font-weight: 700;
+        color: #0066cc;
+    }
+
+    .progress-bar-container {
+        height: 8px;
+        background: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #0066cc 0%, #0099ff 100%);
+        transition: width 0.3s ease;
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.8;
+        }
+    }
+
+    .execution-meta {
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #dee2e6;
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+
+    @@media (max-width: 768px) {
+        .executions-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

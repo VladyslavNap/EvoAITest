@@ -142,6 +142,32 @@ Automated screenshot comparison with AI-powered healing.
 
 ---
 
+### 📊 Real-Time Dashboard Analytics
+
+Live monitoring and analytics for test execution with real-time insights.
+
+- **Real-Time Updates** - SignalR-powered live dashboard
+- **Execution Metrics** - Active tasks, success rates, duration trends
+- **System Health** - Error rates, uptime, consecutive failures
+- **Time Series Analysis** - Historical trends with hourly/daily aggregations
+- **Performance Insights** - Top executed/failing/slowest tasks
+- **Mobile Responsive** - Monitor from any device
+
+**Features:**
+- 🏃 **Active Execution Tracking** - Watch tasks in real-time with progress bars
+- 📈 **Success Rate Trends** - 24-hour and 7-day trend visualization
+- ⚡ **Performance Metrics** - Average duration, throughput analysis
+- 🔧 **Healing Analytics** - Self-healing success rates and patterns
+- 💚 **System Health** - Real-time health monitoring with alerts
+
+**Dashboard Views:**
+- `/execution-dashboard` - Real-time execution monitoring
+- `/analytics/dashboard` - Test analytics and flaky test detection
+
+**📖 Learn more:** [Dashboard Analytics Guide](docs/DASHBOARD_ANALYTICS.md)
+
+---
+
 ### 🔐 Enterprise Ready
 
 Production-ready features for enterprise deployments.
@@ -163,8 +189,9 @@ Production-ready features for enterprise deployments.
 | [**Documentation Index**](DOCUMENTATION_INDEX.md) | Central hub for all documentation |
 | [Test Recording Quick Start](docs/RECORDING_QUICK_START.md) | Get started with test recording in 5 minutes |
 | [Visual Regression Quick Start](docs/VisualRegressionQuickStart.md) | Set up visual testing in 10 minutes |
+| [Dashboard Analytics Guide](docs/DASHBOARD_ANALYTICS.md) | Real-time monitoring and analytics |
 | [LLM Integration Guide](docs/LLM_INTEGRATION_GUIDE.md) | Complete guide to LLM integration |
-| [API Reference](docs/API_REFERENCE.md) | REST API documentation (13 endpoints) |
+| [API Reference](docs/API_REFERENCE.md) | REST API documentation (24+ endpoints) |
 | [Architecture](docs/ARCHITECTURE.md) | Technical architecture details |
 
 **📖 [Browse all documentation](DOCUMENTATION_INDEX.md)**
@@ -176,12 +203,12 @@ Production-ready features for enterprise deployments.
 ```
 ┌─────────────────────────────────────────────┐
 │           Blazor Web UI                     │
-│     (Recording, Monitoring, Control)        │
+│  (Recording, Monitoring, Dashboard, Control)│
 └──────────────────┬──────────────────────────┘
                    │
 ┌──────────────────┴──────────────────────────┐
 │            REST API Service                 │
-│    (Recording, Execution, Visual Testing)   │
+│  (Recording, Execution, Visual, Analytics)  │
 └──────────────────┬──────────────────────────┘
                    │
 ┌──────────────────┴──────────────────────────┐
@@ -191,7 +218,7 @@ Production-ready features for enterprise deployments.
                    │
 ┌──────────────────┴──────────────────────────┐
 │         Browser Automation Core             │
-│      (Playwright, Recording, Analysis)      │
+│  (Playwright, Recording, Analysis, Metrics) │
 └─────────────────────────────────────────────┘
 ```
 
@@ -210,24 +237,28 @@ Production-ready features for enterprise deployments.
 ### For QA Engineers
 - Record manual test flows and generate automated tests
 - Set up visual regression testing for UI changes
-- Monitor test execution with built-in observability
+- Monitor test execution with real-time dashboard analytics
+- Track success rates and identify flaky tests
+- Analyze performance trends and bottlenecks
 
 ### For Developers
 - Use natural language to automate browser tasks
 - Integrate AI-powered automation into CI/CD pipelines
 - Leverage self-healing capabilities to reduce maintenance
+- Monitor system health in real-time
 
 ### For DevOps
 - Deploy with Azure Aspire for cloud-native orchestration
 - Secure secrets with Azure Key Vault
 - Monitor with OpenTelemetry metrics and traces
+- Track execution metrics and system performance
 
 ---
 
 ## 🛠️ Technology Stack
 
 - **.NET 10** - Latest C# and runtime features
-- **Blazor** - Interactive web UI
+- **Blazor** - Interactive web UI with SignalR
 - **Playwright** - Cross-browser automation
 - **Azure OpenAI** - GPT-4 for AI capabilities
 - **Ollama** - Local open-source models
@@ -235,6 +266,7 @@ Production-ready features for enterprise deployments.
 - **SQL Server** - Data persistence
 - **Azure Aspire** - Cloud-native orchestration
 - **OpenTelemetry** - Observability
+- **SignalR** - Real-time web communication
 
 ---
 
@@ -243,8 +275,8 @@ Production-ready features for enterprise deployments.
 - **Build:** Passing ✅
 - **Tests:** Passing ✅
 - **Coverage:** 90%+ ✅
-- **Version:** 1.0.0 (Recording Feature)
-- **Last Updated:** January 2026
+- **Version:** 1.1.0 (Dashboard Analytics)
+- **Last Updated:** January 2025
 
 ---
 

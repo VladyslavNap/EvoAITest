@@ -1,13 +1,13 @@
 # EvoAITest Documentation Index
 
-**Version:** 1.0  
-**Last Updated:** January 2026
+**Version:** 1.1  
+**Last Updated:** January 2025
 
-> ?? Central hub for all EvoAITest documentation and guides
+> 📚 Central hub for all EvoAITest documentation and guides
 
 ---
 
-## ?? Quick Start Guides
+## 🚀 Quick Start Guides
 
 Start here if you're new to EvoAITest:
 
@@ -16,13 +16,14 @@ Start here if you're new to EvoAITest:
 | [**Main README**](README.md) | Project overview, architecture, and setup | 10 min |
 | [**Test Recording Quick Start**](docs/RECORDING_QUICK_START.md) | Record browser interactions and generate test code | 5 min |
 | [**Visual Regression Quick Start**](docs/VisualRegressionQuickStart.md) | Set up visual regression testing | 10 min |
+| [**Dashboard Analytics Guide**](docs/DASHBOARD_ANALYTICS.md) | Real-time monitoring and analytics | 15 min |
 | [**Login Example**](examples/LoginExample/README.md) | Complete working example with natural language automation | 15 min |
 
 ---
 
-## ?? Core Features
+## ✨ Core Features
 
-### ?? Test Recording & Generation
+### 🎬 Test Recording & Generation
 
 AI-powered test generation from recorded browser interactions:
 
@@ -30,20 +31,45 @@ AI-powered test generation from recorded browser interactions:
 |----------|-------------|
 | [**Feature Guide**](docs/RECORDING_FEATURE.md) | Complete feature documentation, architecture, and usage |
 | [**Quick Start**](docs/RECORDING_QUICK_START.md) | 5-minute setup and first recording |
-| [**API Reference**](docs/API_REFERENCE.md) | All 13 REST endpoints documented |
+| [**API Reference**](docs/API_REFERENCE.md) | All 24+ REST endpoints documented |
 | [**Architecture**](docs/ARCHITECTURE.md) | Technical implementation details |
 | [**Changelog**](docs/RECORDING_CHANGELOG.md) | Release notes and version history |
 
 **Key Capabilities:**
-- ? Record 15 action types (Click, Input, Navigation, etc.)
-- ? AI intent detection with 90%+ accuracy
-- ? Generate tests for xUnit, NUnit, MSTest
-- ? 16 assertion types auto-generated
-- ? Optional Page Object Model generation
+- 🎥 Record 15 action types (Click, Input, Navigation, etc.)
+- 🤖 AI intent detection with 90%+ accuracy
+- 🧪 Generate tests for xUnit, NUnit, MSTest
+- ✅ 16 assertion types auto-generated
+- 📦 Optional Page Object Model generation
 
 ---
 
-### ?? LLM Integration
+### 📊 Dashboard Analytics **NEW!**
+
+Real-time monitoring and performance analytics:
+
+| Document | Description |
+|----------|-------------|
+| [**Dashboard Analytics Guide**](docs/DASHBOARD_ANALYTICS.md) | Complete feature guide with examples |
+| [**API Reference**](docs/API_REFERENCE.md) | 11 new analytics endpoints |
+| [**Changelog**](CHANGELOG.md) | Version 1.1.0 release notes |
+
+**Key Capabilities:**
+- 🏃 Real-time execution tracking with progress bars
+- 📈 Success rate trends (hourly/daily)
+- ⚡ Performance metrics and duration analysis
+- 🔧 Self-healing analytics
+- 💚 System health monitoring
+- 📋 Top executed/failing/slowest tasks
+- 🔄 SignalR live updates
+
+**Dashboard Views:**
+- `/execution-dashboard` - Real-time execution monitoring
+- `/analytics/dashboard` - Test analytics and flaky tests
+
+---
+
+### 🤖 LLM Integration
 
 Intelligent multi-model routing and AI provider management:
 
@@ -60,15 +86,15 @@ Intelligent multi-model routing and AI provider management:
 - [LLM Routing Complete Guide](docs/LLM_ROUTING_COMPLETE_GUIDE.md) - Alternative comprehensive guide
 
 **Key Capabilities:**
-- ? Intelligent task-based routing
-- ? Circuit breaker with automatic failover
-- ? Azure OpenAI + Ollama support
-- ? Azure Key Vault integration
-- ? Cost optimization (40-60% reduction)
+- 🎯 Intelligent task-based routing
+- 🔄 Circuit breaker with automatic failover
+- ☁️ Azure OpenAI + Ollama support
+- 🔐 Azure Key Vault integration
+- 💰 Cost optimization (40-60% reduction)
 
 ---
 
-### ?? Visual Regression Testing
+### 📸 Visual Regression Testing
 
 Automated screenshot comparison with AI-powered healing:
 
@@ -78,14 +104,14 @@ Automated screenshot comparison with AI-powered healing:
 | [**User Guide**](docs/VisualRegressionUserGuide.md) | Complete feature documentation |
 
 **Key Capabilities:**
-- ? Automated screenshot capture
-- ? Pixel-perfect comparison
-- ? AI-powered healing
-- ? Diff visualization
+- 📸 Automated screenshot capture
+- 🔍 Pixel-perfect comparison
+- 🤖 AI-powered healing
+- 🎨 Diff visualization
 
 ---
 
-### ?? Browser Automation
+### 🌐 Browser Automation
 
 Playwright-based automation agents:
 
@@ -96,8 +122,8 @@ Playwright-based automation agents:
 | [**Prompts README**](EvoAITest.LLM/Prompts/README.md) | Prompt builder toolkit |
 
 **Key Capabilities:**
-- ? 25 built-in browser tools
-- ? Natural language commands
+- 🛠️ 25 built-in browser tools
+- 💬 Natural language commands
 - ? Self-healing capabilities
 - ? Mobile device emulation
 - ? Network interception
