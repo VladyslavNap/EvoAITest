@@ -75,10 +75,20 @@
 
     private string TruncateUrl(string url)
     {
-        if (url.Length <= 50)
+        if (string.IsNullOrEmpty(url))
+            return string.Empty;
+
+        const int maxLength = 50;
+        const int ellipsisLength = 3;
+
+        if (url.Length <= maxLength)
             return url;
-        
-        return url.Substring(0, 47) + "...";
+
+        int substringLength = Math.Max(0, maxLength - ellipsisLength);
+
+        return url.Length > substringLength
+            ? url[..substringLength] + "..."
+            : url;
     }
 }
 

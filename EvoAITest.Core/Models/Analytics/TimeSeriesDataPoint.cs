@@ -236,7 +236,9 @@ public static class TimeSeriesExtensions
                 timestamp.Hour, 0, 0, timestamp.Offset),
             TimeInterval.Day => new DateTimeOffset(timestamp.Year, timestamp.Month, timestamp.Day,
                 0, 0, 0, timestamp.Offset),
-            TimeInterval.Week => timestamp.AddDays(-(int)timestamp.DayOfWeek).Date,
+            TimeInterval.Week => new DateTimeOffset(
+                timestamp.AddDays(-(int)timestamp.DayOfWeek).Date,
+                timestamp.Offset),
             TimeInterval.Month => new DateTimeOffset(timestamp.Year, timestamp.Month, 1,
                 0, 0, 0, timestamp.Offset),
             _ => timestamp

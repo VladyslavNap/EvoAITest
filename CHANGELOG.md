@@ -192,13 +192,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 3. **Add Chart.js to Your Layout**
    
-   Add to `_Host.cshtml` or `App.razor`:
+   Add to `_Host.cshtml` or `App.razor` (before closing `</body>` tag):
    ```html
-   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+   <!-- Note: Verify the SRI hash from https://www.srihash.org/ or the CDN provider -->
+   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" 
+           crossorigin="anonymous"></script>
    <script>
+     const chartInstances = {};
+     
      function renderChart(canvasId, type, data, options) {
        const ctx = document.getElementById(canvasId);
-       new Chart(ctx, { type, data, options });
+       if (!ctx) return;
+       
+       // Destroy existing chart if it exists
+       if (chartInstances[canvasId]) {
+         chartInstances[canvasId].destroy();
+       }
+       
+       chartInstances[canvasId] = new Chart(ctx, { type, data, options });
+     }
+     
+     function destroyChart(canvasId) {
+       if (chartInstances[canvasId]) {
+         chartInstances[canvasId].destroy();
+         delete chartInstances[canvasId];
+       }
      }
    </script>
    ```

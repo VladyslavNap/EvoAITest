@@ -490,6 +490,48 @@ public sealed class AnalyticsService : IAnalyticsService
         }
     }
 
+    public async Task UpdateStepCountsAsync(
+        Guid taskId,
+        bool success,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var activeMetric = await _dbContext.ExecutionMetrics
+                .Where(m => m.TaskId == taskId && m.IsActive)
+                .OrderByDescending(m => m.RecordedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (activeMetric == null)
+            {
+                _logger.LogWarning("No active execution metric found for Task {TaskId}", taskId);
+                return;
+            }
+
+            if (success)
+            {
+                activeMetric.StepsCompleted++;
+            }
+            else
+            {
+                activeMetric.StepsFailed++;
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogDebug(
+                "Updated step counts for Task {TaskId}: Completed={StepsCompleted}, Failed={StepsFailed}",
+                taskId,
+                activeMetric.StepsCompleted,
+                activeMetric.StepsFailed);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update step counts for Task {TaskId}", taskId);
+            // Don't throw - step counting is non-critical
+        }
+    }
+
     public async Task<SystemHealthMetrics> GetSystemHealthAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -781,7 +823,9 @@ public sealed class AnalyticsService : IAnalyticsService
 
     private static TrendDirection DetermineTrend(double current, double previous)
     {
-        if (previous == 0)
+        const double epsilon = 1e-10;
+        
+        if (Math.Abs(previous) < epsilon)
         {
             return TrendDirection.Unknown;
         }
@@ -799,9 +843,11 @@ public sealed class AnalyticsService : IAnalyticsService
 
     private static double CalculateChangePercent(double current, double previous)
     {
-        if (previous == 0)
+        const double epsilon = 1e-10;
+        
+        if (Math.Abs(previous) < epsilon)
         {
-            return current > 0 ? 100 : 0;
+            return Math.Abs(current) > epsilon ? 100 : 0;
         }
 
         return (current - previous) / previous * 100;

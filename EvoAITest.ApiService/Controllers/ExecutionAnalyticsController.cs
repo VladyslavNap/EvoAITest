@@ -12,6 +12,12 @@ namespace EvoAITest.ApiService.Controllers;
 [Produces("application/json")]
 public sealed class ExecutionAnalyticsController : ControllerBase
 {
+    // Response cache durations in seconds
+    private const int CacheDurationShort = 10;
+    private const int CacheDurationMedium = 30;
+    private const int CacheDurationLong = 60;
+    private const int CacheDurationExtended = 300;
+
     private readonly IAnalyticsService _analyticsService;
     private readonly ILogger<ExecutionAnalyticsController> _logger;
 
@@ -31,7 +37,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [HttpGet("dashboard")]
     [ProducesResponseType(typeof(DashboardAnalytics), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 10)] // Cache for 10 seconds
+    [ResponseCache(Duration = CacheDurationShort)]
     public async Task<ActionResult<DashboardAnalytics>> GetDashboardAnalytics(
         CancellationToken cancellationToken)
     {
@@ -87,7 +93,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [ProducesResponseType(typeof(List<TimeSeriesDataPoint>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 60)] // Cache for 60 seconds
+    [ResponseCache(Duration = CacheDurationLong)]
     public async Task<ActionResult<List<TimeSeriesDataPoint>>> GetTimeSeries(
         [FromQuery] MetricType metricType = MetricType.SuccessRate,
         [FromQuery] TimeInterval interval = TimeInterval.Hour,
@@ -171,7 +177,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [HttpGet("health")]
     [ProducesResponseType(typeof(SystemHealthMetrics), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 30)] // Cache for 30 seconds
+    [ResponseCache(Duration = CacheDurationMedium)]
     public async Task<ActionResult<SystemHealthMetrics>> GetSystemHealth(
         CancellationToken cancellationToken)
     {
@@ -199,7 +205,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [ProducesResponseType(typeof(List<TaskExecutionSummary>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 60)] // Cache for 60 seconds
+    [ResponseCache(Duration = CacheDurationLong)]
     public async Task<ActionResult<List<TaskExecutionSummary>>> GetTopExecutedTasks(
         [FromQuery] int count = 10,
         CancellationToken cancellationToken = default)
@@ -233,7 +239,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [ProducesResponseType(typeof(List<TaskExecutionSummary>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 60)] // Cache for 60 seconds
+    [ResponseCache(Duration = CacheDurationLong)]
     public async Task<ActionResult<List<TaskExecutionSummary>>> GetTopFailingTasks(
         [FromQuery] int count = 10,
         CancellationToken cancellationToken = default)
@@ -267,7 +273,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [ProducesResponseType(typeof(List<TaskExecutionSummary>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 60)] // Cache for 60 seconds
+    [ResponseCache(Duration = CacheDurationLong)]
     public async Task<ActionResult<List<TaskExecutionSummary>>> GetSlowestTasks(
         [FromQuery] int count = 10,
         CancellationToken cancellationToken = default)
@@ -299,7 +305,7 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     [HttpGet("trends")]
     [ProducesResponseType(typeof(ExecutionTrends), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    [ResponseCache(Duration = 300)] // Cache for 5 minutes
+    [ResponseCache(Duration = CacheDurationExtended)]
     public async Task<ActionResult<ExecutionTrends>> GetTrends(
         CancellationToken cancellationToken)
     {
@@ -320,32 +326,39 @@ public sealed class ExecutionAnalyticsController : ControllerBase
     /// <summary>
     /// Triggers calculation of time series data points.
     /// This is typically called by a background job but can be manually triggered.
+    /// The method returns immediately while the calculation runs asynchronously in the background.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Accepted status with calculation initiated message.</returns>
     [HttpPost("calculate-time-series")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> CalculateTimeSeries(
+    public IActionResult CalculateTimeSeries(
         CancellationToken cancellationToken)
     {
         try
         {
             _logger.LogInformation("Starting time series calculation");
             
-            // Run in background without waiting
+            // Fire-and-forget: Run in background without waiting - use a separate CancellationToken to avoid request cancellation affecting the background task
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await _analyticsService.CalculateTimeSeriesAsync(cancellationToken);
+                    // Create a new CancellationTokenSource for the background operation
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+                    await _analyticsService.CalculateTimeSeriesAsync(cts.Token);
                     _logger.LogInformation("Time series calculation completed successfully");
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogWarning("Time series calculation was cancelled");
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Time series calculation failed in background");
                 }
-            }, cancellationToken);
+            }, CancellationToken.None); // Don't link to request cancellation token
 
             return Accepted(new { message = "Time series calculation started" });
         }

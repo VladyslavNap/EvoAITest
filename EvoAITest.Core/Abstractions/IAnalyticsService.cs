@@ -1,3 +1,4 @@
+using EvoAITest.Core.Models;
 using EvoAITest.Core.Models.Analytics;
 
 namespace EvoAITest.Core.Abstractions;
@@ -93,6 +94,17 @@ public interface IAnalyticsService
         int currentStep,
         string currentAction,
         long durationMs,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates step counts (completed/failed) for an active execution.
+    /// </summary>
+    /// <param name="taskId">The task ID.</param>
+    /// <param name="success">Whether the step succeeded.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task UpdateStepCountsAsync(
+        Guid taskId,
+        bool success,
         CancellationToken cancellationToken = default);
 
     /// <summary>

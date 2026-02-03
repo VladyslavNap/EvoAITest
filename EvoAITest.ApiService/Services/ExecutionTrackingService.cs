@@ -37,6 +37,9 @@ public sealed class ExecutionTrackingService
         string? targetUrl = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(taskName);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(totalSteps);
+
         try
         {
             var metrics = new ExecutionMetrics
@@ -81,6 +84,10 @@ public sealed class ExecutionTrackingService
         long durationMs,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(currentAction);
+        ArgumentOutOfRangeException.ThrowIfNegative(currentStep);
+        ArgumentOutOfRangeException.ThrowIfNegative(durationMs);
+
         try
         {
             await _analyticsService.UpdateExecutionProgressAsync(
@@ -124,6 +131,8 @@ public sealed class ExecutionTrackingService
         bool healingSuccessful = false,
         CancellationToken cancellationToken = default)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(durationMs);
+
         try
         {
             await _analyticsService.CompleteExecutionAsync(
@@ -172,25 +181,13 @@ public sealed class ExecutionTrackingService
         long durationMs,
         CancellationToken cancellationToken = default)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(stepNumber);
+        ArgumentOutOfRangeException.ThrowIfNegative(durationMs);
+
         try
         {
-            // Get current metrics and update step counts
-            var metrics = await _analyticsService.GetTaskMetricsAsync(taskId, includeInactive: false, cancellationToken);
-            var currentMetric = metrics.FirstOrDefault();
-
-            if (currentMetric != null)
-            {
-                if (success)
-                {
-                    currentMetric.StepsCompleted++;
-                }
-                else
-                {
-                    currentMetric.StepsFailed++;
-                }
-
-                await _analyticsService.RecordMetricsAsync(currentMetric, cancellationToken);
-            }
+            // Update step counts in the existing active metric record
+            await _analyticsService.UpdateStepCountsAsync(taskId, success, cancellationToken);
 
             _logger.LogDebug(
                 "Step {StepNumber} completed for Task {TaskId}: Success={Success}, Duration={DurationMs}ms",
